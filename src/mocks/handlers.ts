@@ -4,6 +4,7 @@ import { HttpResponse, sse } from "msw";
 import type { EventType } from "@/api/event-types";
 import type { components } from "@/api/schema.gen";
 import { CATALOG, coverSvg, summary, withinCeiling } from "./catalog";
+import { continueChapter, seriesChapters, unifiedChapters } from "./chapters";
 import { health, systemInfo } from "./data";
 import { commit, currentUser, db, type MockInvite, newId } from "./db";
 import { emit, onMockEvent } from "./events";
@@ -1016,6 +1017,129 @@ export const operations: MockOperation[] = [
     emit("work.updated", { work_id: workId });
     commit();
     return rejected ? json(rejected) : problem(404, "not_found", "Not found");
+  }),
+
+  // Chapters
+
+  op("get", "/works/{work_id}/chapters", ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const workId = String(params.work_id);
+    if (!workView(user, workId)) return problem(404, "not_found", "Not found");
+    const chapters = unifiedChapters(db(), workId, user.id).map((c) => c.chapter);
+    if (new URL(request.url).searchParams.get("order") === "desc") chapters.reverse();
+    return json<S["ChapterList"]>({ chapters });
+  }),
+
+  op("get", "/works/{work_id}/chapters/{chapter_id}", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const found = unifiedChapters(db(), String(params.work_id), user.id).find(
+      (c) => c.chapter.id === params.chapter_id,
+    );
+    return found ? json<S["ChapterDetail"]>(found) : problem(404, "not_found", "Not found");
+  }),
+
+  op("put", "/works/{work_id}/chapters/{chapter_id}/pin", async ({ params, request }) => {
+    const user = requireMatcher();
+    if (user instanceof Response) return user;
+    const workId = String(params.work_id);
+    const chapterId = String(params.chapter_id);
+    const { variant_id } = (await request.json()) as S["PinVariantRequest"];
+    const d = db();
+    d.pins[workId] ??= {};
+    const pins = d.pins[workId];
+    if (variant_id) pins[chapterId] = variant_id;
+    else delete pins[chapterId];
+    const found = unifiedChapters(d, workId, user.id).find((c) => c.chapter.id === chapterId);
+    if (!found) return problem(404, "not_found", "Not found");
+    if (variant_id && !found.variants.some((v) => v.id === variant_id))
+      return problem(400, "invalid_request", "Unknown copy");
+    emit("work.updated", { work_id: workId });
+    commit();
+    return json<S["ChapterDetail"]>(found);
+  }),
+
+  op("get", "/works/{work_id}/series/{series_id}/chapters", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const list = seriesChapters(db(), String(params.work_id), String(params.series_id));
+    return list ? json(list) : problem(404, "not_found", "Not found");
+  }),
+
+  op("post", "/works/{work_id}/refresh", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const workId = String(params.work_id);
+    const d = db();
+    const attached = (d.matching[workId] ?? []).filter((r) => r.attached).length;
+    // The check "finds" the newest chapter again, so the new badge can be seen.
+    const newest = unifiedChapters(d, workId, user.id)
+      .filter((c) => !c.chapter.extra)
+      .at(-1);
+    if (newest) {
+      for (const entry of d.library.filter((e) => e.work_id === workId)) {
+        d.fresh[entry.user_id] ??= {};
+        const fresh = d.fresh[entry.user_id] as Record<string, string[]>;
+        fresh[workId] = [...new Set([...(fresh[workId] ?? []), newest.chapter.id])];
+        entry.new_chapters = fresh[workId].length;
+      }
+      emit("chapters.new", { work_id: workId, new: 1 });
+    }
+    commit();
+    return json<S["RefreshQueued"]>({ queued: attached }, 202);
+  }),
+
+  op("post", "/library/{work_id}/seen", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const d = db();
+    const workId = String(params.work_id);
+    if (d.fresh[user.id]) delete d.fresh[user.id]?.[workId];
+    const entry = d.library.find((e) => e.user_id === user.id && e.work_id === workId);
+    if (entry) entry.new_chapters = 0;
+    emit("library.changed", { work_id: workId });
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // Progress
+
+  op("get", "/works/{work_id}/progress", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const workId = String(params.work_id);
+    const chapters = unifiedChapters(db(), workId, user.id).map((c) => c.chapter);
+    const mine = db().progress[user.id] ?? {};
+    const ids = new Set(chapters.map((c) => c.id));
+    const continueId = continueChapter(chapters, mine);
+    return json<S["WorkProgress"]>({
+      chapters: Object.values(mine).filter((p) => ids.has(p.chapter_id)),
+      ...(continueId ? { continue_chapter_id: continueId } : {}),
+    });
+  }),
+
+  op("post", "/works/{work_id}/progress", async ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const { chapter_ids, read } = (await request.json()) as S["MarkReadRequest"];
+    const d = db();
+    d.progress[user.id] ??= {};
+    const mine = d.progress[user.id] as Record<string, S["ChapterProgress"]>;
+    for (const id of chapter_ids) {
+      if (read)
+        mine[id] = {
+          chapter_id: id,
+          page: mine[id]?.pages ? (mine[id]?.pages ?? 1) - 1 : 0,
+          ...(mine[id]?.pages ? { pages: mine[id]?.pages } : {}),
+          completed: true,
+          updated_at: now(),
+        };
+      else delete mine[id];
+    }
+    emit("progress.synced", { work_id: String(params.work_id) });
+    commit();
+    return new HttpResponse(null, { status: 204 });
   }),
 
   // Browsing sources

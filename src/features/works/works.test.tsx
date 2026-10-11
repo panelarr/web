@@ -54,7 +54,7 @@ describe("the library", () => {
 describe("fixing matches", () => {
   it("shows how the work is matched on each source, with evidence", async () => {
     const [work] = seed("ent_1000");
-    await renderApp(`/works/${work?.id}`);
+    await renderApp(`/works/${work?.id}?tab=sources`);
     expect(await screen.findByText("Attached on 1 of 2 sources.")).toBeInTheDocument();
     const example = row("Example Source");
     expect(within(example).getByText("Matched")).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("fixing matches", () => {
 
   it("attaches a candidate, rejects another, and detaches", async () => {
     const [work] = seed("ent_1000");
-    await renderApp(`/works/${work?.id}`);
+    await renderApp(`/works/${work?.id}?tab=sources`);
     const sample = await waitFor(() => row("Sample Scans"));
     const [, second] = within(sample).getAllByRole("button", { name: /^Not / });
     await userEvent.click(second as HTMLElement);
@@ -85,7 +85,7 @@ describe("fixing matches", () => {
 
   it("sets a series' priority", async () => {
     const [work] = seed("ent_1000");
-    await renderApp(`/works/${work?.id}`);
+    await renderApp(`/works/${work?.id}?tab=sources`);
     const priority = await screen.findByLabelText("Priority");
     await userEvent.clear(priority);
     await userEvent.type(priority, "10{Enter}");
@@ -94,7 +94,7 @@ describe("fixing matches", () => {
 
   it("attaches by URL, explaining an unknown one", async () => {
     const [work] = seed("ent_1000");
-    await renderApp(`/works/${work?.id}`);
+    await renderApp(`/works/${work?.id}?tab=sources`);
     await userEvent.click(await screen.findByRole("button", { name: "Attach by URL" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.type(within(dialog).getByLabelText("Series URL"), "https://unknown.example/x");
@@ -109,7 +109,7 @@ describe("fixing matches", () => {
 
   it("searches a source by hand and attaches the result", async () => {
     const [work] = seed("ent_1000");
-    await renderApp(`/works/${work?.id}`);
+    await renderApp(`/works/${work?.id}?tab=sources`);
     await userEvent.click(
       await within(await waitFor(() => row("Sample Scans"))).findByRole("button", {
         name: "Search Sample Scans yourself",
@@ -130,7 +130,7 @@ describe("fixing matches", () => {
     const reader = db().users.find((u) => u.username === "reader");
     if (reader) reader.grants.all_sources = true;
     const [work] = seed("ent_1000");
-    await renderApp(`/works/${work?.id}`);
+    await renderApp(`/works/${work?.id}?tab=sources`);
     expect(await screen.findByText(/Ask your admin to fix matches/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Detach" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Attach by URL" })).not.toBeInTheDocument();
@@ -141,7 +141,7 @@ describe("fixing matches", () => {
     if (!user) throw new Error("no user");
     addToLibrary(user, "ent_1002");
     const work = db().works[0];
-    await renderApp(`/works/${work?.id}`);
+    await renderApp(`/works/${work?.id}?tab=sources`);
     expect((await screen.findAllByText("Searching…")).length).toBe(2);
     act(() => {
       tickMatching(db());
@@ -151,7 +151,7 @@ describe("fixing matches", () => {
 
   it("removes a work from the library after confirming", async () => {
     const [work] = seed("ent_1000");
-    await renderApp(`/works/${work?.id}`);
+    await renderApp(`/works/${work?.id}?tab=sources`);
     await userEvent.click(await screen.findByRole("button", { name: "In library" }));
     await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(db().library).toHaveLength(0));

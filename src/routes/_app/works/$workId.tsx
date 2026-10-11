@@ -25,16 +25,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cover } from "@/features/catalog/cover";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
 import { LIBRARY_INDEX_KEY } from "@/features/catalog/library-index";
+import { ChaptersPanel } from "@/features/works/chapters-panel";
+import { SeriesChaptersPanel } from "@/features/works/series-chapters";
 import { SourcesPanel } from "@/features/works/sources-panel";
 
 type Work = components["schemas"]["Work"];
 
-const TABS = ["sources"] as const;
-type Tab = (typeof TABS)[number];
+/** "chapters", "sources", or "series:<id>" for one source's own list. */
+type Tab = string;
+
+interface WorkSearch {
+  tab?: Tab;
+  order?: "desc";
+  unread?: true;
+}
 
 export const Route = createFileRoute("/_app/works/$workId")({
-  validateSearch: (search: Record<string, unknown>): { tab?: Tab } =>
-    TABS.includes(search.tab as Tab) ? { tab: search.tab as Tab } : {},
+  validateSearch: (search: Record<string, unknown>): WorkSearch => ({
+    ...(typeof search.tab === "string" && /^(chapters|sources|series:[0-9a-f-]{36})$/.test(search.tab)
+      ? { tab: search.tab }
+      : {}),
+    ...(search.order === "desc" ? { order: "desc" as const } : {}),
+    ...(search.unread === true || search.unread === "true" ? { unread: true as const } : {}),
+  }),
   component: WorkPage,
 });
 
@@ -60,7 +73,14 @@ function WorkPage() {
 }
 
 function WorkDetails({ work }: { work: Work }) {
-  const tab = Route.useSearch().tab ?? "sources";
+  const search = Route.useSearch();
+  const attached = work.sources.filter((s) => s.attached);
+  const requested = search.tab ?? "chapters";
+  // A source tab whose series was detached falls back to the chapters.
+  const tab =
+    requested.startsWith("series:") && !attached.some((s) => `series:${s.attached?.id}` === requested)
+      ? "chapters"
+      : requested;
   const navigate = useNavigate({ from: Route.fullPath });
   return (
     <>
@@ -82,10 +102,49 @@ function WorkDetails({ work }: { work: Work }) {
           </div>
         </div>
       </header>
-      <Tabs value={tab} onValueChange={(value) => void navigate({ search: { tab: value as Tab }, replace: true })}>
-        <TabsList>
-          <TabsTrigger value="sources">Sources</TabsTrigger>
-        </TabsList>
+      <Tabs
+        value={tab}
+        onValueChange={(value) =>
+          void navigate({
+            search: (prev) => ({ ...prev, tab: value === "chapters" ? undefined : value }),
+            replace: true,
+          })
+        }
+      >
+        <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+          <TabsList>
+            <TabsTrigger value="chapters">Chapters</TabsTrigger>
+            {attached.map((state) => (
+              <TabsTrigger key={state.attached?.id} value={`series:${state.attached?.id}`}>
+                {state.source.name}
+              </TabsTrigger>
+            ))}
+            <TabsTrigger value="sources">Sources</TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value="chapters" className="mt-4">
+          <ChaptersPanel
+            work={work}
+            view={{ order: search.order ?? "asc", unread: search.unread ?? false }}
+            onViewChange={(view) =>
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  order: view.order === "desc" ? "desc" : undefined,
+                  unread: view.unread ? true : undefined,
+                }),
+                replace: true,
+              })
+            }
+          />
+        </TabsContent>
+        {attached.map((state) =>
+          state.attached ? (
+            <TabsContent key={state.attached.id} value={`series:${state.attached.id}`} className="mt-4">
+              <SeriesChaptersPanel workId={work.id} seriesId={state.attached.id} />
+            </TabsContent>
+          ) : null,
+        )}
         <TabsContent value="sources" className="mt-4">
           <SourcesPanel work={work} />
         </TabsContent>

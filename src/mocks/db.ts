@@ -50,6 +50,10 @@ export interface MockDb extends JobsState {
   library: MockLibraryEntry[];
   /** Per work: its matching state on each source. */
   matching: Record<string, S["WorkSourceState"][]>;
+  pins: Record<string, Record<string, string>>;
+  progress: Record<string, Record<string, S["ChapterProgress"]>>;
+  fresh: Record<string, Record<string, string[]>>;
+  downloaded: string[];
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -82,6 +86,10 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     works: [],
     library: [],
     matching: {},
+    pins: {},
+    progress: {},
+    fresh: {},
+    downloaded: [],
     jobs: initialJobs(),
     runs: initialRuns(),
     tasks: initialTasks(),

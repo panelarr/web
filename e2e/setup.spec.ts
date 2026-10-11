@@ -73,6 +73,7 @@ test("adds a series from a source, then fixes its match on another source", asyn
   await page.goto("/browse/sources/example:1001/series?key=%2Fseries%2F1000&mock=ready");
   await page.getByRole("button", { name: "Add to library" }).click();
   await expect(page).toHaveURL(/\/works\//);
+  await page.getByRole("tab", { name: "Sources" }).click();
   // Matching runs on the mock server; the page follows it live.
   const sample = page.locator("li", { has: page.getByText("Sample Scans", { exact: true }) }).first();
   await expect(sample.getByText(/Needs a decision|Search failed/)).toBeVisible({ timeout: 10_000 });
@@ -80,4 +81,10 @@ test("adds a series from a source, then fixes its match on another source", asyn
   await page.getByLabel("Series URL").fill("https://example.com/1002/series/1000");
   await page.getByRole("dialog").getByRole("button", { name: "Attach" }).click();
   await expect(page.getByText("Attached on 2 of 2 sources.")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Chapters" }).click();
+  await expect(page.getByRole("list", { name: "Chapters" })).toBeVisible();
+  await expect(page.getByText(/\d+ chapters · 0 read/)).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });
