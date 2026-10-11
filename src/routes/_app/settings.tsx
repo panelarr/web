@@ -1,77 +1,59 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { createFileRoute } from "@tanstack/react-router";
-import { useSelector } from "@tanstack/react-store";
-import { Monitor } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { PageHeader } from "@/components/states";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { THEME_PRESETS } from "@/theme/presets";
-import { setThemePrefs, themeStore } from "@/theme/theme";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ApiKeysCard } from "@/features/account/api-keys-card";
+import { AppearanceCard } from "@/features/account/appearance-card";
+import { ProfileCard } from "@/features/account/profile-card";
+import { PasswordCard, SessionsCard } from "@/features/account/security-cards";
+
+const TABS = [
+  { id: "profile", label: "Profile" },
+  { id: "security", label: "Security" },
+  { id: "api-keys", label: "API keys" },
+  { id: "appearance", label: "Appearance" },
+] as const;
+type Tab = (typeof TABS)[number]["id"];
 
 export const Route = createFileRoute("/_app/settings")({
+  validateSearch: (search: Record<string, unknown>): { tab?: Tab } =>
+    TABS.some((t) => t.id === search.tab) ? { tab: search.tab as Tab } : {},
   component: SettingsPage,
 });
 
 function SettingsPage() {
+  // The selected tab comes from the URL's search params (never from link matching), so
+  // exactly one tab is selected and the address can be shared or bookmarked.
+  const tab = Route.useSearch().tab ?? "profile";
+  const navigate = useNavigate({ from: Route.fullPath });
   return (
     <>
       <PageHeader title="Settings" />
-      <AppearanceCard />
-    </>
-  );
-}
-
-function AppearanceCard() {
-  const theme = useSelector(themeStore, (prefs) => prefs.theme);
-  const options = [
-    { id: "system", name: "System", swatch: undefined },
-    ...THEME_PRESETS.map((preset) => ({ id: preset.id, name: preset.name, swatch: preset.colors })),
-  ];
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Appearance</CardTitle>
-        <CardDescription>The theme for this device.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <fieldset>
-          <legend className="mb-3 text-sm font-medium">Theme</legend>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
-            {options.map((option) => (
-              <label
-                key={option.id}
-                className={cn(
-                  "flex cursor-pointer flex-col gap-2 rounded-lg border p-2 text-sm transition-colors hover:bg-accent",
-                  "has-[:checked]:border-primary has-[:checked]:ring-2 has-[:checked]:ring-primary/40",
-                  "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="theme"
-                  value={option.id}
-                  checked={theme === option.id}
-                  onChange={() => setThemePrefs({ theme: option.id })}
-                  className="sr-only"
-                />
-                <span
-                  aria-hidden
-                  className="flex h-14 items-center justify-center rounded-md border"
-                  style={
-                    option.swatch
-                      ? { background: option.swatch.background, color: option.swatch.foreground }
-                      : undefined
-                  }
-                >
-                  {option.swatch ? <span className="text-base font-semibold">Aa</span> : <Monitor className="size-5" />}
-                </span>
-                <span className="px-1 font-medium">{option.name}</span>
-              </label>
+      <Tabs value={tab} onValueChange={(value) => void navigate({ search: { tab: value as Tab }, replace: true })}>
+        <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+          <TabsList>
+            {TABS.map((t) => (
+              <TabsTrigger key={t.id} value={t.id}>
+                {t.label}
+              </TabsTrigger>
             ))}
-          </div>
-        </fieldset>
-      </CardContent>
-    </Card>
+          </TabsList>
+        </div>
+        <TabsContent value="profile" className="mt-4">
+          <ProfileCard />
+        </TabsContent>
+        <TabsContent value="security" className="mt-4 grid gap-6">
+          <PasswordCard />
+          <SessionsCard />
+        </TabsContent>
+        <TabsContent value="api-keys" className="mt-4">
+          <ApiKeysCard />
+        </TabsContent>
+        <TabsContent value="appearance" className="mt-4">
+          <AppearanceCard />
+        </TabsContent>
+      </Tabs>
+    </>
   );
 }

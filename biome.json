@@ -1,6 +1,10 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "files": {
     "includes": ["**", "!api/openapi.yaml", "!src/**/*.gen.ts", "!src/routeTree.gen.ts", "!public"]
   },
@@ -10,7 +14,9 @@
     "lineWidth": 120
   },
   "css": {
-    "parser": { "tailwindDirectives": true }
+    "parser": {
+      "tailwindDirectives": true
+    }
   },
   "linter": {
     "rules": {
@@ -25,7 +31,16 @@
         "noDangerouslySetInnerHtml": "error"
       },
       "style": {
-        "noNonNullAssertion": "warn"
+        "noNonNullAssertion": "warn",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "cn": "Import cn from @/lib/utils. The shadcn CLI writes this import when it adds a component; fix it.",
+              "next-themes": "Themes come from src/theme, not next-themes."
+            }
+          }
+        }
       },
       "suspicious": {
         "noArrayIndexKey": "off"
@@ -36,9 +51,15 @@
     }
   },
   "assist": {
-    "actions": { "source": { "organizeImports": "on" } }
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "javascript": {
-    "formatter": { "quoteStyle": "double" }
+    "formatter": {
+      "quoteStyle": "double"
+    }
   }
 }

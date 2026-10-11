@@ -2,20 +2,47 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
+import { apiBaseUrl } from "@/api/client";
+import { resetDb } from "@/mocks/db";
 import { server } from "./server";
+import { SpecValidator } from "./spec-validator";
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+// Every JSON answer the mock server gives in a test is checked against the spec, so the
+// mocks (and the tests built on them) can't drift from what the real server sends.
+let validator: SpecValidator;
+let responseProblems: string[] = [];
+
+beforeAll(async () => {
+  validator = await SpecValidator.load();
+  server.listen({ onUnhandledRequest: "error" });
+  server.events.on("response:mocked", async ({ request, response }) => {
+    const base = apiBaseUrl();
+    if (!request.url.startsWith(base) || !/json/.test(response.headers.get("Content-Type") ?? "")) return;
+    const path = new URL(request.url).pathname.slice(new URL(base).pathname.length);
+    const body = await response.clone().json();
+    responseProblems.push(...validator.checkResponse(request.method, path, response.status, body));
+  });
+});
+
+beforeEach(() => resetDb("ready"));
+
 afterEach(() => {
   server.resetHandlers();
-  if (typeof window === "undefined") return; // a test in the node environment
-  cleanup();
-  localStorage.clear();
-  for (const cookie of document.cookie.split(";")) {
-    // biome-ignore lint/suspicious/noDocumentCookie: clearing what a test set
-    document.cookie = `${cookie.split("=")[0]?.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+  const problems = responseProblems;
+  responseProblems = [];
+  if (typeof window !== "undefined") {
+    cleanup();
+    localStorage.clear();
+    sessionStorage.clear();
+    for (const cookie of document.cookie.split(";")) {
+      // biome-ignore lint/suspicious/noDocumentCookie: clearing what a test set
+      document.cookie = `${cookie.split("=")[0]?.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    }
   }
+  if (problems.length > 0) throw new Error(`Mock responses don't match the spec:\n  ${problems.join("\n  ")}`);
 });
+
 afterAll(() => server.close());
 
 // jsdom lacks these; Radix and the theme code use them.

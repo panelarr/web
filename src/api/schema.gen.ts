@@ -1034,10 +1034,336 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your library
+         * @description Works you follow, by title. Works you may no longer see (your ceiling or allowed sources changed) are left out.
+         */
+        get: operations["listLibrary"];
+        put?: never;
+        /**
+         * Add a catalogue entry to your library
+         * @description Creates the work for the entry when nobody has it yet (one work per
+         *     entry, shared by everyone) and starts matching it on the sources.
+         *     Adding it again returns `200` with the existing entry. With
+         *     `source`, that series is attached to the work (e.g. when you picked
+         *     the entry after adding from a source). Needs the `may_add` grant
+         *     (`403`, code `grant_required`).
+         */
+        post: operations["addToLibrary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/from-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a series seen on a source
+         * @description Finds the series' catalogue entry. When it is clear (the exact
+         *     title and a shared author), the work is added with the series
+         *     attached (`added`). Otherwise the likely entries come back as
+         *     `candidates`: pick one and add it with `POST /library` and this
+         *     series as `source`. Needs `may_add`.
+         */
+        post: operations["addFromSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/{work_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a work from your library
+         * @description Never deletes downloaded files; they are shared.
+         */
+        delete: operations["removeFromLibrary"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A work, with how it is matched on each source
+         * @description Lists every source you may use with its matching state, the attached series and candidates with their evidence.
+         */
+        get: operations["getWork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A work's cover */
+        get: operations["getWorkCover"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match the work on the sources again
+         * @description Searches every source without an attached series (with `force`, every source; attached series stay). Series rejected before are not attached again. Needs `may_manage_matches`.
+         */
+        post: operations["matchWork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach a series to the work by source and key, or by its URL
+         * @description The series becomes the work's series on its source (the one attached before becomes a candidate). A URL no plugin recognises answers `404`. Needs `may_manage_matches`.
+         */
+        post: operations["attachSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/series/{series_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set a series' priority for the work
+         * @description Higher priority wins when the same chapter is on several sources. Needs `may_manage_matches`.
+         */
+        patch: operations["updateWorkSeries"];
+        trace?: never;
+    };
+    "/works/{work_id}/series/{series_id}/attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach a candidate (or a rejected series)
+         * @description Needs `may_manage_matches`.
+         */
+        post: operations["attachCandidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/series/{series_id}/detach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject a series for the work
+         * @description Matching won't attach it again. Needs `may_manage_matches`.
+         */
+        post: operations["detachSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        WorkSummary: {
+            /** Format: uuid */
+            id: string;
+            /** @description The catalogue entry it was created from (see /catalog/entries). */
+            entry_id: string;
+            title: string;
+            type?: string;
+            status?: string;
+            content_rating: components["schemas"]["EntryContentRating"];
+            year?: number;
+            /** @description The server's URL for the cover. */
+            cover_url?: string;
+            /** @description Sources a series is attached on. */
+            attached_sources: number;
+        };
+        LibraryEntry: {
+            work: components["schemas"]["WorkSummary"];
+            /** Format: date-time */
+            added_at: string;
+        };
+        LibraryPage: {
+            entries: components["schemas"]["LibraryEntry"][];
+            next_page_token: string;
+        };
+        SeriesRef: {
+            source_id: string;
+            key: string;
+        };
+        AddToLibraryRequest: {
+            entry_id: string;
+            source?: components["schemas"]["SeriesRef"];
+        };
+        EntryCandidate: {
+            entry: components["schemas"]["CatalogEntrySummary"];
+            /** @description Title similarity, 0 to 1. */
+            score: number;
+            matched_title?: string;
+            /** @description Absent when one side names no people. */
+            authors_match?: boolean;
+        };
+        AddFromSourceResult: {
+            added: boolean;
+            entry?: components["schemas"]["LibraryEntry"];
+            candidates: components["schemas"]["EntryCandidate"][];
+        };
+        MatchEvidence: {
+            entry_title?: string;
+            /** @description The entry's title that matched best. */
+            matched_title?: string;
+            /** @description The search that found it. */
+            query?: string;
+            title_score: number;
+            authors_match?: boolean;
+            source_authors: string[];
+            chapter_count?: number;
+        };
+        MatchSeries: {
+            /** Format: uuid */
+            id: string;
+            source_id: string;
+            key: string;
+            title: string;
+            url?: string;
+            cover_url?: string;
+            /** @enum {string} */
+            state: "attached" | "candidate" | "rejected";
+            /** @enum {string} */
+            origin: "auto" | "manual" | "url";
+            score: number;
+            priority: number;
+            evidence: components["schemas"]["MatchEvidence"];
+        };
+        WorkSourceState: {
+            source: components["schemas"]["SourceInfo"];
+            /** @enum {string} */
+            status: "unchecked" | "pending" | "matched" | "candidates" | "no_match" | "failed";
+            message?: string;
+            /** @description The titles searched, in order. */
+            queries: string[];
+            /** Format: date-time */
+            checked_at?: string;
+            attached?: components["schemas"]["MatchSeries"];
+            candidates: components["schemas"]["MatchSeries"][];
+        };
+        Work: {
+            /** Format: uuid */
+            id: string;
+            entry_id: string;
+            title: string;
+            type?: string;
+            status?: string;
+            content_rating: components["schemas"]["EntryContentRating"];
+            year?: number;
+            cover_url?: string;
+            attached_sources: number;
+            in_library: boolean;
+            /** Format: date-time */
+            added_at?: string;
+            sources: components["schemas"]["WorkSourceState"][];
+        };
+        MatchWorkRequest: {
+            force?: boolean;
+        };
+        TaskRef: {
+            /** Format: uuid */
+            task_id: string;
+        };
+        /** @description Either source_id and key, or url. */
+        AttachSeriesRequest: {
+            source_id?: string;
+            key?: string;
+            url?: string;
+        };
+        UpdateWorkSeriesRequest: {
+            priority: number;
+        };
         JobParam: {
             name: string;
             /** @enum {string} */
@@ -1760,6 +2086,8 @@ export interface components {
         };
     };
     parameters: {
+        WorkId: string;
+        SeriesId: string;
         JobId: string;
         RunId: string;
         TaskId: string;
@@ -3332,6 +3660,291 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": string;
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listLibrary: {
+        parameters: {
+            query?: {
+                /** @description Only titles containing this. */
+                q?: string;
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of your library. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addToLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddToLibraryRequest"];
+            };
+        };
+        responses: {
+            /** @description It was in your library already. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryEntry"];
+                };
+            };
+            /** @description Added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryEntry"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addFromSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeriesRef"];
+            };
+        };
+        responses: {
+            /** @description Added, or candidates to pick from. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddFromSourceResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeFromLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getWork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The work. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Work"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getWorkCover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    matchWork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MatchWorkRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRef"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    attachSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachSeriesRequest"];
+            };
+        };
+        responses: {
+            /** @description Attached. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchSeries"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateWorkSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+                series_id: components["parameters"]["SeriesId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkSeriesRequest"];
+            };
+        };
+        responses: {
+            /** @description The series. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchSeries"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    attachCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+                series_id: components["parameters"]["SeriesId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attached. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchSeries"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    detachSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+                series_id: components["parameters"]["SeriesId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rejected. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchSeries"];
                 };
             };
             default: components["responses"]["Problem"];

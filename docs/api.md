@@ -52,9 +52,21 @@ delete it from the draft and fix whatever changed.
 | `make run` | Only draft endpoints; everything else goes to the real server (`PANELARR_BACKEND`, default `http://localhost:8900`) |
 | Tests (Vitest, Playwright) | Everything |
 
-Every fixture in `src/mocks/data.ts` is validated against the spec's schemas
-(`src/mocks/fixtures.test.ts`), so mocks can't quietly drift from what the server sends.
-Fixtures use invented names only: never real sites, extensions or records.
+The mock server keeps state (`src/mocks/db.ts`): signing in, creating keys or finishing setup
+behave as on a real server. Pick a starting point with `?mock=<scenario>` (it lasts for the tab):
+
+| Scenario | Starts as |
+|---|---|
+| `ready` (default) | Set up, signed in as the admin (`admin` / `password123`) |
+| `fresh` | A new install: no accounts, nothing connected |
+| `signed-out` | Set up, nobody signed in |
+| `user` | Signed in as `reader`, a user without admin rights |
+| `degraded` | Signed in, but the metadata service has no entries yet |
+
+Mocks can't quietly drift from what the server sends: every fixture is validated against the
+spec's schemas (`src/mocks/fixtures.test.ts`), and in tests every JSON answer the mock server
+gives is checked against the operation's response schema (`src/test/setup.ts`); a mismatch
+fails the test. Fixtures use invented names only: never real sites, extensions or records.
 
 ## Errors
 

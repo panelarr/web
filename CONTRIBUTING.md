@@ -33,6 +33,13 @@ changes to the server. Endpoints the server hasn't specified yet are drafted in 
 `src/components/ui/` holds [shadcn/ui](https://ui.shadcn.com) components, added with the
 shadcn CLI and then owned by this repo. They import `cn` from `@/lib/utils`.
 
+```sh
+yes n | pnpm dlx shadcn@4.21.4 add <component>   # "n": never overwrite components we changed
+```
+
+The CLI writes `import { cn } from "cn"` and adds a `cn` package; change the import to
+`@/lib/utils` and `pnpm remove cn` (lint fails until you do).
+
 ### Every screen size
 
 Check changes on a phone-sized screen (360 px wide) and on a desktop. No page may scroll

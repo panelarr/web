@@ -2,6 +2,7 @@
 
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { me } from "@/mocks/data";
 import { mockUrl, problem } from "@/mocks/op";
 import { server } from "@/test/server";
 import { api } from "./client";
@@ -15,7 +16,7 @@ describe("api client", () => {
     server.use(
       http.get(mockUrl("/me"), ({ request }) => {
         seen.get = request.headers.get("X-CSRF-Token");
-        return HttpResponse.json({});
+        return HttpResponse.json(me);
       }),
       http.post(mockUrl("/auth/logout"), ({ request }) => {
         seen.post = request.headers.get("X-CSRF-Token");

@@ -53,7 +53,7 @@ describe("app shell", () => {
 
 describe("settings", () => {
   it("changes the theme", async () => {
-    await renderApp("/settings");
+    await renderApp("/settings?tab=appearance");
     await userEvent.click(await screen.findByRole("radio", { name: "True black" }));
     expect(themeStore.state.theme).toBe("black");
     expect(screen.getByRole("radio", { name: "True black" })).toBeChecked();

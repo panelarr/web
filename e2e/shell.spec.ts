@@ -3,7 +3,7 @@
 import { expect, test } from "@playwright/test";
 
 test("loads the library and moves between pages", async ({ page, isMobile }) => {
-  await page.goto("/");
+  await page.goto("/?mock=ready");
   await expect(page.getByRole("heading", { name: "Library", exact: true })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Main" });
   await expect(nav).toHaveCount(1); // only the layout for this screen size is shown
@@ -20,7 +20,8 @@ test("loads the library and moves between pages", async ({ page, isMobile }) => 
 });
 
 test("never scrolls sideways", async ({ page }) => {
-  for (const path of ["/", "/browse", "/downloads", "/settings", "/more", "/admin"]) {
+  await page.goto("/?mock=ready");
+  for (const path of ["/", "/browse", "/downloads", "/settings", "/settings?tab=security", "/more", "/admin"]) {
     await page.goto(path);
     await expect(page.getByRole("main")).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -30,12 +31,12 @@ test("never scrolls sideways", async ({ page }) => {
 
 test("shows the server version from the (mock) API", async ({ page, isMobile }) => {
   test.skip(isMobile, "the version is in the desktop sidebar");
-  await page.goto("/");
+  await page.goto("/?mock=ready");
   await expect(page.getByText("Server dev")).toBeVisible();
 });
 
 test("keeps the chosen theme across reloads, applied before the app starts", async ({ page }) => {
-  await page.goto("/settings");
+  await page.goto("/settings?tab=appearance&mock=ready");
   await page.getByText("True black").click();
   await expect(page.locator("html")).toHaveClass(/dark/);
 

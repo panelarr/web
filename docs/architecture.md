@@ -32,6 +32,24 @@ src/test/         test setup and helpers
 e2e/              Playwright smoke tests
 ```
 
+## Signing in
+
+The server keeps the session in an HTTP-only cookie the app can't read; the app sends the
+CSRF token from the readable `panelarr_csrf` cookie with every change.
+
+- **Route guards.** Every page inside the app shell (`src/routes/_app.tsx`) loads `GET /me`
+  first: signed out → `/login?redirect=…`; a new install (`setup_required`) → `/setup`; an
+  admin on an unfinished setup → `/setup`. `/login`, `/setup` and `/invite` are public.
+- **Mid-session.** When any request answers `unauthenticated`, the app forgets everything
+  cached and goes to sign-in with `expired`, then back to where the user was. `redirect` only
+  ever leads to a path inside the app.
+- **First run.** `/setup` creates the admin, connects the metadata service (explaining what
+  to do until a provider has entries), optionally adds a source plugin, and finishes. Once
+  finished, it redirects away.
+- **Invites.** An invite link carries its token in the URL fragment (`/invite#token=…`), which
+  browsers never send to the server, so it stays out of logs. The page removes it from the
+  address bar once used.
+
 ## Responsive by design
 
 Phones get a native-app layout: a top bar, a bottom navigation bar, full-screen pages, safe

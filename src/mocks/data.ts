@@ -38,15 +38,97 @@ export const adminUser = {
   last_login_at: "2026-10-11T08:30:00Z",
 } satisfies Schemas["User"];
 
+export const readerUser = {
+  id: "7c9d1e2f-3a4b-4c5d-8e6f-7a8b9c0d1e2f",
+  username: "reader",
+  display_name: "",
+  role: "user",
+  disabled: false,
+  grants: {
+    may_add: true,
+    may_download: false,
+    may_manage_matches: false,
+    content_rating_ceiling: "suggestive",
+    all_sources: false,
+    allowed_sources: ["example:1001"],
+  },
+  created_at: "2026-10-02T09:00:00Z",
+} satisfies Schemas["User"];
+
 export const me = {
   user: adminUser,
   auth: { method: "session", scopes: ["read", "write", "admin"] },
 } satisfies Schemas["Me"];
+
+export const session = {
+  id: "3e2d1c0b-9a8f-4e7d-8c6b-5a4f3e2d1c0b",
+  current: true,
+  user_agent:
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36",
+  ip: "192.0.2.10",
+  created_at: "2026-10-10T18:00:00Z",
+  last_seen_at: "2026-10-11T08:30:00Z",
+  expires_at: "2026-11-10T18:00:00Z",
+} satisfies Schemas["Session"];
+
+export const apiKey = {
+  id: "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d",
+  name: "Tablet app",
+  prefix: "pnl_8f3a",
+  scopes: ["read"],
+  created_at: "2026-10-05T10:00:00Z",
+  last_used_at: "2026-10-11T07:00:00Z",
+} satisfies Schemas["ApiKey"];
+
+export const metaConnection = {
+  url: "http://meta:8901",
+  managed_by_env: false,
+  check: {
+    configured: true,
+    reachable: true,
+    key_valid: true,
+    admin_scope: true,
+    ready: true,
+    providers: [{ id: "example-provider", health: "ok", records: 48210 }],
+    checked_at: "2026-10-11T08:00:00Z",
+  },
+} satisfies Schemas["MetaConnection"];
+
+export const plugin = {
+  id: "example",
+  url: "http://example-plugin:8904",
+  enabled: true,
+  name: "Example Source Plugin",
+  plugin_id: "example",
+  version: "0.1.0",
+  contracts: ["panelarr.source.v1"],
+  capabilities: ["latest", "search", "filters"],
+  has_config: true,
+  health: "ok",
+  checked_at: "2026-10-11T08:00:00Z",
+  source_count: 3,
+  created_at: "2026-10-01T12:30:00Z",
+} satisfies Schemas["Plugin"];
+
+export const health = {
+  status: "ok",
+  version: "dev",
+  components: [
+    { name: "database", required: true, status: "ok", latency_ms: 2 },
+    { name: "meta", required: false, status: "ok", latency_ms: 12 },
+  ],
+} satisfies Schemas["SystemHealth"];
 
 /** Every fixture with the schema it must match. */
 export const FIXTURES: ReadonlyArray<readonly [schema: keyof Schemas, value: unknown]> = [
   ["SystemInfo", systemInfo],
   ["SetupStatus", setupStatus],
   ["User", adminUser],
+  ["User", readerUser],
   ["Me", me],
+  ["Session", session],
+  ["ApiKey", apiKey],
+  ["MetaConnection", metaConnection],
+  ["Plugin", plugin],
+  ["SystemHealth", health],
 ];

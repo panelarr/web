@@ -5,6 +5,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createQueryClient } from "@/api/query-client";
+import { createAuthErrorHandler } from "@/auth/auth-errors";
 import { registerServiceWorker } from "@/pwa";
 import { createAppRouter } from "@/router";
 import { startTheming } from "@/theme/theme";
@@ -20,8 +21,14 @@ async function enableMocks(): Promise<void> {
 startTheming();
 await enableMocks();
 
-const queryClient = createQueryClient();
-const router = createAppRouter(queryClient);
+let router: ReturnType<typeof createAppRouter> | undefined;
+const queryClient = createQueryClient({
+  onError: createAuthErrorHandler(
+    () => router,
+    () => queryClient,
+  ),
+});
+router = createAppRouter(queryClient);
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root");
