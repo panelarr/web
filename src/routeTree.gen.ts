@@ -22,6 +22,7 @@ import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
 import { Route as AppAdminSourcesRouteImport } from './routes/_app/admin/sources'
 import { Route as AppAdminSystemRouteImport } from './routes/_app/admin/system'
+import { Route as AppCatalogEntryIdRouteImport } from './routes/_app/catalog/$entryId'
 import { Route as AppAdminPluginsIndexRouteImport } from './routes/_app/admin/plugins/index'
 import { Route as AppAdminPluginsPluginIdRouteImport } from './routes/_app/admin/plugins/$pluginId'
 import { Route as AppAdminUsersIndexRouteImport } from './routes/_app/admin/users/index'
@@ -91,6 +92,11 @@ const AppAdminSystemRoute = AppAdminSystemRouteImport.update({
   path: '/system',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppCatalogEntryIdRoute = AppCatalogEntryIdRouteImport.update({
+  id: '/catalog/$entryId',
+  path: '/catalog/$entryId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminPluginsIndexRoute = AppAdminPluginsIndexRouteImport.update({
   id: '/plugins/',
   path: '/plugins/',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/admin/sources': typeof AppAdminSourcesRoute
   '/admin/system': typeof AppAdminSystemRoute
+  '/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/admin/': typeof AppAdminIndexRoute
   '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/admin/users/$userId': typeof AppAdminUsersUserIdRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/admin/sources': typeof AppAdminSourcesRoute
   '/admin/system': typeof AppAdminSystemRoute
+  '/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/admin': typeof AppAdminIndexRoute
   '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/admin/users/$userId': typeof AppAdminUsersUserIdRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/admin/sources': typeof AppAdminSourcesRoute
   '/_app/admin/system': typeof AppAdminSystemRoute
+  '/_app/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/_app/admin/': typeof AppAdminIndexRoute
   '/_app/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/_app/admin/users/$userId': typeof AppAdminUsersUserIdRoute
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/admin/sources'
     | '/admin/system'
+    | '/catalog/$entryId'
     | '/admin/'
     | '/admin/plugins/$pluginId'
     | '/admin/users/$userId'
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/sources'
     | '/admin/system'
+    | '/catalog/$entryId'
     | '/admin'
     | '/admin/plugins/$pluginId'
     | '/admin/users/$userId'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/admin/sources'
     | '/_app/admin/system'
+    | '/_app/catalog/$entryId'
     | '/_app/admin/'
     | '/_app/admin/plugins/$pluginId'
     | '/_app/admin/users/$userId'
@@ -324,6 +336,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminSystemRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/catalog/$entryId': {
+      id: '/_app/catalog/$entryId'
+      path: '/catalog/$entryId'
+      fullPath: '/catalog/$entryId'
+      preLoaderRoute: typeof AppCatalogEntryIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/plugins/': {
       id: '/_app/admin/plugins/'
       path: '/plugins'
@@ -386,6 +405,7 @@ interface AppRouteChildren {
   AppMoreRoute: typeof AppMoreRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppCatalogEntryIdRoute: typeof AppCatalogEntryIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -395,6 +415,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMoreRoute: AppMoreRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppCatalogEntryIdRoute: AppCatalogEntryIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

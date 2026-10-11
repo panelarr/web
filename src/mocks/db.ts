@@ -19,6 +19,13 @@ export type Scenario = (typeof SCENARIOS)[number];
 
 export type MockInvite = S["Invite"] & { token: string };
 
+export interface MockLibraryEntry {
+  user_id: string;
+  work_id: string;
+  added_at: string;
+  new_chapters: number;
+}
+
 export interface MockDb {
   users: S["User"][];
   passwords: Record<string, string>;
@@ -35,6 +42,10 @@ export interface MockDb {
   sources: S["SourceInfo"][];
   invites: MockInvite[];
   failedLogins: number;
+  /** Works are shared: one per catalogue entry. */
+  works: S["WorkSummary"][];
+  /** Each user's library. */
+  library: MockLibraryEntry[];
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -64,6 +75,8 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     sources: clone(sources),
     invites: [{ ...clone(invite), token: "open-invite-token" }],
     failedLogins: 0,
+    works: [],
+    library: [],
   };
   switch (scenario) {
     case "fresh":

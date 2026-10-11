@@ -86,6 +86,9 @@ export default defineConfig(({ command, mode }) => {
       }),
       ...(mock !== "off" ? [mockServiceWorker()] : []),
     ],
+    // Scan every route up front: routes load lazily, and a dependency found late makes the dev
+    // server reload the page (which also makes browser tests flaky).
+    optimizeDeps: { entries: ["index.html", "src/routes/**/*.tsx"] },
     server: {
       port: Number(env.WEB_PORT || 5173),
       proxy: mock === "all" ? undefined : { "/api": { target: backend, changeOrigin: false } },

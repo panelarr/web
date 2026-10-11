@@ -50,3 +50,12 @@ test("the sign-in and setup pages fit a phone", async ({ page }) => {
     expect(overflow, `${path} is wider than the screen`).toBeLessThanOrEqual(0);
   }
 });
+
+test("finds a work in the catalogue and adds it", async ({ page }) => {
+  await page.goto("/browse?mock=ready");
+  await page.getByRole("searchbox", { name: "Search the catalogue" }).fill("lantern");
+  await page.getByRole("link", { name: /The Lantern Keeper/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "The Lantern Keeper" })).toBeVisible();
+  await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
+  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+});

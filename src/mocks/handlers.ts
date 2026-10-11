@@ -2,6 +2,7 @@
 
 import { HttpResponse } from "msw";
 import type { components } from "@/api/schema.gen";
+import { CATALOG, coverSvg, summary, withinCeiling } from "./catalog";
 import { health, systemInfo } from "./data";
 import { commit, currentUser, db, type MockInvite, newId } from "./db";
 import { type MockOperation, op, problem } from "./op";
@@ -107,6 +108,42 @@ function recheckMeta(): S["MetaConnection"] {
 }
 
 const json = <T>(body: T, status = 200) => HttpResponse.json(body as object, { status });
+
+/** A page of `items` from `page_token` (an offset here) and `page_size`. */
+function paginate<T>(items: T[], url: URL): { items: T[]; next: string } {
+  const size = Number(url.searchParams.get("page_size") ?? 30);
+  const offset = Number(url.searchParams.get("page_token") || 0);
+  const next = offset + size < items.length ? String(offset + size) : "";
+  return { items: items.slice(offset, offset + size), next };
+}
+
+/** Catalogue entries the user may see, filtered and sorted as asked. */
+function visibleCatalog(user: S["User"], url: URL): Array<[S["CatalogEntry"], number]> {
+  const p = url.searchParams;
+  const types = p.getAll("type");
+  const statuses = p.getAll("status");
+  const genres = p.getAll("genre");
+  const from = Number(p.get("year_from") ?? 0);
+  const to = Number(p.get("year_to") ?? 9999);
+  const list = CATALOG.map((entry, i) => [entry, i] as [S["CatalogEntry"], number]).filter(
+    ([e]) =>
+      withinCeiling(e.content_rating, user.grants.content_rating_ceiling) &&
+      (types.length === 0 || types.includes(e.type ?? "")) &&
+      (statuses.length === 0 || statuses.includes(e.status ?? "")) &&
+      genres.every((g) => e.genres.includes(g)) &&
+      (e.year ?? 0) >= from &&
+      (e.year ?? 0) <= to,
+  );
+  const sort = p.get("sort");
+  const by: Record<string, (a: S["CatalogEntry"], b: S["CatalogEntry"]) => number> = {
+    title: (a, b) => a.title.localeCompare(b.title),
+    year: (a, b) => (b.year ?? 0) - (a.year ?? 0),
+  };
+  const compare = sort ? by[sort] : undefined;
+  if (compare) list.sort(([a], [b]) => compare(a, b));
+  if (p.get("reverse") === "true") list.reverse();
+  return list;
+}
 
 // --- the operations -----------------------------------------------------------------------
 
@@ -641,6 +678,118 @@ export const operations: MockOperation[] = [
     d.invites = d.invites.filter((i) => i.id !== params.id);
     commit();
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  // The catalogue
+
+  op("get", "/catalog/search", ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const url = new URL(request.url);
+    const q = (url.searchParams.get("q") ?? "").toLowerCase();
+    const found = visibleCatalog(user, url).flatMap(([entry, i]) => {
+      const title = entry.titles.find((t) => t.text.toLowerCase().includes(q));
+      if (!title) return [];
+      return [{ entry: summary(entry, i), ...(title.text !== entry.title ? { matched: title.text } : {}) }];
+    });
+    const { items, next } = paginate(found, url);
+    return json<S["CatalogSearchPage"]>({
+      hits: items,
+      next_page_token: next,
+      total_size: found.length,
+      no_providers: false,
+    });
+  }),
+
+  op("get", "/catalog/browse", ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const url = new URL(request.url);
+    if (!db().meta.check.providers.length) {
+      return json<S["CatalogPage"]>({ entries: [], next_page_token: "", no_providers: true });
+    }
+    const all = visibleCatalog(user, url).map(([entry, i]) => summary(entry, i));
+    const { items, next } = paginate(all, url);
+    return json<S["CatalogPage"]>({
+      entries: items,
+      next_page_token: next,
+      total_size: all.length,
+      no_providers: false,
+    });
+  }),
+
+  op("get", "/catalog/entries/{entry_id}", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const entry = CATALOG.find((e) => e.id === params.entry_id);
+    if (!entry || !withinCeiling(entry.content_rating, user.grants.content_rating_ceiling)) {
+      return problem(404, "not_found", "Not found");
+    }
+    return json(entry);
+  }),
+
+  op("get", "/catalog/entries/{entry_id}/cover", ({ params }) => {
+    const i = CATALOG.findIndex((e) => e.id === params.entry_id);
+    const entry = CATALOG[i];
+    if (!entry) return problem(404, "not_found", "Not found");
+    return new HttpResponse(coverSvg(entry, i), {
+      headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400" },
+    });
+  }),
+
+  // The library (more with works and matching)
+
+  op("get", "/library", ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const d = db();
+    const q = (new URL(request.url).searchParams.get("q") ?? "").toLowerCase();
+    const entries: S["LibraryEntry"][] = d.library
+      .filter((e) => e.user_id === user.id)
+      .flatMap((e) => {
+        const work = d.works.find((w) => w.id === e.work_id);
+        if (!work || (q && !work.title.toLowerCase().includes(q))) return [];
+        return [{ work, added_at: e.added_at, new_chapters: e.new_chapters }];
+      })
+      .sort((a, b) => a.work.title.localeCompare(b.work.title));
+    const { items, next } = paginate(entries, new URL(request.url));
+    return json<S["LibraryPage"]>({ entries: items, next_page_token: next });
+  }),
+
+  op("post", "/library", async ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    if (user.role !== "admin" && !user.grants.may_add) {
+      return problem(403, "grant_required", "Not allowed", "You may not add works.");
+    }
+    const body = (await request.json()) as S["AddToLibraryRequest"];
+    const i = CATALOG.findIndex((e) => e.id === body.entry_id);
+    const entry = CATALOG[i];
+    if (!entry) return problem(404, "not_found", "Not found");
+    const d = db();
+    let work = d.works.find((w) => w.entry_id === entry.id);
+    if (!work) {
+      const s = summary(entry, i);
+      work = {
+        id: newId(),
+        entry_id: entry.id,
+        title: entry.title,
+        ...(s.type ? { type: s.type } : {}),
+        ...(s.status ? { status: s.status } : {}),
+        content_rating: entry.content_rating,
+        ...(s.year ? { year: s.year } : {}),
+        cover_url: `/api/v1/catalog/entries/${entry.id}/cover`,
+        attached_sources: 0,
+      };
+      d.works.push(work);
+    }
+    const existing = d.library.find((e) => e.user_id === user.id && e.work_id === work.id);
+    if (existing)
+      return json<S["LibraryEntry"]>({ work, added_at: existing.added_at, new_chapters: existing.new_chapters });
+    const added = { user_id: user.id, work_id: work.id, added_at: now(), new_chapters: 0 };
+    d.library.push(added);
+    commit();
+    return json<S["LibraryEntry"]>({ work, added_at: added.added_at, new_chapters: 0 }, 201);
   }),
 ];
 

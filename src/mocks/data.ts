@@ -3,6 +3,7 @@
 // Made-up data for the mock server and tests. Never put real sites, extensions or records
 // here. src/mocks/fixtures.test.ts checks every fixture against the API's schemas.
 import type { components } from "@/api/schema.gen";
+import { CATALOG, summary } from "./catalog";
 
 type Schemas = components["schemas"];
 
@@ -239,4 +240,6 @@ export const FIXTURES: ReadonlyArray<readonly [schema: keyof Schemas, value: unk
   ...sources.map((source) => ["SourceInfo", source] as const),
   ["PluginConfig", pluginConfig],
   ["Invite", invite],
+  ...CATALOG.map((entry) => ["CatalogEntry", entry] as const),
+  ...CATALOG.map((entry, i) => ["CatalogEntrySummary", summary(entry, i)] as const),
 ];

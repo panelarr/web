@@ -21,7 +21,16 @@ test("loads the library and moves between pages", async ({ page, isMobile }) => 
 
 test("never scrolls sideways", async ({ page }) => {
   await page.goto("/?mock=ready");
-  const paths = ["/", "/browse", "/downloads", "/settings", "/settings?tab=security", "/more"];
+  const paths = [
+    "/",
+    "/browse",
+    "/browse?q=lantern",
+    "/catalog/ent_1001",
+    "/downloads",
+    "/settings",
+    "/settings?tab=security",
+    "/more",
+  ];
   const admin = [
     "/admin/users",
     "/admin/users/7c9d1e2f-3a4b-4c5d-8e6f-7a8b9c0d1e2f",
