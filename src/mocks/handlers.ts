@@ -5,7 +5,7 @@ import type { EventType } from "@/api/event-types";
 import type { components } from "@/api/schema.gen";
 import { CATALOG, coverSvg, summary, withinCeiling } from "./catalog";
 import { continueChapter, seriesChapters, unifiedChapters } from "./chapters";
-import { health, systemInfo } from "./data";
+import { health, sources as sourceFixtures, systemInfo } from "./data";
 import { commit, currentUser, db, type MockInvite, newId } from "./db";
 import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
@@ -602,6 +602,10 @@ export const operations: MockOperation[] = [
       created_at: now(),
     };
     db().plugins.push(added);
+    // The example plugin lists the example sources.
+    if (id === "example" && !db().sources.some((source) => source.plugin_id === id)) {
+      db().sources.push(...structuredClone(sourceFixtures));
+    }
     commit();
     return json(added, 201);
   }),

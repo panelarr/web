@@ -69,10 +69,15 @@ export default defineConfig(({ command, mode }) => {
           orientation: "any",
           background_color: "#0b0b0f",
           theme_color: "#0b0b0f",
+          shortcuts: [
+            { name: "Library", url: "./", icons: [{ src: "icon-192.png", sizes: "192x192" }] },
+            { name: "Browse", url: "./browse", icons: [{ src: "icon-192.png", sizes: "192x192" }] },
+            { name: "Downloads", url: "./downloads", icons: [{ src: "icon-192.png", sizes: "192x192" }] },
+          ],
           icons: [
             { src: "icon-192.png", sizes: "192x192", type: "image/png" },
             { src: "icon-512.png", sizes: "512x512", type: "image/png" },
-            { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+            { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
             { src: "favicon.svg", sizes: "any", type: "image/svg+xml" },
           ],
         },

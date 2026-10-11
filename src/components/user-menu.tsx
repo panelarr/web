@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { ChevronsUpDown, LogOut, Settings } from "lucide-react";
 import { displayName, useMe } from "@/auth/session";
 import { useSignOut } from "@/auth/use-sign-out";
+import { InstallApp, InstallIcon } from "@/components/install-app";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -26,7 +27,9 @@ export function initials(name: string): string {
 export function UserAvatar({ name }: { name: string }) {
   return (
     <Avatar className="size-8">
-      <AvatarFallback className="bg-primary/15 text-xs font-medium text-primary">{initials(name)}</AvatarFallback>
+      <AvatarFallback className="bg-primary text-xs font-medium text-primary-foreground">
+        {initials(name)}
+      </AvatarFallback>
     </Avatar>
   );
 }
@@ -57,6 +60,14 @@ export function UserMenu() {
             Settings
           </Link>
         </DropdownMenuItem>
+        <InstallApp
+          render={({ onClick }) => (
+            <DropdownMenuItem onSelect={onClick}>
+              <InstallIcon aria-hidden />
+              Install the app
+            </DropdownMenuItem>
+          )}
+        />
         <DropdownMenuItem onSelect={signOut}>
           <LogOut aria-hidden />
           Sign out

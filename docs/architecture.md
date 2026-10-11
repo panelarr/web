@@ -56,6 +56,28 @@ Phones get a native-app layout: a top bar, a bottom navigation bar, full-screen 
 areas for notches and the home indicator. From the `md` breakpoint (768 px) up, a sidebar
 replaces both bars. No page may scroll sideways at 360 px; a Playwright test checks every page.
 
+## The reader
+
+`src/features/reader/` is a full-screen route outside the app shell (`/read/$chapterId`).
+
+- **Page by page** (`paged-viewer.tsx`): three slots (previous, current, next) on a track that
+  follows the finger; slide, fade or no transition (none when reduced motion is asked for).
+  Pinch, double tap and Ctrl+wheel zoom with panning (`zoom.ts`), tap zones (`tap-zones.ts`).
+  Double page pairs pages as their sizes become known (`spreads.ts`).
+- **Long strips** (`strip-viewer.tsx`, `horizontal-viewer.tsx`): TanStack Virtual with measured
+  pages and native scrolling and pinch.
+- **Settings** (`settings.ts`): the app's own JSON, stored by the server at three levels
+  (global, source, series), merged over defaults chosen by the work's type, with where each
+  value comes from.
+- **Progress** (`use-progress.ts`): saved at most every 2 seconds while reading, and at once
+  (keepalive) when leaving.
+
+## Downloads and live updates
+
+Downloads are tasks in the server's queue. Their progress arrives over the event stream and is
+patched into cached lists in place (`src/api/events.ts`), so the work page, the downloads page
+and the queue update live without refetching.
+
 ## Theming
 
 Colour themes are data (`src/theme/presets.ts`): each sets every colour token as a CSS
@@ -66,6 +88,23 @@ one loads.
 
 `public/theme-boot.js` applies the saved theme before the app's code runs, so there is no
 flash of the wrong colours. It is a file rather than inline script, which the CSP forbids.
+Appearance is saved to the account (`/me/preferences`, `src/theme/sync.ts`): on sign-in the
+account's choices win, so every device looks the same.
+
+## Installable app
+
+`vite-plugin-pwa` builds the manifest (icons, a maskable icon, shortcuts) and a service worker
+that caches the app shell only, never API responses or pages. A new version asks before it
+reloads. "Install the app" uses the browser's prompt, or shows the steps on iOS.
+
+## Quality gates
+
+- `make check`: lint, generated types, build with the dist check (strict-CSP safety and size
+  budgets: the first visit and all scripts, gzipped), types, unit and component tests (every
+  mock answer checked against the spec).
+- `make e2e`: Playwright on a desktop and a 360 px phone: the main flows, no sideways
+  scrolling, axe accessibility checks (light and dark), a full journey (set up, add, read,
+  download), and the production build under the real CSP.
 
 ## Lessons kept from Panelarr's other admin UIs
 

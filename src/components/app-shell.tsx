@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, WifiOff } from "lucide-react";
 import type { ReactNode } from "react";
 import { $api } from "@/api/client";
 import { useIsAdmin } from "@/auth/session";
@@ -9,6 +9,7 @@ import { HealthBanner } from "@/components/health-banner";
 import { Logo } from "@/components/logo";
 import { NAV_ITEMS, type NavItem } from "@/components/nav";
 import { UserMenu } from "@/components/user-menu";
+import { useOnline } from "@/hooks/use-online";
 import { cn } from "@/lib/utils";
 import { usePreferencesSync } from "@/theme/sync";
 
@@ -27,14 +28,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   usePreferencesSync();
   return (
     <div className="min-h-dvh md:pl-60">
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        Skip to content
+      </a>
       <Sidebar />
       <MobileTopBar />
       <main
+        id="main"
+        tabIndex={-1}
         className={cn(
+          "outline-none",
           "mx-auto w-full max-w-7xl px-gutter pt-4 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)]",
           "md:px-8 md:pt-8 md:pb-8",
         )}
       >
+        <OfflineBanner />
         {isAdmin ? <HealthBanner /> : null}
         {children}
       </main>
@@ -111,6 +122,21 @@ function BottomNav() {
         </Link>
       </div>
     </nav>
+  );
+}
+
+/** Shown while the device is offline: reading downloaded pages needs the server too. */
+function OfflineBanner() {
+  const online = useOnline();
+  if (online) return null;
+  return (
+    <div
+      role="status"
+      className="mb-4 flex items-center gap-2 rounded-lg border border-warning/50 bg-warning/10 px-4 py-2.5 text-sm"
+    >
+      <WifiOff className="size-4 shrink-0 text-warning" aria-hidden />
+      You're offline. Panelarr shows what it has loaded and catches up when you're back.
+    </div>
   );
 }
 

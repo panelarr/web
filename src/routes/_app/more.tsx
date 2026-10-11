@@ -5,6 +5,7 @@ import { ChevronRight, LogOut } from "lucide-react";
 import { displayName, useMe } from "@/auth/session";
 import { useSignOut } from "@/auth/use-sign-out";
 import { useNavItems } from "@/components/app-shell";
+import { InstallApp, InstallIcon } from "@/components/install-app";
 import { PageHeader } from "@/components/states";
 import { UserAvatar } from "@/components/user-menu";
 
@@ -39,6 +40,20 @@ function MorePage() {
               </Link>
             </li>
           ))}
+        <InstallApp
+          render={({ onClick }) => (
+            <li>
+              <button
+                type="button"
+                onClick={onClick}
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-accent"
+              >
+                <InstallIcon className="size-5 text-muted-foreground" aria-hidden />
+                <span className="flex-1">Install the app</span>
+              </button>
+            </li>
+          )}
+        />
         <li>
           <button
             type="button"
