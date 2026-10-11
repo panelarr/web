@@ -41,6 +41,13 @@ export function chaptersBefore(chapters: Chapter[], id: string): string[] {
   return index > 0 ? sorted.slice(0, index).map((c) => c.id) : [];
 }
 
+/** The chapters after `id` in reading order, e.g. to download the rest. */
+export function chaptersAfter(chapters: Chapter[], id: string): string[] {
+  const sorted = [...chapters].sort(readingOrder);
+  const index = sorted.findIndex((c) => c.id === id);
+  return index >= 0 ? sorted.slice(index + 1).map((c) => c.id) : [];
+}
+
 /** Numbered chapters by number, extras after. */
 export function readingOrder(a: Chapter, b: Chapter): number {
   if (a.number === undefined && b.number === undefined) return 0;

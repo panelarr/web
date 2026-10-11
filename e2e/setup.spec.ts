@@ -136,3 +136,18 @@ test("double page shows a spread on its own", async ({ page, isMobile }) => {
   const current = page.locator("[aria-hidden=false]").filter({ has: page.getByAltText("Page 7") });
   await expect(current.getByAltText("Page 8")).toBeVisible();
 });
+
+test("downloads chapters and follows them to the end", async ({ page }) => {
+  await page.goto("/catalog/ent_1000?mock=ready");
+  await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
+  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await page.goto("/");
+  await page.getByText("The Lantern Keeper").click();
+  await expect(page.getByRole("link", { name: /Start reading/ })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Download", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Unread chapters" }).click();
+  await expect(page.getByText(/Downloads: \d+ queued/)).toBeVisible();
+  await page.goto("/downloads?state=succeeded");
+  // The mock server downloads two chapters at a time, a few pages a second.
+  await expect(page.getByText("The Lantern Keeper").first()).toBeVisible({ timeout: 15_000 });
+});

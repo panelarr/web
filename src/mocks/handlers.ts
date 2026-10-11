@@ -7,6 +7,7 @@ import { CATALOG, coverSvg, summary, withinCeiling } from "./catalog";
 import { continueChapter, seriesChapters, unifiedChapters } from "./chapters";
 import { health, systemInfo } from "./data";
 import { commit, currentUser, db, type MockInvite, newId } from "./db";
+import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
 import { finishRun, queueState, startRun, taskEvent } from "./jobs";
 import { type MockOperation, mockUrl, op, problem } from "./op";
@@ -150,6 +151,18 @@ function visibleCatalog(user: S["User"], url: URL): Array<[S["CatalogEntry"], nu
   if (compare) list.sort(([a], [b]) => compare(a, b));
   if (p.get("reverse") === "true") list.reverse();
   return list;
+}
+
+/** What the server's write-read-delete probe would say about a storage; undefined when fine. */
+function storageCheck(kind: string, settings: S["StorageSettings"]): string | undefined {
+  if (kind === "local") {
+    if (!settings.root?.startsWith("/")) return "The directory must be an absolute path.";
+    if (settings.root.startsWith("/readonly")) return `Can't write to ${settings.root}: read-only file system.`;
+    return undefined;
+  }
+  if (!settings.endpoint || !/^https?:\/\//.test(settings.endpoint)) return "The endpoint must be an http(s) URL.";
+  if (!settings.bucket) return "Name the bucket.";
+  return undefined;
 }
 
 /** May the user fix matches? */
@@ -1295,6 +1308,176 @@ export const operations: MockOperation[] = [
     db().preferences[user.id] = (await request.json()) as Record<string, unknown>;
     commit();
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  // Downloads
+
+  op("post", "/works/{work_id}/downloads", async ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    if (user.role !== "admin" && !user.grants.may_download) {
+      return problem(403, "grant_required", "Not allowed", "You may not download.");
+    }
+    const workId = String(params.work_id);
+    const work = workView(user, workId);
+    if (!work) return problem(404, "not_found", "Not found");
+    const body = (await request.json()) as S["DownloadChaptersRequest"];
+    const d = db();
+    const all = unifiedChapters(d, workId, user.id).map((c) => c.chapter);
+    const mine = d.progress[user.id] ?? {};
+    const picked = body.chapter_ids
+      ? all.filter((c) => body.chapter_ids?.includes(c.id))
+      : body.scope === "unread"
+        ? all.filter((c) => !mine[c.id]?.completed)
+        : all;
+    const result = { queued: 0, downloaded: 0, unavailable: 0 };
+    for (const chapter of picked) {
+      if (!chapter.available) {
+        result.unavailable += 1;
+        continue;
+      }
+      const outcome = queueDownload(d, { id: chapter.id, title: chapter.title, number: chapter.number }, work, user.id);
+      if (outcome === "queued") result.queued += 1;
+      if (outcome === "downloaded") result.downloaded += 1;
+    }
+    commit();
+    return json<S["DownloadsQueued"]>(result, 202);
+  }),
+
+  op("get", "/downloads", ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const url = new URL(request.url);
+    const everyone = url.searchParams.get("all") === "true" && user.role === "admin";
+    const state = url.searchParams.get("state");
+    const items = db()
+      .tasks.filter(
+        (t) => t.kind === "download.chapter" && (everyone || t.created_by === user.id) && (!state || t.state === state),
+      )
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map(downloadItem)
+      .filter((item): item is S["DownloadItem"] => item !== undefined);
+    const { items: page, next } = paginate(items, url);
+    return json<S["DownloadPage"]>({ items: page, next_page_token: next });
+  }),
+
+  op("put", "/library/{work_id}/auto-download", async ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    if (user.role !== "admin" && !user.grants.may_download) {
+      return problem(403, "grant_required", "Not allowed", "You may not download.");
+    }
+    const entry = db().library.find((e) => e.user_id === user.id && e.work_id === params.work_id);
+    if (!entry) return problem(404, "not_found", "Not in your library");
+    entry.auto_download = ((await request.json()) as S["AutoDownloadRequest"]).enabled;
+    emit("library.changed", { work_id: String(params.work_id) });
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("delete", "/chapters/{chapter_id}/file", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const d = db();
+    const id = String(params.chapter_id);
+    if (!d.downloaded.includes(id)) return problem(404, "not_found", "Not downloaded");
+    d.downloaded = d.downloaded.filter((c) => c !== id);
+    const storage = d.storages.find((s) => s.default);
+    if (storage && storage.files > 0) storage.files -= 1;
+    const found = findChapter(admin, id);
+    if (found) emit("work.updated", { work_id: found.work.id });
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // Storage
+
+  op("get", "/storages", () => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const list = [...db().storages].sort((a, b) => Number(b.default) - Number(a.default));
+    return json<S["StorageList"]>({ storages: list });
+  }),
+
+  op("post", "/storages", async ({ request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const body = (await request.json()) as S["CreateStorageRequest"];
+    const d = db();
+    if (d.storages.some((s) => s.id === body.id))
+      return problem(409, "storage_exists", "ID taken", `A storage "${body.id}" exists.`);
+    const failed = storageCheck(body.kind, body);
+    if (failed) return problem(422, "storage_check_failed", "The storage check failed", failed);
+    const { secret_key, ...settings } = body;
+    const created: S["StorageInfo"] = {
+      ...settings,
+      name: body.name ?? body.id,
+      default: false,
+      has_secret: !!secret_key,
+      files: 0,
+    };
+    d.storages.push(created);
+    commit();
+    return json(created, 201);
+  }),
+
+  op("patch", "/storages/{storage_id}", async ({ params, request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const d = db();
+    const storage = d.storages.find((s) => s.id === params.storage_id);
+    if (!storage) return problem(404, "not_found", "Not found");
+    const { default: makeDefault, secret_key, ...change } = (await request.json()) as S["UpdateStorageRequest"];
+    const failed = storageCheck(storage.kind, { ...storage, ...change });
+    if (failed) return problem(422, "storage_check_failed", "The storage check failed", failed);
+    Object.assign(storage, change);
+    if (secret_key) storage.has_secret = true;
+    if (makeDefault) for (const s of d.storages) s.default = s.id === storage.id;
+    commit();
+    return json(storage);
+  }),
+
+  op("delete", "/storages/{storage_id}", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const d = db();
+    const storage = d.storages.find((s) => s.id === params.storage_id);
+    if (!storage) return problem(404, "not_found", "Not found");
+    if (storage.default)
+      return problem(409, "storage_default", "The default storage", "Make another storage the default first.");
+    if (storage.files > 0)
+      return problem(
+        409,
+        "storage_in_use",
+        "Files are on it",
+        `Move its ${storage.files} files to another storage first.`,
+      );
+    d.storages = d.storages.filter((s) => s !== storage);
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("post", "/storages/{storage_id}/test", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const storage = db().storages.find((s) => s.id === params.storage_id);
+    if (!storage) return problem(404, "not_found", "Not found");
+    const failed = storageCheck(storage.kind, storage);
+    return json<S["StorageTest"]>(failed ? { ok: false, error: failed } : { ok: true });
+  }),
+
+  op("post", "/storages/{storage_id}/move", async ({ params, request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const d = db();
+    const from = d.storages.find((s) => s.id === params.storage_id);
+    const { to } = (await request.json()) as S["MoveStorageRequest"];
+    const target = d.storages.find((s) => s.id === to);
+    if (!from || !target) return problem(404, "not_found", "Not found");
+    target.files += from.files;
+    from.files = 0;
+    commit();
+    return json<S["TaskRef"]>({ task_id: newId() }, 202);
   }),
 
   // Browsing sources

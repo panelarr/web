@@ -8,6 +8,7 @@ import {
   BookOpen,
   CheckCheck,
   CircleCheck,
+  Download,
   EllipsisVertical,
   HardDriveDownload,
   Layers,
@@ -25,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -32,9 +34,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { VirtualList } from "@/components/virtual-list";
 import { HealthBadge } from "@/features/admin/health-badge";
+import { useLibraryIndex } from "@/features/catalog/library-index";
+import { downloadLabel, useCanDownload, useOpenDownloads } from "@/features/downloads/use-downloads";
 import { formatDate, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { type Chapter, chapterLabel, chaptersBefore, type Progress, reasonText } from "./chapters";
+import { type Chapter, chapterLabel, chaptersAfter, chaptersBefore, type Progress, reasonText } from "./chapters";
 
 type Work = components["schemas"]["Work"];
 
@@ -82,6 +86,30 @@ export function ChaptersPanel({
   });
   const seen = $api.useMutation("post", "/library/{work_id}/seen", { onSuccess: invalidate, onError });
   const mark = $api.useMutation("post", "/works/{work_id}/progress", { onSuccess: invalidate, onError });
+  const { user } = useMe();
+  const canDownload = useCanDownload();
+  const downloads = useOpenDownloads(canDownload);
+  const library = useLibraryIndex();
+  const autoDownload = library.data?.get(work.entry_id)?.auto_download ?? false;
+  const queryClient = useQueryClient();
+  const download = $api.useMutation("post", "/works/{work_id}/downloads", {
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[1] === "/downloads" });
+      const parts = [
+        result.queued > 0 ? `${result.queued} queued` : undefined,
+        result.downloaded > 0 ? `${result.downloaded} already downloaded` : undefined,
+        result.unavailable > 0 ? `${result.unavailable} no longer listed` : undefined,
+      ].filter(Boolean);
+      toast.success(parts.length > 0 ? `Downloads: ${parts.join(", ")}.` : "Nothing new to download.");
+    },
+    onError,
+  });
+  const auto = $api.useMutation("put", "/library/{work_id}/auto-download", {
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["library-index"] }),
+    onError,
+  });
+  const deleteFile = $api.useMutation("delete", "/chapters/{chapter_id}/file", { onSuccess: invalidate, onError });
+  const queue = (body: { chapter_ids: string[] } | { scope: "all" | "unread" }) => download.mutate({ ...path, body });
 
   const byChapter = useMemo(
     () => new Map((progress.data?.chapters ?? []).map((p) => [p.chapter_id, p])),
@@ -146,6 +174,33 @@ export function ChaptersPanel({
           <RefreshCw className={refresh.isPending ? "animate-spin" : undefined} aria-hidden />
           Check for new
         </Button>
+        {canDownload ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={download.isPending}>
+                <Download aria-hidden />
+                Download
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => queue({ scope: "unread" })}>Unread chapters</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => queue({ scope: "all" })}>All chapters</DropdownMenuItem>
+              {work.in_library ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={autoDownload}
+                    onCheckedChange={(enabled) =>
+                      auto.mutate({ params: { path: { work_id: work.id } }, body: { enabled: enabled === true } })
+                    }
+                  >
+                    New chapters automatically
+                  </DropdownMenuCheckboxItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
       {all.length === 0 ? (
         <EmptyState icon={<Layers />} title="No chapters yet">
@@ -168,6 +223,20 @@ export function ChaptersPanel({
               progress={byChapter.get(chapter.id)}
               onRead={(value) => setRead([chapter.id], value)}
               onReadBefore={() => setRead(chaptersBefore(all, chapter.id), true)}
+              download={downloads.get(chapter.id)}
+              onDownload={
+                canDownload
+                  ? (andLater) =>
+                      queue({
+                        chapter_ids: andLater ? [chapter.id, ...chaptersAfter(all, chapter.id)] : [chapter.id],
+                      })
+                  : undefined
+              }
+              onDeleteFile={
+                user.role === "admin" && chapter.downloaded
+                  ? () => deleteFile.mutate({ params: { path: { chapter_id: chapter.id } } })
+                  : undefined
+              }
             />
           )}
         />
@@ -182,12 +251,19 @@ function ChapterRow({
   progress,
   onRead,
   onReadBefore,
+  download,
+  onDownload,
+  onDeleteFile,
 }: {
   work: Work;
   chapter: Chapter;
   progress: Progress | undefined;
   onRead: (read: boolean) => void;
   onReadBefore: () => void;
+  /** Its download, while queued or running. */
+  download?: components["schemas"]["Task"] | undefined;
+  onDownload?: ((andLater: boolean) => void) | undefined;
+  onDeleteFile?: (() => void) | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const read = progress?.completed ?? false;
@@ -205,6 +281,11 @@ function ChapterRow({
               {chapterLabel(chapter)}
             </Link>
             {chapter.new ? <Badge>New</Badge> : null}
+            {download ? (
+              <Badge variant="outline" className="border-info/40 text-info">
+                {downloadLabel(download)}
+              </Badge>
+            ) : null}
             {chapter.pinned ? (
               <Pin className="size-3.5 text-muted-foreground" aria-label="Copy chosen by hand" />
             ) : null}
@@ -255,6 +336,21 @@ function ChapterRow({
               {read ? "Mark as unread" : "Mark as read"}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={onReadBefore}>Mark earlier chapters as read</DropdownMenuItem>
+            {onDownload && !chapter.downloaded && !download ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => onDownload(false)}>Download</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onDownload(true)}>Download this and later chapters</DropdownMenuItem>
+              </>
+            ) : null}
+            {onDeleteFile ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={onDeleteFile}>
+                  Delete the downloaded file
+                </DropdownMenuItem>
+              </>
+            ) : null}
             {chapter.variants > 1 ? (
               <>
                 <DropdownMenuSeparator />

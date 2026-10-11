@@ -41,6 +41,7 @@ test("never scrolls sideways", async ({ page }) => {
     "/admin/plugins",
     "/admin/plugins/example",
     "/admin/sources",
+    "/admin/storage",
     "/admin/system",
     "/admin/jobs",
     "/admin/jobs/update-check",

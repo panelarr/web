@@ -35,9 +35,20 @@ export const PATCHES: Partial<Record<EventType, (client: QueryClient, data: neve
     client.setQueriesData<{ id: string }>({ predicate: (q) => keyPath(q) === "/tasks/{task_id}" }, (old) =>
       old?.id === task.id ? patch(old) : old,
     );
+    // Downloads are tasks too: { items: [{ task }] }.
+    client.setQueriesData<DownloadPage | Paged<DownloadPage>>(
+      { predicate: (q) => keyPath(q) === "/downloads" },
+      (old) =>
+        mapPages(old, (page) =>
+          page.items ? { ...page, items: page.items.map((item) => ({ ...item, task: patch(item.task) })) } : page,
+        ),
+    );
   },
 };
 
+interface DownloadPage {
+  items?: Array<{ task: { id: string } }>;
+}
 interface TaskPage {
   tasks?: Array<{ id: string }>;
 }

@@ -15,7 +15,11 @@ const TONES = {
 } as const;
 
 export function RunStatusBadge({ status, className }: { status: RunStatus | string; className?: string }) {
-  const known = RUN_STATUS[status as RunStatus] ?? { label: status, tone: "neutral" as const };
+  // Tasks share the run states, plus "queued".
+  const known = RUN_STATUS[status as RunStatus] ?? {
+    label: status === "queued" ? "Queued" : status.replace(/^./, (c) => c.toUpperCase()),
+    tone: "neutral" as const,
+  };
   return (
     <span
       className={cn(

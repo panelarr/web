@@ -11,6 +11,7 @@
 // In the browser, pick one with `?mock=<scenario>`; it lasts for the tab (sessionStorage).
 import type { components } from "@/api/schema.gen";
 import { adminUser, apiKey, invite, metaConnection, plugin, pluginConfig, readerUser, session, sources } from "./data";
+import { initialStorages } from "./downloads";
 import { initialJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
 
 type S = components["schemas"];
@@ -58,6 +59,7 @@ export interface MockDb extends JobsState {
   readerSettings: Record<string, Record<string, Record<string, unknown>>>;
   /** Per user: app preferences. */
   preferences: Record<string, Record<string, unknown>>;
+  storages: S["StorageInfo"][];
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -96,6 +98,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     downloaded: [],
     readerSettings: {},
     preferences: {},
+    storages: initialStorages(),
     jobs: initialJobs(),
     runs: initialRuns(),
     tasks: initialTasks(),

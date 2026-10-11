@@ -2,6 +2,7 @@
 
 import { setupWorker } from "msw/browser";
 import { commit, db, loadBrowserDb } from "./db";
+import { tickDownloads } from "./downloads";
 import { createEventsHandler, operations } from "./handlers";
 import { tickJobs } from "./jobs";
 import { isDraft } from "./op";
@@ -23,7 +24,8 @@ export async function startMockWorker(mode: "all" | "drafts"): Promise<void> {
     setInterval(() => {
       const jobs = tickJobs(db());
       const matching = tickMatching(db());
-      if (jobs || matching) commit();
+      const downloads = tickDownloads(db());
+      if (jobs || matching || downloads) commit();
     }, 1_000);
   }
   await worker.start({
