@@ -114,3 +114,25 @@ test("reads a chapter: swipe and tap through pages, right to left", async ({ pag
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("double page shows a spread on its own", async ({ page, isMobile }) => {
+  test.skip(isMobile, "double page is for wide screens");
+  await page.goto("/catalog/ent_1000?mock=ready");
+  await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
+  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await page.goto("/");
+  await page.getByText("The Lantern Keeper").click();
+  await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Reader settings" }).click();
+  await page.getByLabel(/^Mode/).selectOption("double");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  const status = page.locator("[aria-live=polite]").filter({ hasText: /Page \d+ of \d+/ });
+  // Cover alone, then 2+3, 4+5; page 6 is a spread, alone.
+  for (const expected of ["Page 1", "Page 3", "Page 5", "Page 6"]) {
+    await expect(status).toHaveText(new RegExp(`^${expected} of`));
+    await page.keyboard.press("ArrowLeft");
+  }
+  const current = page.locator("[aria-hidden=false]").filter({ has: page.getByAltText("Page 7") });
+  await expect(current.getByAltText("Page 8")).toBeVisible();
+});

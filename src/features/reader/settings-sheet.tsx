@@ -52,13 +52,11 @@ const TRANSITION: Options<"transition"> = [
 ];
 const BACKGROUND: Options<"background"> = [
   ["theme", "Theme"],
+  ["auto", "Match the page"],
   ["black", "Black"],
   ["gray", "Gray"],
   ["white", "White"],
 ];
-
-/** In 7b: double page and horizontal scroll. */
-const NOT_YET: ReadonlyArray<ReaderSettings["mode"]> = ["double", "horizontal"];
 
 /**
  * The reader's settings, changed live. Each says where its value comes from; changes are
@@ -110,7 +108,10 @@ export function ReaderSettingsSheet({
       )}
     </Row>
   );
-  const toggle = (key: "stretch" | "invertTapZones" | "showPageNumber", label: string) => (
+  const toggle = (
+    key: "stretch" | "invertTapZones" | "showPageNumber" | "offsetSpreads" | "keepAwake",
+    label: string,
+  ) => (
     <Row key={key} label={label} origin={origin[key]} inline>
       {(id) => <Switch id={id} checked={settings[key]} onCheckedChange={(checked) => onChange({ [key]: checked })} />}
     </Row>
@@ -178,17 +179,25 @@ export function ReaderSettingsSheet({
           </fieldset>
           <section className="grid gap-3">
             <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Reading</h3>
-            {select("mode", "Mode", MODE, (v) => NOT_YET.includes(v))}
-            {continuous ? null : select("direction", "Direction", DIRECTION)}
+            {select("mode", "Mode", MODE)}
+            {settings.mode === "vertical" || settings.mode === "webtoon"
+              ? null
+              : select("direction", "Direction", DIRECTION)}
+            {settings.mode === "double" ? toggle("offsetSpreads", "Cover alone (pairs printed pages)") : null}
           </section>
           <section className="grid gap-3">
             <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Display</h3>
-            {continuous ? null : select("fit", "Fit", FIT)}
+            {continuous || settings.mode === "double" ? null : select("fit", "Fit", FIT)}
             {continuous ? null : toggle("stretch", "Stretch small pages")}
-            {settings.mode === "vertical" ? number("pageGap", "Gap between pages (px)", 0, 64, 2) : null}
-            {continuous ? number("maxWidth", "Widest page (px, 0 for none)", 0, 4000, 50) : null}
+            {settings.mode === "vertical" || settings.mode === "horizontal"
+              ? number("pageGap", "Gap between pages (px)", 0, 64, 2)
+              : null}
+            {settings.mode === "vertical" || settings.mode === "webtoon"
+              ? number("maxWidth", "Widest page (px, 0 for none)", 0, 4000, 50)
+              : null}
             {select("background", "Background", BACKGROUND)}
             {toggle("showPageNumber", "Page number")}
+            {toggle("keepAwake", "Keep the screen on")}
           </section>
           <section className="grid gap-3">
             <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Controls</h3>

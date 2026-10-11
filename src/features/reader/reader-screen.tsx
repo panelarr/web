@@ -10,9 +10,12 @@ import type { components } from "@/api/schema.gen";
 import { serverUrl } from "@/lib/server-url";
 import { cn } from "@/lib/utils";
 import { ChapterEdge, PageNumber, ReaderOverlay } from "./chrome";
+import { HorizontalViewer } from "./horizontal-viewer";
 import { PagedViewer } from "./paged-viewer";
+import { edgeColor, TapZonePreview, useFullscreen, useWakeLock } from "./screen-helpers";
 import { isContinuous, type Mode, type ReaderSettings } from "./settings";
 import { ReaderSettingsSheet } from "./settings-sheet";
+import { isSpread, pairPages, viewOf } from "./spreads";
 import { StripViewer } from "./strip-viewer";
 import { useProgressSaver } from "./use-progress";
 import { type SaveLevel, useReaderSettings } from "./use-reader-settings";
@@ -22,17 +25,16 @@ type Work = components["schemas"]["Work"];
 
 const BACKGROUNDS: Record<ReaderSettings["background"], string> = {
   theme: "bg-background",
+  auto: "bg-background",
   black: "bg-black",
   gray: "bg-neutral-700",
   white: "bg-white",
 };
 
-/** Modes still to come fall back to the closest one that works today. */
-function playable(mode: Mode): Mode {
-  if (mode === "double") return "single";
-  if (mode === "horizontal") return "vertical";
-  return mode;
-}
+type Size = { width: number; height: number };
+
+/** A page this much taller than wide is part of a long strip. */
+const STRIP_RATIO = 2.5;
 
 /** Where to open: the page asked for, else where the user left off (unless finished). */
 export function startPage(data: ChapterPages, asked: number | "last" | undefined): number {
@@ -59,10 +61,37 @@ export function ReaderScreen({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const reader = useReaderSettings(data.work_id, data.variant.source_id, work?.type);
-  const settings = { ...reader.settings, mode: playable(reader.settings.mode) };
+  // Long strips found in a work without a chosen mode are read as a webtoon.
+  const [stripFound, setStripFound] = useState(false);
+  const settings: ReaderSettings = {
+    ...reader.settings,
+    mode: stripFound && reader.origin.mode === "default" ? ("webtoon" as Mode) : reader.settings.mode,
+  };
   const continuous = isContinuous(settings.mode);
   const total = data.pages.length;
   const urls = useMemo(() => data.pages.map((p) => p.url), [data.pages]);
+
+  // Page sizes, learnt as images load: for spreads and long strips.
+  const [sizes, setSizes] = useState<Record<number, Size>>({});
+  const offerWebtoon = useRef(true);
+  const recordSize = useCallback(
+    (page: number, size: Size) => {
+      setSizes((prev) => (prev[page] ? prev : { ...prev, [page]: size }));
+      if (size.height > size.width * STRIP_RATIO && reader.origin.mode === "default" && offerWebtoon.current) {
+        offerWebtoon.current = false;
+        setStripFound(true);
+        toast("Long strip found: reading as a webtoon.", {
+          action: { label: "Keep for this series", onClick: () => reader.update({ mode: "webtoon" }, "work") },
+        });
+      }
+    },
+    [reader],
+  );
+  const views = useMemo(
+    () =>
+      settings.mode === "double" ? pairPages(total, (i) => isSpread(sizes[i]), settings.offsetSpreads) : undefined,
+    [settings.mode, settings.offsetSpreads, total, sizes],
+  );
 
   const [index, setIndex] = useState(() => startPage(data, asked));
   const [overlay, setOverlay] = useState(true);
@@ -118,10 +147,12 @@ export function ReaderScreen({
   useEffect(() => {
     for (let i = Math.max(0, index - 1); i <= Math.min(total - 1, index + settings.preload); i++) {
       const image = new Image();
+      const page = i;
       image.decoding = "async";
+      image.onload = () => recordSize(page, { width: image.naturalWidth, height: image.naturalHeight });
       image.src = serverUrl(urls[i]) ?? "";
     }
-  }, [index, settings.preload, total, urls]);
+  }, [index, settings.preload, total, urls, recordSize]);
 
   // Near the end, fetch the next chapter's page list so it opens at once.
   useEffect(() => {
@@ -150,10 +181,12 @@ export function ReaderScreen({
       if (k.sheet || event.altKey || event.metaKey || event.ctrlKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [role=dialog]")) return;
-      const rtl = !k.continuous && k.settings.direction === "rtl";
+      // Arrows sideways follow the direction wherever pages move sideways; long strips scroll natively.
+      const strip = k.settings.mode === "vertical" || k.settings.mode === "webtoon";
+      const rtl = !strip && k.settings.direction === "rtl";
       const map: Record<string, (() => void) | undefined> = {
-        ArrowRight: k.continuous ? undefined : () => k.step(rtl ? "prev" : "next"),
-        ArrowLeft: k.continuous ? undefined : () => k.step(rtl ? "next" : "prev"),
+        ArrowRight: strip ? undefined : () => k.step(rtl ? "prev" : "next"),
+        ArrowLeft: strip ? undefined : () => k.step(rtl ? "next" : "prev"),
         ArrowDown: k.continuous ? undefined : () => k.step("next"),
         ArrowUp: k.continuous ? undefined : () => k.step("prev"),
         PageDown: () => k.step("next"),
@@ -181,6 +214,34 @@ export function ReaderScreen({
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate]);
 
+  // "Match the page": the colour of the current page's edges.
+  const [pageColor, setPageColor] = useState<string>();
+  useEffect(() => {
+    if (settings.background !== "auto" || index < 0 || index >= total) return;
+    let cancelled = false;
+    void edgeColor(serverUrl(urls[index]) ?? "").then((color) => {
+      if (!cancelled && color) setPageColor(color);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.background, index, total, urls]);
+
+  useWakeLock(settings.keepAwake);
+  const { fullscreen, toggle: toggleFullscreen } = useFullscreen();
+
+  // Show where the tap zones are for a moment after they change.
+  const [preview, setPreview] = useState(false);
+  const zones = `${settings.tapZones}|${settings.invertTapZones}|${settings.direction}`;
+  const firstZones = useRef(zones);
+  useEffect(() => {
+    if (zones === firstZones.current) return;
+    firstZones.current = zones;
+    setPreview(true);
+    const timer = setTimeout(() => setPreview(false), 1600);
+    return () => clearTimeout(timer);
+  }, [zones]);
+
   const edge = (kind: "start" | "end") => () => (
     <ChapterEdge
       kind={kind}
@@ -191,9 +252,21 @@ export function ReaderScreen({
     />
   );
 
+  // Page by page in double mode turns a view (one or two pages) at a time.
+  const viewIndex = views ? viewOf(views, index) : index;
+  const onViewChange = (view: number) => {
+    if (!views) return onIndexChange(view);
+    const pages = views[view];
+    onIndexChange(view < 0 ? -1 : view >= views.length || !pages ? total : (pages[pages.length - 1] as number));
+  };
+  // Right to left applies to everything that moves sideways.
+  const sideways = settings.mode !== "vertical" && settings.mode !== "webtoon";
+  const rtl = sideways && settings.direction === "rtl";
+
   return (
     <div
       className={cn("fixed inset-0 overflow-hidden text-foreground", BACKGROUNDS[settings.background])}
+      style={settings.background === "auto" && pageColor ? { backgroundColor: pageColor } : undefined}
       role="application"
       aria-label={`Reader: ${work?.title ?? ""}`}
       aria-roledescription="reader"
@@ -205,7 +278,19 @@ export function ReaderScreen({
             ? "End of the chapter"
             : "Start of the chapter"}
       </p>
-      {continuous ? (
+      {settings.mode === "horizontal" ? (
+        <HorizontalViewer
+          key={`${data.chapter.id}-${settings.mode}-${settings.direction}`}
+          urls={urls}
+          startIndex={index}
+          onIndexChange={onIndexChange}
+          settings={settings}
+          onMenu={() => setOverlay((v) => !v)}
+          renderStart={edge("start")}
+          renderEnd={edge("end")}
+          scroll={scroll}
+        />
+      ) : continuous ? (
         <StripViewer
           key={`${data.chapter.id}-${settings.mode}`}
           urls={urls}
@@ -219,10 +304,12 @@ export function ReaderScreen({
         />
       ) : (
         <PagedViewer
-          key={data.chapter.id}
+          key={`${data.chapter.id}-${settings.mode}`}
           urls={urls}
-          index={index}
-          onIndexChange={onIndexChange}
+          views={views}
+          onPageSize={recordSize}
+          index={viewIndex}
+          onIndexChange={onViewChange}
           settings={settings}
           onMenu={() => setOverlay((v) => !v)}
           renderStart={edge("start")}
@@ -230,6 +317,9 @@ export function ReaderScreen({
           turn={turn}
         />
       )}
+      {preview && !continuous ? (
+        <TapZonePreview layout={settings.tapZones} flip={rtl !== settings.invertTapZones} />
+      ) : null}
       {settings.showPageNumber && !overlay ? <PageNumber index={index} total={total} /> : null}
       <ReaderOverlay
         visible={overlay}
@@ -238,14 +328,16 @@ export function ReaderScreen({
         chapter={data.chapter}
         index={index}
         total={total}
-        rtl={settings.direction === "rtl"}
-        continuous={continuous}
+        rtl={rtl}
+        continuous={false}
         hasPrev={!!data.prev_chapter_id}
         hasNext={!!data.next_chapter_id}
         onPage={(page) => (continuous ? setScroll({ to: page, id: Date.now() }) : onIndexChange(page))}
         onPrevChapter={() => goToChapter(data.prev_chapter_id, "last")}
         onNextChapter={() => goToChapter(data.next_chapter_id, 0)}
         onSettings={() => setSheet(true)}
+        fullscreen={fullscreen}
+        onFullscreen={toggleFullscreen}
       />
       <ReaderSettingsSheet
         open={sheet}

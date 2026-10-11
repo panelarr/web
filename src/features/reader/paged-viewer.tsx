@@ -33,6 +33,8 @@ interface Pointer {
  */
 export function PagedViewer({
   urls,
+  views: givenViews,
+  onPageSize,
   index,
   onIndexChange,
   settings,
@@ -42,6 +44,10 @@ export function PagedViewer({
   turn,
 }: {
   urls: readonly string[];
+  /** What each turn shows: one page, or two side by side (double-page mode). Defaults to one each. */
+  views?: readonly (readonly number[])[];
+  /** Tells the size of each page as it loads (for spread detection). */
+  onPageSize?: (page: number, size: { width: number; height: number }) => void;
   index: number;
   onIndexChange: (index: number) => void;
   settings: ReaderSettings;
@@ -78,7 +84,8 @@ export function PagedViewer({
   const tapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const min = -1;
-  const max = urls.length;
+  const views = givenViews ?? urls.map((_, i) => [i]);
+  const max = views.length;
   // A new page starts unzoomed, and the track settles without animating.
   // biome-ignore lint/correctness/useExhaustiveDependencies: on page change only
   useEffect(() => {
@@ -309,13 +316,35 @@ export function PagedViewer({
                     : undefined
                 }
               >
-                <PageImage
-                  url={urls[slot] as string}
-                  index={slot}
-                  fit={settings.fit}
-                  stretch={settings.stretch}
-                  eager={Math.abs(slot - index) <= 1}
-                />
+                {(views[slot] ?? []).length > 1 ? (
+                  <div className={cn("flex h-full w-full items-center justify-center", rtl && "flex-row-reverse")}>
+                    {(views[slot] ?? []).map((page, i) => (
+                      <PageImage
+                        key={page}
+                        url={urls[page] as string}
+                        index={page}
+                        fit="screen"
+                        stretch={settings.stretch}
+                        eager
+                        // The two pages meet at the spine.
+                        className={cn("w-1/2 basis-1/2", (i === 0) !== rtl ? "justify-end" : "justify-start")}
+                        onSize={(size) => onPageSize?.(page, size)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  (views[slot] ?? []).map((page) => (
+                    <PageImage
+                      key={page}
+                      url={urls[page] as string}
+                      index={page}
+                      fit={settings.fit}
+                      stretch={settings.stretch}
+                      eager={Math.abs(slot - index) <= 1}
+                      onSize={(size) => onPageSize?.(page, size)}
+                    />
+                  ))
+                )}
               </div>
             )}
           </div>

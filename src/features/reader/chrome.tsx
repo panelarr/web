@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Settings2, SkipBack, SkipForward } from "lucide-react";
+import { ArrowLeft, Maximize, Minimize, Settings2, SkipBack, SkipForward } from "lucide-react";
 import type { components } from "@/api/schema.gen";
 import { Button } from "@/components/ui/button";
 import { chapterLabel } from "@/features/works/chapters";
@@ -97,6 +97,8 @@ export function ReaderOverlay({
   onPrevChapter,
   onNextChapter,
   onSettings,
+  fullscreen,
+  onFullscreen,
 }: {
   visible: boolean;
   workId: string;
@@ -112,6 +114,8 @@ export function ReaderOverlay({
   onPrevChapter: () => void;
   onNextChapter: () => void;
   onSettings: () => void;
+  fullscreen?: boolean;
+  onFullscreen?: () => void;
 }) {
   const page = Math.min(total, Math.max(1, index + 1));
   const bar = "pointer-events-auto bg-background/90 backdrop-blur transition-transform duration-200 ease-out";
@@ -139,6 +143,17 @@ export function ReaderOverlay({
               {chapter.chosen ? ` · ${chapter.chosen.source_name}` : ""}
             </p>
           </div>
+          {onFullscreen && typeof document !== "undefined" && document.fullscreenEnabled ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={fullscreen ? "Leave fullscreen" : "Fullscreen"}
+              tabIndex={visible ? 0 : -1}
+              onClick={onFullscreen}
+            >
+              {fullscreen ? <Minimize aria-hidden /> : <Maximize aria-hidden />}
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"

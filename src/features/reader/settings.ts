@@ -9,7 +9,7 @@ export const DIRECTIONS = ["rtl", "ltr"] as const;
 export const FITS = ["width", "height", "screen", "original"] as const;
 export const TAP_ZONES = ["edge", "kindle", "lshape", "sides", "off"] as const;
 export const TRANSITIONS = ["slide", "fade", "none"] as const;
-export const BACKGROUNDS = ["theme", "black", "gray", "white"] as const;
+export const BACKGROUNDS = ["theme", "auto", "black", "gray", "white"] as const;
 
 export type Mode = (typeof MODES)[number];
 export type Direction = (typeof DIRECTIONS)[number];
@@ -37,6 +37,8 @@ export interface ReaderSettings {
   /** Show the first page alone in double-page mode (covers). */
   offsetSpreads: boolean;
   showPageNumber: boolean;
+  /** Keep the screen on while reading. */
+  keepAwake: boolean;
 }
 
 export type Level = "work" | "source" | "global" | "default";
@@ -56,6 +58,7 @@ const BASE: ReaderSettings = {
   preload: 4,
   offsetSpreads: true,
   showPageNumber: true,
+  keepAwake: true,
 };
 
 /** The defaults for a work's type: manga reads right to left, webtoons scroll. */

@@ -17,6 +17,7 @@ export function PageImage({
   onSize,
   className,
   placeholderHeight,
+  placeholderWidth,
 }: {
   url: string;
   index: number;
@@ -28,6 +29,8 @@ export function PageImage({
   className?: string;
   /** Space kept while loading (CSS length), so a long strip doesn't jump. */
   placeholderHeight?: string;
+  /** Width kept while loading, for pages side by side. */
+  placeholderWidth?: string;
 }) {
   const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
   const [attempt, setAttempt] = useState(0);
@@ -38,7 +41,14 @@ export function PageImage({
         fit === "screen" && "h-full",
         className,
       )}
-      style={state === "loaded" || !placeholderHeight ? undefined : { minHeight: placeholderHeight }}
+      style={
+        state === "loaded"
+          ? undefined
+          : {
+              ...(placeholderHeight ? { minHeight: placeholderHeight } : {}),
+              ...(placeholderWidth ? { minWidth: placeholderWidth } : {}),
+            }
+      }
     >
       {state !== "failed" ? (
         <img
