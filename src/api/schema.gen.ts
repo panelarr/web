@@ -1244,10 +1244,452 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/works/{work_id}/chapters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A work's unified chapters
+         * @description One row per chapter across all the work's sources: chapters with the
+         *     same number on several sources are one chapter, and a chapter
+         *     missing on one source is filled from another. Each shows the chosen
+         *     copy (variant) and why (`reason`): `pinned`, `only_source`,
+         *     `language` (the instance's preferred languages), `healthier_source`,
+         *     `priority` (the series' priority), `newest_upload` or
+         *     `first_listed`. Chapters without a number stay per source and come
+         *     last. `new` marks chapters found since you last marked the work
+         *     seen.
+         */
+        get: operations["listWorkChapters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/chapters/{chapter_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One chapter with every copy */
+        get: operations["getWorkChapter"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/chapters/{chapter_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose a chapter's copy by hand
+         * @description A pinned copy wins until it disappears from its source. `variant_id` null unpins. Needs `may_manage_matches`.
+         */
+        put: operations["pinChapterVariant"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/series/{series_id}/chapters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One source's chapters of the work, as the source lists them */
+        get: operations["listSeriesChapters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check the work's sources for new chapters now */
+        post: operations["refreshWork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/{work_id}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear the work's "new" chapter badges for you */
+        post: operations["markWorkSeen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chapters/{chapter_id}/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A chapter's pages for the reader
+         * @description The pages of the chapter's chosen copy (or `variant_id`'s), with
+         *     the previous and next chapters in reading order and your progress.
+         *     When the chosen copy is on a source you may not use, another copy
+         *     is used; `404` with code `no_copy` when none is left.
+         */
+        get: operations["getChapterPages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chapters/{chapter_id}/pages/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One page image
+         * @description Fetched through the source's plugin (its headers and network settings apply), never by the browser from the site.
+         */
+        get: operations["getChapterPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chapters/{chapter_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save where you are in a chapter
+         * @description Reaching the last page (when `pages` is given) marks the chapter read, unless `completed` says otherwise. Your other devices get a `progress.synced` event.
+         */
+        put: operations["setChapterProgress"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your progress in a work, and where to continue */
+        get: operations["getWorkProgress"];
+        put?: never;
+        /** Mark chapters read or unread */
+        post: operations["markChaptersRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chapters you read, newest first */
+        get: operations["getMyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/reader-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your reader settings for a place
+         * @description Settings live at three levels: global, per source and per work
+         *     (series). `effective` merges them, a more specific level's keys
+         *     winning. Their shape belongs to the client (zoom, fit, mode,
+         *     direction, …); the server stores JSON objects up to 16 KiB.
+         */
+        get: operations["getReaderSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/reader-settings/{scope}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description global, source:<source id> or work:<work id>. */
+                scope: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace one level of your reader settings */
+        put: operations["putReaderSettings"];
+        post?: never;
+        /** Remove one level (fall back to the broader ones) */
+        delete: operations["deleteReaderSettings"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your app preferences
+         * @description Theme, colours, fonts and other choices that follow you across devices. The shape belongs to the client; up to 16 KiB.
+         */
+        get: operations["getMyPreferences"];
+        /** Replace your app preferences */
+        put: operations["putMyPreferences"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ReaderPage: {
+            index: number;
+            /** @description The server's URL for the page image. */
+            url: string;
+        };
+        ChapterProgress: {
+            /** Format: uuid */
+            chapter_id: string;
+            /** @description The page you are on, from 0. */
+            page: number;
+            pages?: number;
+            completed: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ChapterPages: {
+            /** Format: uuid */
+            work_id: string;
+            chapter: components["schemas"]["UnifiedChapter"];
+            variant: components["schemas"]["ChapterVariant"];
+            /**
+             * @description Pages come live from the source, or from the downloaded file.
+             * @enum {string}
+             */
+            origin: "source" | "file";
+            pages: components["schemas"]["ReaderPage"][];
+            /** Format: uuid */
+            prev_chapter_id?: string;
+            /** Format: uuid */
+            next_chapter_id?: string;
+            progress?: components["schemas"]["ChapterProgress"];
+        };
+        SetProgressRequest: {
+            page: number;
+            pages?: number;
+            completed?: boolean;
+        };
+        WorkProgress: {
+            chapters: components["schemas"]["ChapterProgress"][];
+            /**
+             * Format: uuid
+             * @description Where to continue reading.
+             */
+            continue_chapter_id?: string;
+        };
+        MarkReadRequest: {
+            chapter_ids: string[];
+            read: boolean;
+        };
+        HistoryItem: {
+            /** Format: uuid */
+            work_id: string;
+            work_title: string;
+            work_cover_url?: string;
+            /** Format: uuid */
+            chapter_id: string;
+            chapter_number?: number;
+            chapter_title: string;
+            page: number;
+            pages?: number;
+            completed: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        HistoryPage: {
+            items: components["schemas"]["HistoryItem"][];
+            next_page_token: string;
+        };
+        ReaderSettings: {
+            global?: {
+                [key: string]: unknown;
+            };
+            source?: {
+                [key: string]: unknown;
+            };
+            work?: {
+                [key: string]: unknown;
+            };
+            effective: {
+                [key: string]: unknown;
+            };
+        };
+        ChapterVariant: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            series_id: string;
+            source_id: string;
+            source_name: string;
+            key: string;
+            name: string;
+            number?: number;
+            volume?: string;
+            scanlator?: string;
+            lang?: string;
+            /** Format: date-time */
+            uploaded_at?: string;
+            priority: number;
+            /** @enum {string} */
+            source_health: "ok" | "failing" | "unknown";
+        };
+        UnifiedChapter: {
+            /** Format: uuid */
+            id: string;
+            /** @description Absent for chapters without a number (extras). */
+            number?: number;
+            volume?: string;
+            title: string;
+            extra: boolean;
+            /** @description False when no source lists it any more. */
+            available: boolean;
+            new: boolean;
+            /** @description How many copies across your sources. */
+            variants: number;
+            /** @description Why the chosen copy won. */
+            reason: string;
+            pinned: boolean;
+            chosen?: components["schemas"]["ChapterVariant"];
+            /**
+             * Format: date-time
+             * @description When the chapter was first found.
+             */
+            created_at: string;
+        };
+        ChapterList: {
+            chapters: components["schemas"]["UnifiedChapter"][];
+        };
+        ChapterDetail: {
+            chapter: components["schemas"]["UnifiedChapter"];
+            variants: components["schemas"]["ChapterVariant"][];
+        };
+        PinVariantRequest: {
+            /** Format: uuid */
+            variant_id: string | null;
+        };
+        SeriesChapter: {
+            key: string;
+            name: string;
+            number?: number;
+            volume?: string;
+            scanlator?: string;
+            lang?: string;
+            url?: string;
+            /** Format: date-time */
+            uploaded_at?: string;
+            /** @description False when the source no longer lists it. */
+            present: boolean;
+            /**
+             * Format: uuid
+             * @description The unified chapter it belongs to.
+             */
+            chapter_id?: string;
+        };
+        SeriesChapterList: {
+            series: components["schemas"]["MatchSeries"];
+            /** Format: date-time */
+            checked_at?: string;
+            check_error?: string;
+            chapters: components["schemas"]["SeriesChapter"][];
+        };
+        RefreshQueued: {
+            queued: number;
+        };
         WorkSummary: {
             /** Format: uuid */
             id: string;
@@ -1267,6 +1709,8 @@ export interface components {
             work: components["schemas"]["WorkSummary"];
             /** Format: date-time */
             added_at: string;
+            /** @description Chapters found since you last marked the work seen. */
+            new_chapters: number;
         };
         LibraryPage: {
             entries: components["schemas"]["LibraryEntry"][];
@@ -2086,6 +2530,9 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Read this copy instead of the chosen one. */
+        VariantIdQuery: string;
+        ChapterId: string;
         WorkId: string;
         SeriesId: string;
         JobId: string;
@@ -3946,6 +4393,429 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MatchSeries"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listWorkChapters: {
+        parameters: {
+            query?: {
+                /** @description asc (reading order, the default) or desc. */
+                order?: "asc" | "desc";
+            };
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chapters. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChapterList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getWorkChapter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+                chapter_id: components["parameters"]["ChapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chapter. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChapterDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    pinChapterVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+                chapter_id: components["parameters"]["ChapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinVariantRequest"];
+            };
+        };
+        responses: {
+            /** @description The chapter. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChapterDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listSeriesChapters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+                series_id: components["parameters"]["SeriesId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The source's chapters in its own order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeriesChapterList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    refreshWork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Checks queued, one per attached series. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefreshQueued"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    markWorkSeen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Seen. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getChapterPages: {
+        parameters: {
+            query?: {
+                /** @description Read this copy instead of the chosen one. */
+                variant_id?: components["parameters"]["VariantIdQuery"];
+            };
+            header?: never;
+            path: {
+                chapter_id: components["parameters"]["ChapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pages. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChapterPages"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getChapterPage: {
+        parameters: {
+            query?: {
+                /** @description Read this copy instead of the chosen one. */
+                variant_id?: components["parameters"]["VariantIdQuery"];
+            };
+            header?: never;
+            path: {
+                chapter_id: components["parameters"]["ChapterId"];
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setChapterProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapter_id: components["parameters"]["ChapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetProgressRequest"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChapterProgress"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getWorkProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Progress per chapter you started. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProgress"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    markChaptersRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMyHistory: {
+        parameters: {
+            query?: {
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getReaderSettings: {
+        parameters: {
+            query?: {
+                source_id?: string;
+                work_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each level and the effective settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReaderSettings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    putReaderSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description global, source:<source id> or work:<work id>. */
+                scope: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteReaderSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description global, source:<source id> or work:<work id>. */
+                scope: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMyPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The preferences ({} when none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    putMyPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

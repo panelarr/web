@@ -11,15 +11,7 @@ import { Button } from "@/components/ui/button";
 
 /** Registers source plugins running as services, and lists the ones registered. */
 export function PluginsPanel() {
-  const queryClient = useQueryClient();
-  const formRef = useRef<HTMLFormElement>(null);
   const plugins = $api.useQuery("get", "/plugins");
-  const register = $api.useMutation("post", "/plugins", {
-    onSuccess: () => {
-      formRef.current?.reset();
-      void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/plugins").queryKey });
-    },
-  });
 
   return (
     <div className="grid gap-6">
@@ -45,50 +37,67 @@ export function PluginsPanel() {
         </ul>
       ) : null}
 
-      <form
-        ref={formRef}
-        className="grid gap-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const { url = "", id = "", api_key = "" } = formValues(event.currentTarget);
-          register.mutate({ body: { url, ...(id ? { id } : {}), ...(api_key ? { api_key } : {}) } });
-        }}
-      >
-        {register.error ? <ErrorAlert error={register.error} title="Not added" /> : null}
+      <RegisterPluginForm />
+    </div>
+  );
+}
+
+/** Adds a source plugin running as a service: checked by the server before it is saved. */
+export function RegisterPluginForm({ onAdded }: { onAdded?: () => void }) {
+  const queryClient = useQueryClient();
+  const formRef = useRef<HTMLFormElement>(null);
+  const register = $api.useMutation("post", "/plugins", {
+    onSuccess: () => {
+      formRef.current?.reset();
+      void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/plugins").queryKey });
+      void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/sources").queryKey.slice(0, 2) });
+      onAdded?.();
+    },
+  });
+  return (
+    <form
+      ref={formRef}
+      className="grid gap-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const { url = "", id = "", api_key = "" } = formValues(event.currentTarget);
+        register.mutate({ body: { url, ...(id ? { id } : {}), ...(api_key ? { api_key } : {}) } });
+      }}
+    >
+      {register.error ? <ErrorAlert error={register.error} title="Not added" /> : null}
+      <TextField
+        label="Plugin URL"
+        name="url"
+        type="url"
+        required
+        placeholder="http://source-plugin:8904"
+        error={register.error}
+        autoCapitalize="none"
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
         <TextField
-          label="Plugin URL"
-          name="url"
-          type="url"
-          required
-          placeholder="http://source-plugin:8904"
+          label="ID"
+          name="id"
+          pattern="[a-z0-9][a-z0-9_\-]{0,39}"
+          hint="Optional. Names this plugin and prefixes its sources' IDs."
           error={register.error}
           autoCapitalize="none"
         />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField
-            label="ID"
-            name="id"
-            pattern="[a-z0-9][a-z0-9_\-]{0,39}"
-            hint="Optional. Names this plugin and prefixes its sources' IDs."
-            error={register.error}
-            autoCapitalize="none"
-          />
-          <TextField
-            label="API key"
-            name="api_key"
-            type="password"
-            autoComplete="off"
-            hint="Optional, if the plugin needs one."
-            error={register.error}
-          />
-        </div>
-        <div>
-          <Button type="submit" variant="outline" disabled={register.isPending}>
-            {register.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-            Add plugin
-          </Button>
-        </div>
-      </form>
-    </div>
+        <TextField
+          label="API key"
+          name="api_key"
+          type="password"
+          autoComplete="off"
+          hint="Optional, if the plugin needs one."
+          error={register.error}
+        />
+      </div>
+      <div>
+        <Button type="submit" variant="outline" disabled={register.isPending}>
+          {register.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+          Add plugin
+        </Button>
+      </div>
+    </form>
   );
 }

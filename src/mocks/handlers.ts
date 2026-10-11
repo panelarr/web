@@ -3,12 +3,22 @@
 import { HttpResponse } from "msw";
 import type { components } from "@/api/schema.gen";
 import { health, systemInfo } from "./data";
-import { commit, currentUser, db, newId } from "./db";
+import { commit, currentUser, db, type MockInvite, newId } from "./db";
 import { type MockOperation, op, problem } from "./op";
 
 type S = components["schemas"];
 
 const CSRF = "mock-csrf-token";
+
+/** What a new user may do unless the admin says otherwise. */
+const DEFAULT_GRANTS: S["Grants"] = {
+  may_add: true,
+  may_download: false,
+  may_manage_matches: false,
+  content_rating_ceiling: "suggestive",
+  all_sources: true,
+  allowed_sources: [],
+};
 const now = () => new Date().toISOString();
 
 // --- guards, like the server's -------------------------------------------------------------
@@ -223,14 +233,7 @@ export const operations: MockOperation[] = [
       display_name: body.display_name ?? "",
       role: invite.role,
       disabled: false,
-      grants: {
-        may_add: true,
-        may_download: false,
-        may_manage_matches: false,
-        content_rating_ceiling: "suggestive",
-        all_sources: true,
-        allowed_sources: [],
-      },
+      grants: invite.grants,
       created_at: now(),
     };
     d.users.push(user);
@@ -418,6 +421,226 @@ export const operations: MockOperation[] = [
     db().plugins.push(added);
     commit();
     return json(added, 201);
+  }),
+
+  op("get", "/plugins/{plugin_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = db().plugins.find((p) => p.id === params.plugin_id);
+    return found ? json(found) : problem(404, "not_found", "Not found");
+  }),
+
+  op("patch", "/plugins/{plugin_id}", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = db().plugins.find((p) => p.id === params.plugin_id);
+    if (!found) return problem(404, "not_found", "Not found");
+    const body = (await request.json()) as S["UpdatePluginRequest"];
+    if (body.url !== undefined) {
+      if (!/^https?:\/\/\S+$/.test(body.url))
+        return problem(422, "plugin_unreachable", "The plugin didn't answer", `Can't reach ${body.url}.`);
+      found.url = body.url;
+    }
+    if (body.enabled !== undefined) found.enabled = body.enabled;
+    commit();
+    return json(found);
+  }),
+
+  op("delete", "/plugins/{plugin_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    d.plugins = d.plugins.filter((p) => p.id !== params.plugin_id);
+    d.sources = d.sources.filter((source) => source.plugin_id !== params.plugin_id);
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("post", "/plugins/{plugin_id}/sync", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = db().plugins.find((p) => p.id === params.plugin_id);
+    if (!found) return problem(404, "not_found", "Not found");
+    found.checked_at = now();
+    commit();
+    return json(found);
+  }),
+
+  op("get", "/plugins/{plugin_id}/config", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const config = db().pluginConfigs[String(params.plugin_id)];
+    if (!config) return problem(404, "no_config", "No settings", "This plugin has no settings.");
+    return json(config);
+  }),
+
+  op("put", "/plugins/{plugin_id}/config", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const config = db().pluginConfigs[String(params.plugin_id)];
+    if (!config) return problem(404, "no_config", "No settings", "This plugin has no settings.");
+    const { values } = (await request.json()) as S["SetPluginConfigRequest"];
+    if (typeof values.base_url === "string" && !/^https?:\/\//.test(values.base_url)) {
+      return HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "Invalid settings",
+          status: 400,
+          code: "invalid_config",
+          detail: "The plugin rejected the settings.",
+          errors: [{ field: "base_url", message: "must be an http(s) URL" }],
+        },
+        { status: 400, headers: { "Content-Type": "application/problem+json" } },
+      );
+    }
+    // Secret fields come back empty; leaving them empty keeps the stored value.
+    config.values = { ...values, api_token: "" };
+    commit();
+    return json(config);
+  }),
+
+  // Sources
+
+  op("get", "/sources", ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const url = new URL(request.url);
+    const all = url.searchParams.get("all") === "true" && user.role === "admin";
+    const lang = url.searchParams.get("lang");
+    const list = db().sources.filter((source) => {
+      if (lang && source.lang !== lang) return false;
+      if (all) return true;
+      if (!source.enabled || !source.present) return false;
+      return user.role === "admin" || user.grants.all_sources || user.grants.allowed_sources.includes(source.id);
+    });
+    return json<S["SourceList"]>({ sources: list });
+  }),
+
+  op("patch", "/sources/{source_id}", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const source = db().sources.find((s) => s.id === params.source_id);
+    if (!source) return problem(404, "not_found", "Not found");
+    source.enabled = ((await request.json()) as S["UpdateSourceRequest"]).enabled;
+    commit();
+    return json(source);
+  }),
+
+  // Users
+
+  op("get", "/users", () => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const users = [...db().users].sort((a, b) => a.username.localeCompare(b.username));
+    return json<S["UserList"]>({ users, next_page_token: "" });
+  }),
+
+  op("post", "/users", async ({ request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const body = (await request.json()) as S["CreateUserRequest"];
+    const d = db();
+    if (d.users.some((u) => u.username.toLowerCase() === body.username.toLowerCase())) {
+      return problem(409, "username_taken", "Username taken", `"${body.username}" is taken.`);
+    }
+    const user: S["User"] = {
+      id: newId(),
+      username: body.username,
+      display_name: body.display_name ?? "",
+      role: body.role ?? "user",
+      disabled: false,
+      grants: { ...DEFAULT_GRANTS, ...body.grants },
+      created_at: now(),
+    };
+    d.users.push(user);
+    d.passwords[body.username.toLowerCase()] = body.password;
+    commit();
+    return json(user, 201);
+  }),
+
+  op("get", "/users/{id}", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const user = db().users.find((u) => u.id === params.id);
+    return user ? json(user) : problem(404, "not_found", "Not found");
+  }),
+
+  op("patch", "/users/{id}", async ({ params, request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const d = db();
+    const user = d.users.find((u) => u.id === params.id);
+    if (!user) return problem(404, "not_found", "Not found");
+    const body = (await request.json()) as S["UpdateUserRequest"];
+    const demoting = (body.role !== undefined && body.role !== "admin") || body.disabled === true;
+    if (demoting && user.id === admin.id) {
+      return problem(
+        409,
+        "cannot_change_self",
+        "Can't change yourself",
+        "You can't disable or demote your own account.",
+      );
+    }
+    const otherAdmins = d.users.filter((u) => u.role === "admin" && !u.disabled && u.id !== user.id);
+    if (demoting && user.role === "admin" && otherAdmins.length === 0) {
+      return problem(409, "last_admin", "Last admin", "Panelarr needs at least one enabled admin.");
+    }
+    if (body.display_name !== undefined) user.display_name = body.display_name;
+    if (body.role !== undefined) user.role = body.role;
+    if (body.disabled !== undefined) user.disabled = body.disabled;
+    if (body.password !== undefined) d.passwords[user.username.toLowerCase()] = body.password;
+    if (body.grants) user.grants = { ...user.grants, ...body.grants };
+    commit();
+    return json(user);
+  }),
+
+  op("delete", "/users/{id}", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    if (params.id === admin.id) {
+      return problem(409, "cannot_change_self", "Can't delete yourself", "You can't delete your own account.");
+    }
+    const d = db();
+    d.users = d.users.filter((u) => u.id !== params.id);
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // Invites
+
+  op("get", "/invites", () => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const open = db().invites.filter((i) => Date.parse(i.expires_at) > Date.now());
+    return json<S["InviteList"]>({ invites: open.map(({ token: _token, ...rest }) => rest) });
+  }),
+
+  op("post", "/invites", async ({ request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const body = (await request.json()) as S["CreateInviteRequest"];
+    const created: MockInvite = {
+      id: newId(),
+      token: crypto.randomUUID().replaceAll("-", ""),
+      role: body.role ?? "user",
+      grants: { ...DEFAULT_GRANTS, ...body.grants },
+      note: body.note ?? "",
+      created_at: now(),
+      expires_at: new Date(Date.now() + (body.expires_in_hours ?? 72) * 3_600_000).toISOString(),
+    };
+    db().invites.unshift(created);
+    commit();
+    const { token, ...invite } = created;
+    return json<S["InviteCreated"]>({ invite, token }, 201);
+  }),
+
+  op("delete", "/invites/{id}", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const d = db();
+    d.invites = d.invites.filter((i) => i.id !== params.id);
+    commit();
+    return new HttpResponse(null, { status: 204 });
   }),
 ];
 

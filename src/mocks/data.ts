@@ -119,6 +119,111 @@ export const health = {
   ],
 } satisfies Schemas["SystemHealth"];
 
+export const sources = [
+  {
+    id: "example:1001",
+    plugin_id: "example",
+    name: "Example Source",
+    lang: "en",
+    content_rating: "safe",
+    home_url: "https://example.com",
+    capabilities: ["latest", "search", "filters"],
+    health: { status: "ok", checked_at: "2026-10-11T08:00:00Z" },
+    enabled: true,
+    present: true,
+  },
+  {
+    id: "example:1002",
+    plugin_id: "example",
+    name: "Sample Scans",
+    lang: "en",
+    content_rating: "mixed",
+    home_url: "https://example.org",
+    capabilities: ["latest", "search"],
+    health: {
+      status: "failing",
+      reason: "SOURCE_DOWN",
+      message: "The site answered 503 for the last 3 checks.",
+      checked_at: "2026-10-11T08:00:00Z",
+    },
+    enabled: true,
+    present: true,
+  },
+  {
+    id: "example:1003",
+    plugin_id: "example",
+    name: "Demo Comics",
+    lang: "ja",
+    content_rating: "unknown",
+    home_url: "https://example.net",
+    capabilities: ["search"],
+    health: { status: "unknown" },
+    enabled: false,
+    present: true,
+  },
+] satisfies Schemas["SourceInfo"][];
+
+/** A plugin's settings, as JSON Schema, the way plugins declare them. */
+export const pluginConfig = {
+  schema: {
+    type: "object",
+    required: ["base_url"],
+    properties: {
+      base_url: {
+        type: "string",
+        title: "Service URL",
+        description: "Where the plugin reaches its backend.",
+        format: "uri",
+        default: "http://backend:8080",
+      },
+      api_token: { type: "string", title: "API token", writeOnly: true },
+      languages: {
+        type: "array",
+        title: "Languages",
+        description: "Only offer sources in these languages.",
+        items: { type: "string", enum: ["en", "ja", "es", "fr"] },
+        uniqueItems: true,
+      },
+      mode: { type: "string", title: "Image quality", enum: ["original", "compressed"], default: "original" },
+      max_results: { type: "integer", title: "Results per page", minimum: 1, maximum: 100, default: 20 },
+      show_nsfw: { type: "boolean", title: "Show adult sources", default: false },
+      proxy: {
+        type: "object",
+        title: "Proxy",
+        properties: {
+          url: { type: "string", title: "Proxy URL" },
+          enabled: { type: "boolean", title: "Use the proxy" },
+        },
+      },
+    },
+  },
+  values: {
+    base_url: "http://backend:8080",
+    api_token: "",
+    languages: ["en"],
+    mode: "original",
+    max_results: 20,
+    show_nsfw: false,
+    proxy: { url: "", enabled: false },
+  },
+} satisfies Schemas["PluginConfig"];
+
+export const invite = {
+  id: "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+  role: "user",
+  grants: {
+    may_add: true,
+    may_download: false,
+    may_manage_matches: false,
+    content_rating_ceiling: "suggestive",
+    all_sources: true,
+    allowed_sources: [],
+  },
+  note: "For Sam",
+  created_at: "2026-10-10T10:00:00Z",
+  expires_at: "2099-10-13T10:00:00Z",
+} satisfies Schemas["Invite"];
+
 /** Every fixture with the schema it must match. */
 export const FIXTURES: ReadonlyArray<readonly [schema: keyof Schemas, value: unknown]> = [
   ["SystemInfo", systemInfo],
@@ -131,4 +236,7 @@ export const FIXTURES: ReadonlyArray<readonly [schema: keyof Schemas, value: unk
   ["MetaConnection", metaConnection],
   ["Plugin", plugin],
   ["SystemHealth", health],
+  ...sources.map((source) => ["SourceInfo", source] as const),
+  ["PluginConfig", pluginConfig],
+  ["Invite", invite],
 ];

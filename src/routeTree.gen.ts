@@ -19,6 +19,13 @@ import { Route as AppBrowseRouteImport } from './routes/_app/browse'
 import { Route as AppDownloadsRouteImport } from './routes/_app/downloads'
 import { Route as AppMoreRouteImport } from './routes/_app/more'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
+import { Route as AppAdminSourcesRouteImport } from './routes/_app/admin/sources'
+import { Route as AppAdminSystemRouteImport } from './routes/_app/admin/system'
+import { Route as AppAdminPluginsIndexRouteImport } from './routes/_app/admin/plugins/index'
+import { Route as AppAdminPluginsPluginIdRouteImport } from './routes/_app/admin/plugins/$pluginId'
+import { Route as AppAdminUsersIndexRouteImport } from './routes/_app/admin/users/index'
+import { Route as AppAdminUsersUserIdRouteImport } from './routes/_app/admin/users/$userId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -69,28 +76,76 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminSourcesRoute = AppAdminSourcesRouteImport.update({
+  id: '/sources',
+  path: '/sources',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminSystemRoute = AppAdminSystemRouteImport.update({
+  id: '/system',
+  path: '/system',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminPluginsIndexRoute = AppAdminPluginsIndexRouteImport.update({
+  id: '/plugins/',
+  path: '/plugins/',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminPluginsPluginIdRoute = AppAdminPluginsPluginIdRouteImport.update({
+  id: '/plugins/$pluginId',
+  path: '/plugins/$pluginId',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminUsersIndexRoute = AppAdminUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminUsersUserIdRoute = AppAdminUsersUserIdRouteImport.update({
+  id: '/users/$userId',
+  path: '/users/$userId',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
-  '/admin': typeof AppAdminRoute
+  '/admin': typeof AppAdminRouteWithChildren
   '/browse': typeof AppBrowseRoute
   '/downloads': typeof AppDownloadsRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
+  '/admin/sources': typeof AppAdminSourcesRoute
+  '/admin/system': typeof AppAdminSystemRoute
+  '/admin/': typeof AppAdminIndexRoute
+  '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
+  '/admin/users/$userId': typeof AppAdminUsersUserIdRoute
+  '/admin/plugins/': typeof AppAdminPluginsIndexRoute
+  '/admin/users/': typeof AppAdminUsersIndexRoute
 }
 export interface FileRoutesByTo {
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
-  '/admin': typeof AppAdminRoute
   '/browse': typeof AppBrowseRoute
   '/downloads': typeof AppDownloadsRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
+  '/admin/sources': typeof AppAdminSourcesRoute
+  '/admin/system': typeof AppAdminSystemRoute
+  '/admin': typeof AppAdminIndexRoute
+  '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
+  '/admin/users/$userId': typeof AppAdminUsersUserIdRoute
+  '/admin/plugins': typeof AppAdminPluginsIndexRoute
+  '/admin/users': typeof AppAdminUsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,12 +153,19 @@ export interface FileRoutesById {
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
-  '/_app/admin': typeof AppAdminRoute
+  '/_app/admin': typeof AppAdminRouteWithChildren
   '/_app/browse': typeof AppBrowseRoute
   '/_app/downloads': typeof AppDownloadsRoute
   '/_app/more': typeof AppMoreRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/admin/sources': typeof AppAdminSourcesRoute
+  '/_app/admin/system': typeof AppAdminSystemRoute
+  '/_app/admin/': typeof AppAdminIndexRoute
+  '/_app/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
+  '/_app/admin/users/$userId': typeof AppAdminUsersUserIdRoute
+  '/_app/admin/plugins/': typeof AppAdminPluginsIndexRoute
+  '/_app/admin/users/': typeof AppAdminUsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -117,17 +179,30 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/more'
     | '/settings'
+    | '/admin/sources'
+    | '/admin/system'
+    | '/admin/'
+    | '/admin/plugins/$pluginId'
+    | '/admin/users/$userId'
+    | '/admin/plugins/'
+    | '/admin/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/invite'
     | '/login'
     | '/setup'
-    | '/admin'
     | '/browse'
     | '/downloads'
     | '/more'
     | '/settings'
     | '/'
+    | '/admin/sources'
+    | '/admin/system'
+    | '/admin'
+    | '/admin/plugins/$pluginId'
+    | '/admin/users/$userId'
+    | '/admin/plugins'
+    | '/admin/users'
   id:
     | '__root__'
     | '/_app'
@@ -140,6 +215,13 @@ export interface FileRouteTypes {
     | '/_app/more'
     | '/_app/settings'
     | '/_app/'
+    | '/_app/admin/sources'
+    | '/_app/admin/system'
+    | '/_app/admin/'
+    | '/_app/admin/plugins/$pluginId'
+    | '/_app/admin/users/$userId'
+    | '/_app/admin/plugins/'
+    | '/_app/admin/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -221,11 +303,84 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/': {
+      id: '/_app/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AppAdminIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/sources': {
+      id: '/_app/admin/sources'
+      path: '/sources'
+      fullPath: '/admin/sources'
+      preLoaderRoute: typeof AppAdminSourcesRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/system': {
+      id: '/_app/admin/system'
+      path: '/system'
+      fullPath: '/admin/system'
+      preLoaderRoute: typeof AppAdminSystemRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/plugins/': {
+      id: '/_app/admin/plugins/'
+      path: '/plugins'
+      fullPath: '/admin/plugins/'
+      preLoaderRoute: typeof AppAdminPluginsIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/plugins/$pluginId': {
+      id: '/_app/admin/plugins/$pluginId'
+      path: '/plugins/$pluginId'
+      fullPath: '/admin/plugins/$pluginId'
+      preLoaderRoute: typeof AppAdminPluginsPluginIdRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/users/': {
+      id: '/_app/admin/users/'
+      path: '/users'
+      fullPath: '/admin/users/'
+      preLoaderRoute: typeof AppAdminUsersIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/users/$userId': {
+      id: '/_app/admin/users/$userId'
+      path: '/users/$userId'
+      fullPath: '/admin/users/$userId'
+      preLoaderRoute: typeof AppAdminUsersUserIdRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
   }
 }
 
+interface AppAdminRouteChildren {
+  AppAdminSourcesRoute: typeof AppAdminSourcesRoute
+  AppAdminSystemRoute: typeof AppAdminSystemRoute
+  AppAdminIndexRoute: typeof AppAdminIndexRoute
+  AppAdminPluginsPluginIdRoute: typeof AppAdminPluginsPluginIdRoute
+  AppAdminUsersUserIdRoute: typeof AppAdminUsersUserIdRoute
+  AppAdminPluginsIndexRoute: typeof AppAdminPluginsIndexRoute
+  AppAdminUsersIndexRoute: typeof AppAdminUsersIndexRoute
+}
+
+const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminSourcesRoute: AppAdminSourcesRoute,
+  AppAdminSystemRoute: AppAdminSystemRoute,
+  AppAdminIndexRoute: AppAdminIndexRoute,
+  AppAdminPluginsPluginIdRoute: AppAdminPluginsPluginIdRoute,
+  AppAdminUsersUserIdRoute: AppAdminUsersUserIdRoute,
+  AppAdminPluginsIndexRoute: AppAdminPluginsIndexRoute,
+  AppAdminUsersIndexRoute: AppAdminUsersIndexRoute,
+}
+
+const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
+  AppAdminRouteChildren,
+)
+
 interface AppRouteChildren {
-  AppAdminRoute: typeof AppAdminRoute
+  AppAdminRoute: typeof AppAdminRouteWithChildren
   AppBrowseRoute: typeof AppBrowseRoute
   AppDownloadsRoute: typeof AppDownloadsRoute
   AppMoreRoute: typeof AppMoreRoute
@@ -234,7 +389,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppAdminRoute: AppAdminRoute,
+  AppAdminRoute: AppAdminRouteWithChildren,
   AppBrowseRoute: AppBrowseRoute,
   AppDownloadsRoute: AppDownloadsRoute,
   AppMoreRoute: AppMoreRoute,

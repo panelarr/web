@@ -34,6 +34,9 @@ describe("mock fixtures", () => {
     for (const session of db.sessions) check("Session", session);
     for (const key of db.apiKeys) check("ApiKey", key);
     for (const plugin of db.plugins) check("Plugin", plugin);
+    for (const source of db.sources) check("SourceInfo", source);
+    for (const config of Object.values(db.pluginConfigs)) check("PluginConfig", config);
+    for (const { token: _token, ...invite } of db.invites) check("Invite", invite);
     check("MetaConnection", db.meta);
   });
 

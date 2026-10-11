@@ -3,6 +3,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { invite } from "@/mocks/data";
 import { db, resetDb } from "@/mocks/db";
 import { renderApp } from "@/test/render";
 
@@ -120,7 +121,7 @@ describe("the first-run wizard", () => {
 describe("invites", () => {
   it("create an account and sign it in", async () => {
     resetDb("signed-out");
-    db().invites.push({ id: "i1", token: "invite-token", role: "user", expires_at: "2099-01-01T00:00:00Z" });
+    db().invites.push({ ...invite, token: "invite-token" });
     window.location.hash = "#token=invite-token";
     const { router } = await renderApp("/invite");
     expect(await screen.findByRole("heading", { name: "Join Panelarr" })).toBeInTheDocument();

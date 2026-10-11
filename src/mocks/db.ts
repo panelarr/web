@@ -10,19 +10,14 @@
 //
 // In the browser, pick one with `?mock=<scenario>`; it lasts for the tab (sessionStorage).
 import type { components } from "@/api/schema.gen";
-import { adminUser, apiKey, metaConnection, plugin, readerUser, session } from "./data";
+import { adminUser, apiKey, invite, metaConnection, plugin, pluginConfig, readerUser, session, sources } from "./data";
 
 type S = components["schemas"];
 
 export const SCENARIOS = ["ready", "fresh", "signed-out", "user", "degraded"] as const;
 export type Scenario = (typeof SCENARIOS)[number];
 
-export interface MockInvite {
-  id: string;
-  token: string;
-  role: S["Role"];
-  expires_at: string;
-}
+export type MockInvite = S["Invite"] & { token: string };
 
 export interface MockDb {
   users: S["User"][];
@@ -36,6 +31,8 @@ export interface MockDb {
   /** Providers being synced: each check adds entries until ready. */
   syncing: string[];
   plugins: S["Plugin"][];
+  pluginConfigs: Record<string, S["PluginConfig"]>;
+  sources: S["SourceInfo"][];
   invites: MockInvite[];
   failedLogins: number;
 }
@@ -63,7 +60,9 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     meta: clone(metaConnection),
     syncing: [],
     plugins: [clone(plugin)],
-    invites: [],
+    pluginConfigs: { [plugin.id]: clone(pluginConfig) },
+    sources: clone(sources),
+    invites: [{ ...clone(invite), token: "open-invite-token" }],
     failedLogins: 0,
   };
   switch (scenario) {
@@ -90,6 +89,9 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
           },
         },
         plugins: [],
+        pluginConfigs: {},
+        sources: [],
+        invites: [],
       };
     case "signed-out":
       return { ...ready, currentUserId: undefined };
