@@ -5,6 +5,7 @@ import { commit, db, loadBrowserDb } from "./db";
 import { createEventsHandler, operations } from "./handlers";
 import { tickJobs } from "./jobs";
 import { isDraft } from "./op";
+import { tickMatching } from "./works";
 
 /**
  * Starts the mock server in the browser. "all" answers every request (no server needed);
@@ -20,7 +21,9 @@ export async function startMockWorker(mode: "all" | "drafts"): Promise<void> {
   if (mode === "all") {
     // Running jobs move on every second, with live events, as on a real server.
     setInterval(() => {
-      if (tickJobs(db())) commit();
+      const jobs = tickJobs(db());
+      const matching = tickMatching(db());
+      if (jobs || matching) commit();
     }, 1_000);
   }
   await worker.start({

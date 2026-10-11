@@ -68,3 +68,16 @@ test("runs a job and watches it finish over the live event stream", async ({ pag
   await expect(card.getByText(/of 5/)).toBeVisible({ timeout: 5000 });
   await expect(card.getByText(/Done: 12 works/)).toBeVisible({ timeout: 10_000 });
 });
+
+test("adds a series from a source, then fixes its match on another source", async ({ page }) => {
+  await page.goto("/browse/sources/example:1001/series?key=%2Fseries%2F1000&mock=ready");
+  await page.getByRole("button", { name: "Add to library" }).click();
+  await expect(page).toHaveURL(/\/works\//);
+  // Matching runs on the mock server; the page follows it live.
+  const sample = page.locator("li", { has: page.getByText("Sample Scans", { exact: true }) }).first();
+  await expect(sample.getByText(/Needs a decision|Search failed/)).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Attach by URL" }).click();
+  await page.getByLabel("Series URL").fill("https://example.com/1002/series/1000");
+  await page.getByRole("dialog").getByRole("button", { name: "Attach" }).click();
+  await expect(page.getByText("Attached on 2 of 2 sources.")).toBeVisible();
+});

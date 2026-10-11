@@ -11,12 +11,13 @@ import { EmptyState, ErrorAlert, Loading, PageHeader } from "@/components/states
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BrowseTabs } from "@/features/catalog/browse-tabs";
 import { EntryCard, EntryGrid } from "@/features/catalog/entry-card";
 import { CatalogFilters, type CatalogSearch, countFilters, validateCatalogSearch } from "@/features/catalog/filters";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
 import { useLibraryIndex } from "@/features/catalog/library-index";
 
-export const Route = createFileRoute("/_app/browse")({
+export const Route = createFileRoute("/_app/browse/")({
   validateSearch: validateCatalogSearch,
   component: BrowsePage,
 });
@@ -34,7 +35,7 @@ function BrowsePage() {
   const commitQuery = useDebouncedCallback(
     (q: string) => {
       // The user may have tapped a result meanwhile: never pull them back here.
-      if (router.state.location.pathname !== Route.fullPath) return;
+      if (router.state.location.pathname.replace(/\/$/, "") !== "/browse") return;
       void navigate({ search: (prev) => ({ ...prev, q: q.trim() || undefined }), replace: true });
     },
     { wait: 300 },
@@ -48,6 +49,7 @@ function BrowsePage() {
   return (
     <>
       <PageHeader title="Browse" description="Find works in the catalogue and add them to your library." />
+      <BrowseTabs />
       <div className="sticky top-[calc(var(--app-bar-h)+env(safe-area-inset-top))] z-20 -mx-4 mb-4 bg-background/95 px-4 py-2 backdrop-blur md:static md:mx-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
         <search>
           <form

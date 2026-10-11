@@ -6,9 +6,11 @@ import type { components } from "@/api/schema.gen";
 import { CATALOG, coverSvg, summary, withinCeiling } from "./catalog";
 import { health, systemInfo } from "./data";
 import { commit, currentUser, db, type MockInvite, newId } from "./db";
-import { onMockEvent } from "./events";
+import { emit, onMockEvent } from "./events";
 import { finishRun, queueState, startRun, taskEvent } from "./jobs";
 import { type MockOperation, mockUrl, op, problem } from "./op";
+import { FILTERS, listSeries, seriesIndex, sourceChapters, sourceSeries } from "./sources";
+import { entryCandidates, matchSeries, resolveUrl, startMatching } from "./works";
 
 type S = components["schemas"];
 
@@ -146,6 +148,121 @@ function visibleCatalog(user: S["User"], url: URL): Array<[S["CatalogEntry"], nu
   if (compare) list.sort(([a], [b]) => compare(a, b));
   if (p.get("reverse") === "true") list.reverse();
   return list;
+}
+
+/** May the user fix matches? */
+function requireMatcher(): S["User"] | Response {
+  const user = requireUser();
+  if (user instanceof Response) return user;
+  if (user.role !== "admin" && !user.grants.may_manage_matches) {
+    return problem(403, "grant_required", "Not allowed", "You may not change matches.");
+  }
+  return user;
+}
+
+function canUseSource(user: S["User"], source: S["SourceInfo"]): boolean {
+  if (!source.enabled || !source.present) return false;
+  return user.role === "admin" || user.grants.all_sources || user.grants.allowed_sources.includes(source.id);
+}
+
+function usableSource(user: S["User"], id: string): S["SourceInfo"] | Response {
+  const source = db().sources.find((s) => s.id === id);
+  return source && canUseSource(user, source) ? source : problem(404, "not_found", "Not found", "No such source.");
+}
+
+function seriesPage(list: S["SourceSeries"][], page: string | null): S["SourceSeriesPage"] {
+  const n = Math.max(1, Number(page) || 1);
+  const size = 12;
+  return { series: list.slice((n - 1) * size, n * size), has_next_page: n * size < list.length };
+}
+
+function workView(user: S["User"], workId: string): S["Work"] | undefined {
+  const d = db();
+  const work = d.works.find((w) => w.id === workId);
+  if (!work) return undefined;
+  const entry = d.library.find((e) => e.user_id === user.id && e.work_id === workId);
+  return {
+    ...work,
+    in_library: entry !== undefined,
+    ...(entry ? { added_at: entry.added_at } : {}),
+    sources: (d.matching[workId] ?? []).filter((row) => canUseSource(user, row.source)),
+  };
+}
+
+function findSeries(workId: string, seriesId: string): S["MatchSeries"] | undefined {
+  for (const row of db().matching[workId] ?? []) {
+    if (row.attached?.id === seriesId) return row.attached;
+    const found = row.candidates.find((c) => c.id === seriesId);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function refreshAttachedCount(workId: string): void {
+  const work = db().works.find((w) => w.id === workId);
+  if (work) work.attached_sources = (db().matching[workId] ?? []).filter((r) => r.attached).length;
+}
+
+/** Attaches a series to a work on its source; the series attached before becomes a candidate. */
+function attachSeries(
+  workId: string,
+  ref: S["SeriesRef"],
+  origin: S["MatchSeries"]["origin"],
+): S["MatchSeries"] | undefined {
+  const d = db();
+  const work = d.works.find((w) => w.id === workId);
+  const row = d.matching[workId]?.find((r) => r.source.id === ref.source_id);
+  const forEntry = CATALOG.findIndex((e) => e.id === work?.entry_id);
+  if (!work || !row) return undefined;
+  const series = matchSeries(ref.source_id, seriesIndex(ref.key), forEntry, "attached", origin);
+  if (!series) return undefined;
+  const previous = row.attached;
+  row.candidates = row.candidates.filter((c) => c.key !== ref.key);
+  if (previous && previous.key !== ref.key) row.candidates.unshift({ ...previous, state: "candidate" });
+  row.attached = series;
+  row.status = "matched";
+  refreshAttachedCount(workId);
+  emit("work.updated", { work_id: workId });
+  return series;
+}
+
+/** Adds the entry's work (made once, shared) to the user's library, optionally attaching a series. */
+export function addToLibrary(
+  user: S["User"],
+  entryId: string,
+  source?: S["SeriesRef"],
+): { entry: S["LibraryEntry"]; created: boolean } | undefined {
+  const i = CATALOG.findIndex((e) => e.id === entryId);
+  const entry = CATALOG[i];
+  if (!entry) return undefined;
+  const d = db();
+  let work = d.works.find((w) => w.entry_id === entry.id);
+  if (!work) {
+    const s = summary(entry, i);
+    work = {
+      id: newId(),
+      entry_id: entry.id,
+      title: entry.title,
+      ...(s.type ? { type: s.type } : {}),
+      ...(s.status ? { status: s.status } : {}),
+      content_rating: entry.content_rating,
+      ...(s.year ? { year: s.year } : {}),
+      cover_url: `/api/v1/catalog/entries/${entry.id}/cover`,
+      attached_sources: 0,
+    };
+    d.works.push(work);
+    startMatching(d, work);
+  }
+  if (source) attachSeries(work.id, source, "manual");
+  const existing = d.library.find((e) => e.user_id === user.id && e.work_id === work.id);
+  if (existing) {
+    const { added_at, new_chapters, auto_download } = existing;
+    return { entry: { work, added_at, new_chapters, auto_download }, created: false };
+  }
+  const added = { user_id: user.id, work_id: work.id, added_at: now(), new_chapters: 0, auto_download: false };
+  d.library.push(added);
+  emit("library.changed", { work_id: work.id });
+  return { entry: { work, added_at: added.added_at, new_chapters: 0, auto_download: false }, created: true };
 }
 
 // --- the operations -----------------------------------------------------------------------
@@ -766,35 +883,197 @@ export const operations: MockOperation[] = [
       return problem(403, "grant_required", "Not allowed", "You may not add works.");
     }
     const body = (await request.json()) as S["AddToLibraryRequest"];
-    const i = CATALOG.findIndex((e) => e.id === body.entry_id);
+    const added = addToLibrary(user, body.entry_id, body.source);
+    if (!added) return problem(404, "not_found", "Not found");
+    commit();
+    return json(added.entry, added.created ? 201 : 200);
+  }),
+
+  op("post", "/library/from-source", async ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    if (user.role !== "admin" && !user.grants.may_add) {
+      return problem(403, "grant_required", "Not allowed", "You may not add works.");
+    }
+    const ref = (await request.json()) as S["SeriesRef"];
+    const candidates = entryCandidates(ref.source_id, ref.key);
+    const best = candidates[0];
+    // Clear: the exact title with a shared author.
+    if (best && best.score === 1 && best.authors_match) {
+      const added = addToLibrary(user, best.entry.id, ref);
+      commit();
+      return json<S["AddFromSourceResult"]>({ added: true, ...(added ? { entry: added.entry } : {}), candidates: [] });
+    }
+    return json<S["AddFromSourceResult"]>({ added: false, candidates });
+  }),
+
+  op("delete", "/library/{work_id}", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const d = db();
+    d.library = d.library.filter((e) => !(e.user_id === user.id && e.work_id === params.work_id));
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // Works and matching
+
+  op("get", "/works/{work_id}", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const view = workView(user, String(params.work_id));
+    return view ? json(view) : problem(404, "not_found", "Not found");
+  }),
+
+  op("get", "/works/{work_id}/cover", ({ params }) => {
+    const work = db().works.find((w) => w.id === params.work_id);
+    const i = CATALOG.findIndex((e) => e.id === work?.entry_id);
     const entry = CATALOG[i];
     if (!entry) return problem(404, "not_found", "Not found");
-    const d = db();
-    let work = d.works.find((w) => w.entry_id === entry.id);
-    if (!work) {
-      const s = summary(entry, i);
-      work = {
-        id: newId(),
-        entry_id: entry.id,
-        title: entry.title,
-        ...(s.type ? { type: s.type } : {}),
-        ...(s.status ? { status: s.status } : {}),
-        content_rating: entry.content_rating,
-        ...(s.year ? { year: s.year } : {}),
-        cover_url: `/api/v1/catalog/entries/${entry.id}/cover`,
-        attached_sources: 0,
-      };
-      d.works.push(work);
+    return new HttpResponse(coverSvg(entry, i), { headers: { "Content-Type": "image/svg+xml" } });
+  }),
+
+  op("post", "/works/{work_id}/match", async ({ params, request }) => {
+    const user = requireMatcher();
+    if (user instanceof Response) return user;
+    const rows = db().matching[String(params.work_id)];
+    if (!rows) return problem(404, "not_found", "Not found");
+    const text = await request.text();
+    const force = text ? ((JSON.parse(text) as S["MatchWorkRequest"]).force ?? false) : false;
+    for (const row of rows) {
+      if (row.attached && !force) continue;
+      row.status = "pending";
+      delete row.message;
+      row.candidates = row.candidates.filter((c) => c.state === "rejected");
     }
-    const existing = d.library.find((e) => e.user_id === user.id && e.work_id === work.id);
-    if (existing) {
-      const { added_at, new_chapters, auto_download } = existing;
-      return json<S["LibraryEntry"]>({ work, added_at, new_chapters, auto_download });
-    }
-    const added = { user_id: user.id, work_id: work.id, added_at: now(), new_chapters: 0, auto_download: false };
-    d.library.push(added);
+    emit("work.updated", { work_id: String(params.work_id) });
     commit();
-    return json<S["LibraryEntry"]>({ work, added_at: added.added_at, new_chapters: 0, auto_download: false }, 201);
+    return json<S["TaskRef"]>({ task_id: newId() }, 202);
+  }),
+
+  op("post", "/works/{work_id}/series", async ({ params, request }) => {
+    const user = requireMatcher();
+    if (user instanceof Response) return user;
+    const workId = String(params.work_id);
+    const body = (await request.json()) as S["AttachSeriesRequest"];
+    const ref = body.url
+      ? resolveUrl(body.url)
+      : body.source_id && body.key
+        ? { source_id: body.source_id, key: body.key }
+        : undefined;
+    if (!ref) return problem(404, "not_found", "Not found", "No plugin recognises that URL.");
+    const attached = attachSeries(workId, ref, body.url ? "url" : "manual");
+    if (!attached) return problem(404, "not_found", "Not found", "That series isn't on the source.");
+    commit();
+    return json(attached, 201);
+  }),
+
+  op("patch", "/works/{work_id}/series/{series_id}", async ({ params, request }) => {
+    const user = requireMatcher();
+    if (user instanceof Response) return user;
+    const series = findSeries(String(params.work_id), String(params.series_id));
+    if (!series) return problem(404, "not_found", "Not found");
+    series.priority = ((await request.json()) as S["UpdateWorkSeriesRequest"]).priority;
+    commit();
+    return json(series);
+  }),
+
+  op("post", "/works/{work_id}/series/{series_id}/attach", ({ params }) => {
+    const user = requireMatcher();
+    if (user instanceof Response) return user;
+    const series = findSeries(String(params.work_id), String(params.series_id));
+    if (!series) return problem(404, "not_found", "Not found");
+    const attached = attachSeries(String(params.work_id), { source_id: series.source_id, key: series.key }, "manual");
+    commit();
+    return attached ? json(attached) : problem(404, "not_found", "Not found");
+  }),
+
+  op("post", "/works/{work_id}/series/{series_id}/detach", ({ params }) => {
+    const user = requireMatcher();
+    if (user instanceof Response) return user;
+    const workId = String(params.work_id);
+    const row = db().matching[workId]?.find(
+      (r) => r.attached?.id === params.series_id || r.candidates.some((c) => c.id === params.series_id),
+    );
+    if (!row) return problem(404, "not_found", "Not found");
+    let rejected: S["MatchSeries"] | undefined;
+    const attached = row.attached;
+    if (attached && attached.id === params.series_id) {
+      const gone: S["MatchSeries"] = { ...attached, state: "rejected" };
+      rejected = gone;
+      delete row.attached;
+      row.candidates = [gone, ...row.candidates];
+      row.status = row.candidates.some((c) => c.state === "candidate") ? "candidates" : "no_match";
+    } else {
+      row.candidates = row.candidates.map((c) => {
+        if (c.id !== params.series_id) return c;
+        const gone: S["MatchSeries"] = { ...c, state: "rejected" };
+        rejected = gone;
+        return gone;
+      });
+    }
+    refreshAttachedCount(workId);
+    emit("work.updated", { work_id: workId });
+    commit();
+    return rejected ? json(rejected) : problem(404, "not_found", "Not found");
+  }),
+
+  // Browsing sources
+
+  op("get", "/sources/{source_id}/popular", ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const source = usableSource(user, String(params.source_id));
+    if (source instanceof Response) return source;
+    return json(seriesPage(listSeries(source.id), new URL(request.url).searchParams.get("page")));
+  }),
+
+  op("get", "/sources/{source_id}/latest", ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const source = usableSource(user, String(params.source_id));
+    if (source instanceof Response) return source;
+    if (!source.capabilities.includes("latest"))
+      return problem(422, "unsupported", "Not supported", "This source has no latest list.");
+    return json(seriesPage([...listSeries(source.id)].reverse(), new URL(request.url).searchParams.get("page")));
+  }),
+
+  op("post", "/sources/{source_id}/search", async ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const source = usableSource(user, String(params.source_id));
+    if (source instanceof Response) return source;
+    const body = (await request.json()) as S["SourceSearchRequest"];
+    const q = (body.query ?? "").toLowerCase();
+    const found = listSeries(source.id).filter((series) => series.title.toLowerCase().includes(q));
+    return json(seriesPage(found, String(body.page ?? 1)));
+  }),
+
+  op("get", "/sources/{source_id}/filters", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const source = usableSource(user, String(params.source_id));
+    if (source instanceof Response) return source;
+    return json(FILTERS);
+  }),
+
+  op("get", "/sources/{source_id}/series", ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const source = usableSource(user, String(params.source_id));
+    if (source instanceof Response) return source;
+    const series = sourceSeries(source.id, seriesIndex(new URL(request.url).searchParams.get("key") ?? ""));
+    return series ? json(series) : problem(404, "not_found", "Not found");
+  }),
+
+  op("get", "/sources/{source_id}/chapters", ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const source = usableSource(user, String(params.source_id));
+    if (source instanceof Response) return source;
+    const i = seriesIndex(new URL(request.url).searchParams.get("key") ?? "");
+    if (!sourceSeries(source.id, i)) return problem(404, "not_found", "Not found");
+    return json<S["SourceChapterList"]>({ chapters: sourceChapters(source.id, i) });
   }),
 
   // Jobs
