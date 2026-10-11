@@ -1,0 +1,30 @@
+# Progress
+
+The plan for the web app's first version, in slices. Each slice works end to end, has tests and ends with `make check` and `make e2e` green. The first version covers: setup and login, the users admin, the catalogue, adding works and fixing matches, the work page with source tabs and unified chapters, the reader, downloads, the jobs page, themes and fonts.
+
+- [x] **0. Scaffold:** Vite + React + TypeScript, TanStack Router/Query/Virtual/Pacer/Store, shadcn/ui on Tailwind v4, Biome, Vitest + MSW, Playwright (desktop, 360 px phone, CSP); `make` targets, CI, release workflow (dist archive for the server), repo docs. The API client generated from the server's spec plus drafts; the spec copy and its sync; one error type for every failure (problem details, network errors), retry rules; the event-stream client with query invalidation; the mock server with spec-validated fixtures (full or drafts-only). The app shell: sidebar on desktop, top bar + bottom navigation on phones, safe areas; light, dark and true-black themes with the brand accent, applied before the first paint; installable PWA (app shell only); the serving contract with the server (`docs/embedding.md`).
+- [ ] **1. Setup and login:** first-run gate and wizard (admin → metadata service check with what to do, retry and "start sync" → optional source plugin → finish); login, logout, invite links; account page (profile, password, sessions, API keys shown once); session handling (CSRF, 401 → sign in again, `setup_required` → wizard); degraded banner.
+- [ ] **2. Users, plugins and sources admin:** users (create, invite, role, grants incl. allowed sources and content-rating ceiling, disable, delete); plugins (register, settings form, sync) and sources (on/off, health).
+- [ ] **3. Catalogue:** search as you type, browse with filters and sort in the URL, the entry page; "Add to library".
+- [ ] **4. Jobs, queue and live events:** jobs by group with runs, status filter, parameter form, run now / cancel, "already running" → the current run; task queue per kind (pause/resume, cancel, retry); live updates over the event stream.
+- [ ] **5. Library, add and fix match:** library grid/list (virtualised), sort and filters, unread badges; add from the catalogue with per-source match state live; fix match (candidates with evidence, attach, detach, re-run, paste a URL); browse a source and add from it.
+- [ ] **6. Work page:** metadata, the unified chapter list (chosen variant and why, pin a variant), a tab per source, source health and priority, check for updates, new badges, read/unread.
+- [ ] **7a. Reader, core:** full-screen reader; single page (LTR/RTL), continuous vertical, webtoon; fit and zoom (pinch, double tap, wheel); tap zones, swipe, keyboard; preloading; progress sync; next chapter; settings per user at global, source and series level.
+- [ ] **7b. Reader, more modes:** double page (spread detection, cover offset), continuous horizontal (LTR/RTL), page transitions, polish.
+- [ ] **8. Downloads:** download one, a range or all unread; "download new chapters"; the downloads page with live progress; pause, retry, cancel (admins); storage endpoints (local, S3-compatible: configure, test, default).
+- [ ] **9. Themes and fonts:** more preset themes, custom accent and key colours (contrast-checked), UI font choice, reader background; saved per user on the server.
+- [ ] **10. PWA and hardening:** install and update flow, accessibility pass, a smoke test over setup → add → read → download, bundle budget, first release.
+
+## Working assumptions
+
+Settled for now, cheap to change:
+
+- The brand pink (`#E0457B`) is the default accent; theme presets and fonts are data (`src/theme/`).
+- The app is served at the root; every asset path is relative to `<base href>` so a URL base can come later (`docs/embedding.md`).
+- Inline styles are allowed by the CSP (UI libraries insert `<style>` at runtime); scripts are strictly same-origin.
+- Reader settings and appearance are per user (per-series overrides too), stored by the server; until the server has them, appearance is kept per device.
+- Library categories and the connected services' admin pages are not part of the first version.
+
+## Next
+
+Slice 1: setup and login.

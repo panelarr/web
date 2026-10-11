@@ -1,0 +1,2910 @@
+openapi: 3.1.0
+info:
+  title: Panelarr API
+  version: 1.0.0-dev
+  summary: The public client API of the Panelarr server.
+  description: |
+    Everything the Panelarr web app does goes through this API, and any other
+    client may use it too. Paths are relative to `/api/v1`. Breaking changes
+    need a new major path (`/api/v2`); CI checks every change against the
+    published spec.
+
+    ## Authentication
+
+    - **Browser sessions:** `POST /auth/login` sets an HTTP-only session
+      cookie (`panelarr_session`) and a readable CSRF cookie
+      (`panelarr_csrf`). Requests that change something (any method other
+      than GET, HEAD and OPTIONS) made with the session cookie must send the
+      CSRF token in the `X-CSRF-Token` header.
+    - **Personal API keys** (`pnl_…`): send `X-Api-Key: <key>` or
+      `Authorization: Bearer <key>`. No CSRF token is needed. A key acts as
+      its owner, limited by its scopes: `read` (GET requests), `write`
+      (everything else), `admin` (admin endpoints, for admins' keys) and
+      `metrics:read` (`/metrics` on the API port).
+
+    Some endpoints need a browser session (marked "session only"): changing
+    the password and managing sessions and API keys can't be done with a key.
+
+    ## First run
+
+    Until the first account exists, every endpoint except the setup ones
+    answers `409` with code `setup_required`. `POST /setup/admin` creates
+    that account, which becomes the admin.
+
+    ## Errors
+
+    Errors use RFC 9457 problem details (`application/problem+json`) with a
+    stable, machine-readable `code`.
+
+    ## Lists
+
+    Lists are cursor-paginated: pass `page_token` from the previous
+    response's `next_page_token`; an empty token means the last page.
+  license:
+    name: GPL-3.0-or-later
+    identifier: GPL-3.0-or-later
+servers:
+  - url: /api/v1
+security:
+  - sessionCookie: []
+  - apiKeyHeader: []
+  - bearer: []
+tags:
+  - name: system
+    description: Server information and health.
+  - name: setup
+    description: The first-run wizard.
+  - name: auth
+    description: Signing in and out, and invites.
+  - name: me
+    description: The signed-in user's own account, sessions and API keys.
+  - name: users
+    description: Managing users (admins).
+  - name: invites
+    description: Invite links for new users (admins).
+  - name: meta
+    description: The connection to the metadata service (admins).
+  - name: catalog
+    description: Searching and browsing the metadata catalogue, to find works to add.
+  - name: plugins
+    description: Source plugins (admins).
+  - name: sources
+    description: Browsing sources through their plugins.
+  - name: jobs
+    description: Named background jobs and their runs (admins).
+  - name: tasks
+    description: The task queue (admins).
+
+paths:
+  /system/info:
+    get:
+      operationId: getSystemInfo
+      tags: [system]
+      summary: Server name, version and setup state
+      description: Needs no authentication, so clients can recognise a Panelarr server and whether it still needs setting up before signing in.
+      security: []
+      x-panelarr-access: public
+      x-panelarr-setup: true
+      responses:
+        "200":
+          description: Server information.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemInfo"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/health:
+    get:
+      operationId: getSystemHealth
+      tags: [system]
+      summary: Detailed health (admins)
+      description: Every component the server depends on, with its status and the error if it fails. `degraded` means an optional component fails and the server keeps serving what it can.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The health of each component.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemHealth"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /setup:
+    get:
+      operationId: getSetup
+      tags: [setup]
+      summary: First-run wizard state
+      security: []
+      x-panelarr-access: public
+      x-panelarr-setup: true
+      responses:
+        "200":
+          description: Where the wizard stands.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /setup/admin:
+    post:
+      operationId: createSetupAdmin
+      tags: [setup]
+      summary: Create the first account (the admin)
+      description: Works only while no account exists; afterwards it answers `409` with code `already_set_up`. Signs the new admin in (sets the session cookies).
+      security: []
+      x-panelarr-access: public
+      x-panelarr-setup: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSetupAdminRequest"
+      responses:
+        "201":
+          description: The admin, signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /setup/complete:
+    post:
+      operationId: completeSetup
+      tags: [setup]
+      summary: Finish the first-run wizard
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The wizard is complete.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Sign in with a username and password
+      description: |
+        Sets the session cookie and the CSRF cookie, and returns the CSRF
+        token. Wrong credentials answer `401` with code
+        `invalid_credentials`; too many failed attempts answer `429` with
+        code `rate_limited` and a `Retry-After` header.
+      security: []
+      x-panelarr-access: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Sign out (session only)
+      description: Ends the current session and clears the cookies.
+      x-panelarr-access: user
+      x-panelarr-session-only: true
+      responses:
+        "204":
+          description: Signed out.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /auth/invites/check:
+    post:
+      operationId: checkInvite
+      tags: [auth]
+      summary: Check an invite token before signing up
+      description: The token travels in the body, never in a URL, so it doesn't end up in logs. An unknown, used or expired token answers `404` with code `invite_invalid`.
+      security: []
+      x-panelarr-access: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteToken"
+      responses:
+        "200":
+          description: The invite is valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteCheck"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /auth/invites/accept:
+    post:
+      operationId: acceptInvite
+      tags: [auth]
+      summary: Create an account from an invite
+      description: Creates the user with the invite's role and grants, uses up the invite and signs the user in.
+      security: []
+      x-panelarr-access: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInviteRequest"
+      responses:
+        "201":
+          description: The new user, signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [me]
+      summary: The signed-in user
+      x-panelarr-access: user
+      responses:
+        "200":
+          description: The caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: updateMe
+      tags: [me]
+      summary: Change your own profile
+      x-panelarr-access: user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeRequest"
+      responses:
+        "200":
+          description: The updated caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/password:
+    post:
+      operationId: changeMyPassword
+      tags: [me]
+      summary: Change your own password (session only)
+      description: Needs the current password (`403` with code `invalid_credentials` otherwise). Ends every other session of the user.
+      x-panelarr-access: user
+      x-panelarr-session-only: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "204":
+          description: Changed.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/sessions:
+    get:
+      operationId: listMySessions
+      tags: [me]
+      summary: Your signed-in sessions (session only)
+      x-panelarr-access: user
+      x-panelarr-session-only: true
+      responses:
+        "200":
+          description: Sessions, most recently used first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/sessions/{id}:
+    delete:
+      operationId: deleteMySession
+      tags: [me]
+      summary: Sign out another session (session only)
+      x-panelarr-access: user
+      x-panelarr-session-only: true
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Signed out.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/api-keys:
+    get:
+      operationId: listMyApiKeys
+      tags: [me]
+      summary: Your API keys (session only)
+      x-panelarr-access: user
+      x-panelarr-session-only: true
+      responses:
+        "200":
+          description: Keys, newest first. The keys themselves are never shown again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createMyApiKey
+      tags: [me]
+      summary: Create an API key (session only)
+      description: The key is in this response only; the server keeps just its hash. `admin` and `metrics:read` scopes need an admin account.
+      x-panelarr-access: user
+      x-panelarr-session-only: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKeyRequest"
+      responses:
+        "201":
+          description: The new key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreated"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/api-keys/{id}:
+    delete:
+      operationId: deleteMyApiKey
+      tags: [me]
+      summary: Revoke an API key (session only)
+      x-panelarr-access: user
+      x-panelarr-session-only: true
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Revoked.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Users by username.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a user with a password
+      description: A taken username answers `409` with code `username_taken`.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: The new user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Change a user
+      description: |
+        Only the fields sent change. Setting `password` resets it and ends
+        the user's sessions; disabling a user ends their sessions and stops
+        their API keys from working. The last enabled admin can't be
+        disabled or demoted (`409`, code `last_admin`), and admins can't
+        disable or demote themselves (`409`, code `cannot_change_self`).
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: The updated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete a user
+      description: Deletes the account with its sessions and API keys. Content they added stays (it is shared). Admins can't delete themselves (`409`, code `cannot_change_self`).
+      x-panelarr-access: admin
+      responses:
+        "204":
+          description: Deleted.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /invites:
+    get:
+      operationId: listInvites
+      tags: [invites]
+      summary: List open invites
+      description: Invites that are neither used nor expired, newest first.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: Open invites.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createInvite
+      tags: [invites]
+      summary: Create an invite
+      description: The token is in this response only. The web app builds the invite link from it (as a URL fragment, so it never reaches server logs).
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInviteRequest"
+      responses:
+        "201":
+          description: The new invite and its token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteCreated"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /invites/{id}:
+    delete:
+      operationId: deleteInvite
+      tags: [invites]
+      summary: Revoke an invite
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Revoked.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta:
+    get:
+      operationId: getMetaConnection
+      tags: [meta]
+      summary: The metadata service connection and its state
+      description: Panelarr needs the metadata service for its library. Until it is reachable, has an admin key and a provider with entries, the server is degraded and nothing can be added; `check.problem` says what to do.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaConnection"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: setMetaConnection
+      tags: [meta]
+      summary: Connect the metadata service
+      description: |
+        Tests the URL and key first. They are saved when the service is
+        reachable and the key has the admin scope, even if no provider has
+        data yet (the check says so). Otherwise nothing is saved and the
+        answer is `422` with code `meta_check_failed` and what to fix. When
+        the connection comes from `PANELARR_META_URL`, it can't be changed
+        here (`409`, code `managed_by_env`).
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetMetaConnectionRequest"
+      responses:
+        "200":
+          description: Saved; the check result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaConnection"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/check:
+    post:
+      operationId: checkMetaConnection
+      tags: [meta]
+      summary: Check the metadata service again now
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: A fresh check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaConnection"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/providers/{provider}/sync:
+    post:
+      operationId: runMetaProviderSync
+      tags: [meta]
+      summary: Start a sync of a metadata provider
+      description: Starts a sync in the metadata service and returns at once. A first full import can take a while; check the connection to see entries arrive.
+      x-panelarr-access: admin
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunMetaSyncRequest"
+      responses:
+        "202":
+          description: Started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaSyncStarted"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /catalog/search:
+    get:
+      operationId: searchCatalog
+      tags: [catalog]
+      summary: Search the catalogue by title
+      description: Searches every title (all languages and romanizations). Only entries within the caller's content-rating ceiling are returned. While the metadata service is unavailable this answers `503` with code `meta_unavailable`.
+      x-panelarr-access: user
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - $ref: "#/components/parameters/CatalogType"
+        - $ref: "#/components/parameters/CatalogStatus"
+        - $ref: "#/components/parameters/CatalogGenre"
+        - $ref: "#/components/parameters/YearFrom"
+        - $ref: "#/components/parameters/YearTo"
+        - $ref: "#/components/parameters/CatalogSort"
+        - $ref: "#/components/parameters/Reverse"
+        - $ref: "#/components/parameters/Lang"
+        - $ref: "#/components/parameters/CatalogPageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Matching entries, best first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogSearchPage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /catalog/browse:
+    get:
+      operationId: browseCatalog
+      tags: [catalog]
+      summary: Browse the catalogue
+      description: Discovery without search text, with filters and a sort. Only entries within the caller's content-rating ceiling are returned.
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/CatalogType"
+        - $ref: "#/components/parameters/CatalogStatus"
+        - $ref: "#/components/parameters/CatalogGenre"
+        - $ref: "#/components/parameters/YearFrom"
+        - $ref: "#/components/parameters/YearTo"
+        - $ref: "#/components/parameters/CatalogSort"
+        - $ref: "#/components/parameters/Reverse"
+        - $ref: "#/components/parameters/Lang"
+        - $ref: "#/components/parameters/CatalogPageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: A page of entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogPage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /catalog/entries/{entry_id}:
+    get:
+      operationId: getCatalogEntry
+      tags: [catalog]
+      summary: One catalogue entry in full
+      description: Entries above the caller's content-rating ceiling answer `404` like missing ones.
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/EntryId"
+        - $ref: "#/components/parameters/Lang"
+      responses:
+        "200":
+          description: The entry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogEntry"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /catalog/entries/{entry_id}/cover:
+    get:
+      operationId: getCatalogEntryCover
+      tags: [catalog]
+      summary: An entry's cover image
+      description: Served by the server from its cache, so browsers never contact metadata sites. `404` when the entry has no cover or the caller may not see it.
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/EntryId"
+      responses:
+        "200":
+          description: The image.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /plugins:
+    get:
+      operationId: listPlugins
+      tags: [plugins]
+      summary: List source plugins
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: Plugins by ID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: registerPlugin
+      tags: [plugins]
+      summary: Add a source plugin running as a service
+      description: |
+        The server checks the plugin answers and speaks the source plugin
+        contract (`422`, code `plugin_unreachable`, otherwise), stores it and
+        lists its sources. The ID names this plugin instance and prefixes
+        its sources' IDs; it defaults to the plugin's own ID. A taken ID
+        answers `409`, code `plugin_id_taken`.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPluginRequest"
+      responses:
+        "201":
+          description: The plugin, with its sources synced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plugin"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /plugins/{plugin_id}:
+    parameters:
+      - $ref: "#/components/parameters/PluginId"
+    get:
+      operationId: getPlugin
+      tags: [plugins]
+      summary: Get a plugin
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The plugin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plugin"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: updatePlugin
+      tags: [plugins]
+      summary: Change a plugin's address or key, or turn it off
+      description: A new address or key is checked before it is saved.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePluginRequest"
+      responses:
+        "200":
+          description: The plugin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plugin"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deletePlugin
+      tags: [plugins]
+      summary: Remove a plugin and its sources
+      x-panelarr-access: admin
+      responses:
+        "204":
+          description: Removed.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /plugins/{plugin_id}/sync:
+    post:
+      operationId: syncPlugin
+      tags: [plugins]
+      summary: Refresh a plugin's info, health and sources now
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/PluginId"
+      responses:
+        "200":
+          description: The plugin after the sync. A plugin that didn't answer shows health `down`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plugin"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /plugins/{plugin_id}/config:
+    parameters:
+      - $ref: "#/components/parameters/PluginId"
+    get:
+      operationId: getPluginConfig
+      tags: [plugins]
+      summary: A plugin's configuration and its schema
+      description: Secret fields (`writeOnly` in the schema) come back empty. A plugin without configuration answers `404`, code `no_config`.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginConfig"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: setPluginConfig
+      tags: [plugins]
+      summary: Replace a plugin's configuration
+      description: The plugin validates and applies it; the server keeps it (encrypted) and hands it back whenever the plugin restarts. Secret fields left empty keep their current value.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPluginConfigRequest"
+      responses:
+        "200":
+          description: The configuration as the plugin now reports it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginConfig"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources:
+    get:
+      operationId: listSources
+      tags: [sources]
+      summary: Sources the caller may use
+      description: Users see enabled sources their grants allow, within their content-rating ceiling. Admins see every usable source, and with `all=true` also disabled ones and ones their plugin no longer lists.
+      x-panelarr-access: user
+      parameters:
+        - name: all
+          in: query
+          schema:
+            type: boolean
+        - name: lang
+          in: query
+          description: Only sources in this language.
+          schema:
+            type: string
+            maxLength: 35
+      responses:
+        "200":
+          description: Sources by plugin and name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}:
+    patch:
+      operationId: updateSource
+      tags: [sources]
+      summary: Turn a source on or off for everyone
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSourceRequest"
+      responses:
+        "200":
+          description: The source.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceInfo"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/popular:
+    get:
+      operationId: sourcePopular
+      tags: [sources]
+      summary: A source's popular series
+      description: Errors from the source answer `502` with code `source_failed` (the reason, e.g. a challenge page or the site being down, is in the detail), or `429` with code `rate_limited`.
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+        - $ref: "#/components/parameters/SourcePage"
+      responses:
+        "200":
+          description: A page of series.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceSeriesPage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/latest:
+    get:
+      operationId: sourceLatest
+      tags: [sources]
+      summary: A source's latest updates
+      description: "`422`, code `unsupported`, when the source has no latest list."
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+        - $ref: "#/components/parameters/SourcePage"
+      responses:
+        "200":
+          description: A page of series.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceSeriesPage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/search:
+    post:
+      operationId: sourceSearch
+      tags: [sources]
+      summary: Search a source
+      description: A POST because filter values are structured; it only reads, so a `read` API key may call it.
+      x-panelarr-access: user
+      x-panelarr-read-only: true
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceSearchRequest"
+      responses:
+        "200":
+          description: A page of series.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceSeriesPage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/filters:
+    get:
+      operationId: sourceFilters
+      tags: [sources]
+      summary: A source's search filters
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+      responses:
+        "200":
+          description: The filters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceFilters"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/series:
+    get:
+      operationId: sourceSeries
+      tags: [sources]
+      summary: A series on a source, in full
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+        - $ref: "#/components/parameters/SeriesKey"
+      responses:
+        "200":
+          description: The series.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceSeries"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/chapters:
+    get:
+      operationId: sourceChapters
+      tags: [sources]
+      summary: A series' chapters exactly as the source lists them
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+        - $ref: "#/components/parameters/SeriesKey"
+      responses:
+        "200":
+          description: The chapters, newest first as the source orders them.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceChapterList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/image:
+    get:
+      operationId: sourceImage
+      tags: [sources]
+      summary: An image from a source (covers, icons)
+      description: Only image links the server handed out work (they are signed); the image is fetched through the source's plugin and cached.
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+        - name: ref
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 4000
+        - name: sig
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+      responses:
+        "200":
+          description: The image.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: Background jobs
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: Every job with its schedule and last run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /jobs/{job_id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: One job
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /jobs/{job_id}/runs:
+    get:
+      operationId: listJobRuns
+      tags: [jobs]
+      summary: A job's runs, newest first
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/JobRunStatus"
+      responses:
+        "200":
+          description: Runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRunList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /jobs/{job_id}/run:
+    post:
+      operationId: runJob
+      tags: [jobs]
+      summary: Run a job now
+      description: A job that is running answers `409`, code `already_running`, with the running run's ID in the detail. Parameters the job doesn't know, or that don't fit, answer `400`.
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunJobRequest"
+      responses:
+        "202":
+          description: Started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRunSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /job-runs/{run_id}:
+    get:
+      operationId: getJobRun
+      tags: [jobs]
+      summary: One run in full
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRun"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /job-runs/{run_id}/cancel:
+    post:
+      operationId: cancelJobRun
+      tags: [jobs]
+      summary: Cancel a running run
+      description: "`409` with code `not_running` for a finished run, `not_cancellable` for jobs that can't stop midway."
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "202":
+          description: Cancelling.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRunSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: Queued, running and recent tasks
+      x-panelarr-access: admin
+      parameters:
+        - name: kind
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: state
+          in: query
+          schema:
+            $ref: "#/components/schemas/TaskState"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Tasks, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /tasks/{task_id}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: One task
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: The task.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /tasks/{task_id}/cancel:
+    post:
+      operationId: cancelTask
+      tags: [tasks]
+      summary: Cancel a queued or running task
+      description: "`409`, code `task_finished`, when it already ended."
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: The task.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /tasks/{task_id}/retry:
+    post:
+      operationId: retryTask
+      tags: [tasks]
+      summary: Run a failed or cancelled task again
+      description: "`409`, code `not_retryable`, for other states or when the same work is queued already."
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: The task, queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /queue:
+    get:
+      operationId: getQueue
+      tags: [tasks]
+      summary: The task queue per kind
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: Each kind's counts and state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueState"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /queue/kinds/{kind}:
+    patch:
+      operationId: updateQueueKind
+      tags: [tasks]
+      summary: Pause or resume a kind of task
+      description: Queued tasks of a paused kind wait; running ones finish.
+      x-panelarr-access: admin
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateQueueKindRequest"
+      responses:
+        "200":
+          description: The queue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueState"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /events:
+    get:
+      operationId: streamEvents
+      tags: [system]
+      summary: Live events (server-sent events)
+      description: |
+        A `text/event-stream` of what changes, filtered to what the caller
+        may see: `task.queued`, `task.started`, `task.progress`,
+        `task.updated` (admins and the task's requester), `job.started`,
+        `job.progress`, `job.done`, `job.failed` (admins), and more as
+        features arrive (`work.updated`, `chapter.downloaded`, …). Each
+        event's `data` is JSON. The stream opens with a `ready` event and
+        sends a comment every 25 seconds to keep proxies from closing it.
+        Events aren't replayed: after reconnecting, refetch what you show.
+      x-panelarr-access: user
+      responses:
+        "200":
+          description: The event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Problem"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: panelarr_session
+      description: Browser session. Changes also need the `X-CSRF-Token` header.
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: A personal API key.
+    bearer:
+      type: http
+      scheme: bearer
+      description: A personal API key as a bearer token.
+
+  parameters:
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9._-]*$"
+        maxLength: 100
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PluginId:
+      name: plugin_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
+    SourceId:
+      name: source_id
+      in: path
+      required: true
+      description: The source's ID, "plugin:source".
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 300
+    SourcePage:
+      name: page
+      in: query
+      description: The page, from 1.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 10000
+    SeriesKey:
+      name: key
+      in: query
+      required: true
+      description: The series' key on the source, as listed.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 2000
+    EntryId:
+      name: entry_id
+      in: path
+      required: true
+      description: The metadata service's entry ID.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+    Lang:
+      name: lang
+      in: query
+      description: Preferred language for titles and descriptions (BCP 47, e.g. "en", "ja-Latn"). Default from the Accept-Language header.
+      schema:
+        type: string
+        maxLength: 35
+        pattern: "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
+    CatalogType:
+      name: type
+      in: query
+      description: Only these types, e.g. manga, manhwa, manhua, webtoon, comic, light_novel.
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 20
+        items:
+          type: string
+          pattern: "^[a-z_]{1,40}$"
+    CatalogStatus:
+      name: status
+      in: query
+      description: Only these statuses, e.g. releasing, completed, hiatus, cancelled, upcoming.
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 10
+        items:
+          type: string
+          pattern: "^[a-z_]{1,40}$"
+    CatalogGenre:
+      name: genre
+      in: query
+      description: Only entries with all of these genres.
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 20
+        items:
+          type: string
+          minLength: 1
+          maxLength: 100
+    YearFrom:
+      name: year_from
+      in: query
+      schema:
+        type: integer
+        minimum: 1800
+        maximum: 3000
+    YearTo:
+      name: year_to
+      in: query
+      schema:
+        type: integer
+        minimum: 1800
+        maximum: 3000
+    CatalogSort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        enum: [relevance, popularity, rating, updated, year, title]
+    Reverse:
+      name: reverse
+      in: query
+      description: Reverse the sort order.
+      schema:
+        type: boolean
+    CatalogPageSize:
+      name: page_size
+      in: query
+      description: Entries per page, 1 to 100. Default 30.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PageSize:
+      name: page_size
+      in: query
+      description: Items per page, 1 to 200. Default 50.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+    PageToken:
+      name: page_token
+      in: query
+      description: The `next_page_token` of the previous page.
+      schema:
+        type: string
+        maxLength: 512
+
+  responses:
+    Problem:
+      description: An error, as RFC 9457 problem details.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+  schemas:
+    JobParam:
+      type: object
+      required: [name, type, required]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [bool, int, string, string_list]
+        description:
+          type: string
+        required:
+          type: boolean
+        default:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+    JobSchedule:
+      type: object
+      required: [enabled]
+      properties:
+        interval_seconds:
+          type: integer
+          description: Absent for jobs run by hand only.
+        enabled:
+          type: boolean
+        source:
+          type: string
+          description: Where the schedule is configured (read-only here).
+    JobRunStatus:
+      type: string
+      enum: [running, succeeded, failed, cancelled, skipped]
+    JobRunSummary:
+      type: object
+      required: [id, job_id, status, trigger, started_at, message, counts]
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/JobRunStatus"
+        trigger:
+          type: string
+          enum: [schedule, manual, startup, system]
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        message:
+          type: string
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        triggered_by:
+          type: string
+    JobRunNote:
+      type: object
+      required: [at, level, message]
+      properties:
+        at:
+          type: string
+          format: date-time
+        level:
+          type: string
+        message:
+          type: string
+        ref:
+          type: string
+    JobProgress:
+      type: object
+      required: [done]
+      properties:
+        phase:
+          type: string
+        done:
+          type: integer
+          format: int64
+        total:
+          type: integer
+          format: int64
+        unit:
+          type: string
+    JobRun:
+      type: object
+      required: [summary, params, notes]
+      properties:
+        summary:
+          $ref: "#/components/schemas/JobRunSummary"
+        params:
+          type: object
+          additionalProperties:
+            type: string
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobRunNote"
+        progress:
+          $ref: "#/components/schemas/JobProgress"
+    JobRunList:
+      type: object
+      required: [runs, next_page_token]
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobRunSummary"
+        next_page_token:
+          type: string
+    Job:
+      type: object
+      required: [id, name, description, group, schedule, running, cancellable, params]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        group:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/JobSchedule"
+        running:
+          type: boolean
+        current_run_id:
+          type: string
+          format: uuid
+        last_run:
+          $ref: "#/components/schemas/JobRunSummary"
+        next_run_at:
+          type: string
+          format: date-time
+        cancellable:
+          type: boolean
+        params:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobParam"
+    JobList:
+      type: object
+      required: [jobs]
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Job"
+    RunJobRequest:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            type: string
+            maxLength: 1000
+
+    TaskState:
+      type: string
+      enum: [queued, running, succeeded, failed, cancelled]
+    Task:
+      type: object
+      required: [id, kind, state, priority, attempts, max_attempts, run_after, payload, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          description: e.g. match.work, update.work, download.chapter.
+        state:
+          $ref: "#/components/schemas/TaskState"
+        priority:
+          type: integer
+        attempts:
+          type: integer
+        max_attempts:
+          type: integer
+        run_after:
+          type: string
+          format: date-time
+          description: When a queued task may run next (retries wait).
+        last_error:
+          type: string
+        progress:
+          $ref: "#/components/schemas/JobProgress"
+        limit_key:
+          type: string
+          description: The limit it counts against, e.g. "source:fake:1001".
+        payload:
+          type: object
+          additionalProperties: true
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+    TaskList:
+      type: object
+      required: [tasks, next_page_token]
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        next_page_token:
+          type: string
+    QueueKind:
+      type: object
+      required: [kind, paused, running, concurrency, queued, failed]
+      properties:
+        kind:
+          type: string
+        paused:
+          type: boolean
+        running:
+          type: integer
+        concurrency:
+          type: integer
+        queued:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+    QueueState:
+      type: object
+      required: [kinds]
+      properties:
+        kinds:
+          type: array
+          items:
+            $ref: "#/components/schemas/QueueKind"
+    UpdateQueueKindRequest:
+      type: object
+      required: [paused]
+      properties:
+        paused:
+          type: boolean
+
+    RateLimit:
+      type: object
+      required: [requests, period_seconds]
+      properties:
+        requests:
+          type: integer
+        period_seconds:
+          type: number
+        burst:
+          type: integer
+    Plugin:
+      type: object
+      required: [id, url, enabled, name, version, contracts, capabilities, has_config, health, source_count, created_at]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        enabled:
+          type: boolean
+        name:
+          type: string
+          description: The plugin's own name.
+        plugin_id:
+          type: string
+          description: The plugin's own ID (what it reports), e.g. to tell instances of one plugin apart.
+        version:
+          type: string
+        contracts:
+          type: array
+          items:
+            type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        max_concurrency_per_source:
+          type: integer
+          description: How many calls per source the plugin takes at once, when it says.
+        default_rate_limit:
+          $ref: "#/components/schemas/RateLimit"
+        has_config:
+          type: boolean
+          description: The plugin has settings (see its config).
+        health:
+          type: string
+          enum: [ok, degraded, down, unknown]
+        health_message:
+          type: string
+        checked_at:
+          type: string
+          format: date-time
+        source_count:
+          type: integer
+          format: int64
+          description: Sources the plugin lists now.
+        created_at:
+          type: string
+          format: date-time
+    PluginList:
+      type: object
+      required: [plugins]
+      properties:
+        plugins:
+          type: array
+          items:
+            $ref: "#/components/schemas/Plugin"
+    RegisterPluginRequest:
+      type: object
+      required: [url]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
+        url:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: The plugin service's base URL, e.g. "http://source-plugin:8904".
+        api_key:
+          type: string
+          maxLength: 500
+    UpdatePluginRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          minLength: 1
+          maxLength: 500
+        api_key:
+          type: string
+          maxLength: 500
+          description: The new key; an empty string removes it.
+        enabled:
+          type: boolean
+    PluginConfig:
+      type: object
+      required: [schema, values]
+      properties:
+        schema:
+          type: object
+          additionalProperties: true
+          description: The plugin's JSON Schema for its configuration. Render the form from it.
+        values:
+          type: object
+          additionalProperties: true
+    SetPluginConfigRequest:
+      type: object
+      required: [values]
+      properties:
+        values:
+          type: object
+          additionalProperties: true
+
+    SourceHealth:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, failing, unknown]
+        reason:
+          type: string
+          description: Why it fails, e.g. CLOUDFLARE_CHALLENGE or SOURCE_DOWN.
+        message:
+          type: string
+        checked_at:
+          type: string
+          format: date-time
+    SourceInfo:
+      type: object
+      required: [id, plugin_id, name, lang, content_rating, capabilities, health, enabled, present]
+      properties:
+        id:
+          type: string
+          description: '"plugin:source".'
+        plugin_id:
+          type: string
+        name:
+          type: string
+        lang:
+          type: string
+        content_rating:
+          type: string
+          enum: [safe, mixed, nsfw, unknown]
+        icon_url:
+          type: string
+          description: The server's URL for the source's icon.
+        home_url:
+          type: string
+        capabilities:
+          type: array
+          description: latest, search, filters, resolve_url, settings, needs_webview, nsfw.
+          items:
+            type: string
+        health:
+          $ref: "#/components/schemas/SourceHealth"
+        enabled:
+          type: boolean
+        present:
+          type: boolean
+          description: The plugin still lists it.
+    SourceList:
+      type: object
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceInfo"
+    UpdateSourceRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+    SourceSeries:
+      type: object
+      required: [key, title, alt_titles, authors, artists, genres]
+      properties:
+        key:
+          type: string
+          description: The series' key on the source; pass it back as is.
+        title:
+          type: string
+        alt_titles:
+          type: array
+          items:
+            type: string
+        authors:
+          type: array
+          items:
+            type: string
+        artists:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          description: ongoing, completed, licensed, publishing_finished, cancelled, on_hiatus or absent when unknown.
+        cover_url:
+          type: string
+          description: The server's URL for the cover.
+        url:
+          type: string
+          description: The series' page on the site.
+    SourceSeriesPage:
+      type: object
+      required: [series, has_next_page]
+      properties:
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceSeries"
+        has_next_page:
+          type: boolean
+    SourceSearchRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          maxLength: 200
+        page:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        filters:
+          type: array
+          maxItems: 200
+          description: Filter values in the source plugin contract's JSON form, e.g. {"path":[2],"select":1}.
+          items:
+            type: object
+            additionalProperties: true
+    SourceFilters:
+      type: object
+      required: [filters]
+      properties:
+        filters:
+          type: array
+          description: The source's filters in the source plugin contract's JSON form (headers, separators, text, checkboxes, tri-states, selects, sorts, groups).
+          items:
+            type: object
+            additionalProperties: true
+    SourceChapter:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        number:
+          type: number
+        volume:
+          type: string
+        scanlator:
+          type: string
+        uploaded_at:
+          type: string
+          format: date-time
+        lang:
+          type: string
+        url:
+          type: string
+    SourceChapterList:
+      type: object
+      required: [chapters]
+      properties:
+        chapters:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceChapter"
+
+    MetaProvider:
+      type: object
+      required: [id, health, records]
+      properties:
+        id:
+          type: string
+        health:
+          type: string
+          description: ok, degraded, down or unknown.
+        message:
+          type: string
+        records:
+          type: integer
+          format: int64
+          description: Records the provider has delivered so far.
+    MetaCheck:
+      type: object
+      required: [configured, reachable, key_valid, admin_scope, ready, providers, checked_at]
+      properties:
+        configured:
+          type: boolean
+        reachable:
+          type: boolean
+        key_valid:
+          type: boolean
+        admin_scope:
+          type: boolean
+        ready:
+          type: boolean
+          description: Reachable, an admin key, and a provider with entries.
+        problem:
+          type: string
+          description: What to do, when not ready.
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetaProvider"
+        checked_at:
+          type: string
+          format: date-time
+    MetaConnection:
+      type: object
+      required: [managed_by_env, check]
+      properties:
+        url:
+          type: string
+          description: Empty when not connected. The key is never shown.
+        managed_by_env:
+          type: boolean
+          description: The connection comes from PANELARR_META_URL and can't be changed here.
+        check:
+          $ref: "#/components/schemas/MetaCheck"
+    SetMetaConnectionRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: The service's base URL, e.g. "http://meta:8901".
+          minLength: 1
+          maxLength: 500
+        api_key:
+          type: string
+          description: A key with the admin scope. Leave out to keep the stored one.
+          maxLength: 500
+    RunMetaSyncRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          description: The sync kind the provider supports, "dump" (full import, the default) or "delta".
+          enum: [dump, delta]
+    MetaSyncStarted:
+      type: object
+      required: [run_id]
+      properties:
+        run_id:
+          type: string
+
+    Attribution:
+      type: object
+      required: [provider]
+      description: Where data comes from and under which terms. Show it next to the data.
+      properties:
+        provider:
+          type: string
+        url:
+          type: string
+        license:
+          type: string
+        license_url:
+          type: string
+        notice:
+          type: string
+    CatalogCover:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: The server's URL for the image, relative to the server, e.g. "/api/v1/catalog/entries/{id}/cover".
+        width:
+          type: integer
+        height:
+          type: integer
+        blurhash:
+          type: string
+          description: A placeholder to show while the image loads.
+        thumbhash:
+          type: string
+    EntryContentRating:
+      type: string
+      enum: [safe, suggestive, erotic, pornographic, unknown]
+    CatalogEntrySummary:
+      type: object
+      required: [id, title, content_rating, genres, attribution]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+          description: The title in the requested language when known.
+        type:
+          type: string
+          description: e.g. manga, manhwa, manhua, webtoon, comic, light_novel. Absent when unknown; the list may grow.
+        status:
+          type: string
+          description: releasing, completed, hiatus, cancelled, upcoming or unknown. Absent when unknown.
+        content_rating:
+          $ref: "#/components/schemas/EntryContentRating"
+        year:
+          type: integer
+        original_language:
+          type: string
+        cover:
+          $ref: "#/components/schemas/CatalogCover"
+        genres:
+          type: array
+          items:
+            type: string
+        rating:
+          type: number
+          description: Average score from 0 to 10, when known.
+        attribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attribution"
+    CatalogPage:
+      type: object
+      required: [entries, next_page_token, no_providers]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogEntrySummary"
+        next_page_token:
+          type: string
+        total_size:
+          type: integer
+          format: int64
+          description: The number of matches, when the catalogue knows it.
+        no_providers:
+          type: boolean
+          description: The metadata service has no provider, so the catalogue is empty.
+    CatalogSearchHit:
+      type: object
+      required: [entry]
+      properties:
+        entry:
+          $ref: "#/components/schemas/CatalogEntrySummary"
+        matched:
+          type: string
+          description: The title or name that matched, when it isn't the shown title.
+    CatalogSearchPage:
+      type: object
+      required: [hits, next_page_token, no_providers]
+      properties:
+        hits:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogSearchHit"
+        next_page_token:
+          type: string
+        total_size:
+          type: integer
+          format: int64
+        no_providers:
+          type: boolean
+    CatalogTitle:
+      type: object
+      required: [text, kind, primary]
+      properties:
+        text:
+          type: string
+        language:
+          type: string
+          description: BCP 47, e.g. "ja", "ja-Latn", "en".
+        kind:
+          type: string
+          description: official, native, romanized, alternative, unofficial or unknown.
+        primary:
+          type: boolean
+    CatalogDescription:
+      type: object
+      required: [text, format]
+      properties:
+        text:
+          type: string
+        language:
+          type: string
+        format:
+          type: string
+          enum: [plain, markdown, html]
+          description: HTML comes from the provider; sanitise it before showing.
+    CatalogCredit:
+      type: object
+      required: [name, role]
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          description: author, artist, writer, illustrator, original_creator, …
+        person_id:
+          type: string
+    CatalogTag:
+      type: object
+      required: [name, genre, spoiler]
+      properties:
+        name:
+          type: string
+        genre:
+          type: boolean
+        spoiler:
+          type: boolean
+    CatalogExternalId:
+      type: object
+      required: [provider, id]
+      properties:
+        provider:
+          type: string
+        id:
+          type: string
+        url:
+          type: string
+    CatalogLink:
+      type: object
+      required: [type, url]
+      properties:
+        type:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+    CatalogEntry:
+      type: object
+      required: [id, title, content_rating, titles, descriptions, credits, genres, tags, external_ids, links, attribution]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        content_rating:
+          $ref: "#/components/schemas/EntryContentRating"
+        original_language:
+          type: string
+        year:
+          type: integer
+          description: The year it started.
+        end_year:
+          type: integer
+        cover:
+          $ref: "#/components/schemas/CatalogCover"
+        titles:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogTitle"
+        descriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogDescription"
+        credits:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogCredit"
+        genres:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogTag"
+        external_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogExternalId"
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogLink"
+        attribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attribution"
+
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          description: A URI reference that identifies the problem type; "about:blank" when only the status applies.
+          examples: ["about:blank"]
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type.
+        status:
+          type: integer
+          description: The HTTP status code.
+        detail:
+          type: string
+          description: What went wrong in this occurrence, for people.
+        instance:
+          type: string
+          description: The request path.
+        code:
+          type: string
+          description: |
+            A stable, machine-readable error code. Common ones:
+            `invalid_request`, `unauthenticated`, `forbidden`, `csrf_failed`,
+            `not_found`, `setup_required`, `rate_limited`, `internal`.
+          pattern: "^[a-z][a-z0-9_]*$"
+        request_id:
+          type: string
+          description: The request's ID, also in the X-Request-Id header and the server log.
+        errors:
+          type: array
+          description: Per-field validation errors.
+          items:
+            $ref: "#/components/schemas/FieldError"
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          description: The field, e.g. "grants.allowed_sources".
+        message:
+          type: string
+
+    SystemInfo:
+      type: object
+      required: [name, version, setup_required]
+      properties:
+        name:
+          type: string
+          description: Always "panelarr".
+          const: panelarr
+        version:
+          type: string
+          description: The server version, e.g. "0.3.1", or "dev".
+        setup_required:
+          type: boolean
+          description: True until the first account (the admin) exists.
+
+    HealthStatus:
+      type: string
+      enum: [ok, degraded, unavailable]
+      description: "`unavailable`: a required component fails. `degraded`: an optional one fails."
+    ComponentHealth:
+      type: object
+      required: [name, required, status]
+      properties:
+        name:
+          type: string
+        required:
+          type: boolean
+          description: Whether the server can't work without it.
+        status:
+          type: string
+          enum: [ok, failing]
+        error:
+          type: string
+        latency_ms:
+          type: integer
+    SystemHealth:
+      type: object
+      required: [status, version, components]
+      properties:
+        status:
+          $ref: "#/components/schemas/HealthStatus"
+        version:
+          type: string
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentHealth"
+
+    SetupStatus:
+      type: object
+      required: [admin_created, meta_configured, meta_ready, completed]
+      properties:
+        admin_created:
+          type: boolean
+          description: The first account exists.
+        meta_configured:
+          type: boolean
+          description: The metadata service is connected.
+        meta_ready:
+          type: boolean
+          description: The metadata service is usable (see `GET /system/meta` for details).
+        completed:
+          type: boolean
+          description: An admin finished the wizard.
+        completed_at:
+          type: string
+          format: date-time
+    CreateSetupAdminRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          $ref: "#/components/schemas/Username"
+        password:
+          $ref: "#/components/schemas/Password"
+        display_name:
+          $ref: "#/components/schemas/DisplayName"
+
+    Username:
+      type: string
+      description: Letters, digits, `.`, `_` and `-`, starting with a letter or digit. Case-insensitively unique.
+      minLength: 2
+      maxLength: 64
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    Password:
+      type: string
+      description: 8 to 256 characters.
+      minLength: 8
+      maxLength: 256
+    DisplayName:
+      type: string
+      maxLength: 100
+    Role:
+      type: string
+      enum: [admin, user]
+      description: Admins may do everything; users what their grants allow.
+    ContentRating:
+      type: string
+      enum: [safe, suggestive, erotic, pornographic]
+      description: Content ratings from mildest to strongest.
+    Grants:
+      type: object
+      description: What a user may do. Admins may always do everything, whatever their grants say.
+      required: [may_add, may_download, may_manage_matches, content_rating_ceiling, all_sources, allowed_sources]
+      properties:
+        may_add:
+          type: boolean
+          description: Add works to their library.
+        may_download:
+          type: boolean
+          description: Queue downloads.
+        may_manage_matches:
+          type: boolean
+          description: Fix source matches, pin chapter variants and set source priorities for works.
+        content_rating_ceiling:
+          $ref: "#/components/schemas/ContentRating"
+        all_sources:
+          type: boolean
+          description: Every source is allowed, including ones added later. When false, only `allowed_sources`.
+        allowed_sources:
+          type: array
+          description: Source IDs (`plugin:source`) the user may use when `all_sources` is false.
+          maxItems: 1000
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+    GrantsPatch:
+      type: object
+      description: Only the fields sent change.
+      properties:
+        may_add:
+          type: boolean
+        may_download:
+          type: boolean
+        may_manage_matches:
+          type: boolean
+        content_rating_ceiling:
+          $ref: "#/components/schemas/ContentRating"
+        all_sources:
+          type: boolean
+        allowed_sources:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+
+    User:
+      type: object
+      required: [id, username, display_name, role, disabled, grants, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+          description: Empty when not set; show the username then.
+        role:
+          $ref: "#/components/schemas/Role"
+        disabled:
+          type: boolean
+        grants:
+          $ref: "#/components/schemas/Grants"
+        created_at:
+          type: string
+          format: date-time
+        last_login_at:
+          type: string
+          format: date-time
+    UserList:
+      type: object
+      required: [users, next_page_token]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        next_page_token:
+          type: string
+    CreateUserRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          $ref: "#/components/schemas/Username"
+        password:
+          $ref: "#/components/schemas/Password"
+        display_name:
+          $ref: "#/components/schemas/DisplayName"
+        role:
+          $ref: "#/components/schemas/Role"
+        grants:
+          $ref: "#/components/schemas/GrantsPatch"
+    UpdateUserRequest:
+      type: object
+      properties:
+        display_name:
+          $ref: "#/components/schemas/DisplayName"
+        role:
+          $ref: "#/components/schemas/Role"
+        disabled:
+          type: boolean
+        password:
+          $ref: "#/components/schemas/Password"
+        grants:
+          $ref: "#/components/schemas/GrantsPatch"
+
+    Me:
+      type: object
+      required: [user, auth]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        auth:
+          type: object
+          required: [method, scopes]
+          properties:
+            method:
+              type: string
+              enum: [session, api_key]
+            scopes:
+              type: array
+              description: For API keys, the key's scopes; for sessions, every scope the user's role allows.
+              items:
+                $ref: "#/components/schemas/ApiKeyScope"
+    UpdateMeRequest:
+      type: object
+      properties:
+        display_name:
+          $ref: "#/components/schemas/DisplayName"
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+          maxLength: 256
+        new_password:
+          $ref: "#/components/schemas/Password"
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          maxLength: 64
+        password:
+          type: string
+          maxLength: 256
+    LoginResponse:
+      type: object
+      required: [user, csrf_token]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        csrf_token:
+          type: string
+          description: Send it as `X-CSRF-Token` with changing requests. Also in the `panelarr_csrf` cookie.
+
+    Session:
+      type: object
+      required: [id, current, created_at, last_seen_at, expires_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        current:
+          type: boolean
+          description: The session making this request.
+        user_agent:
+          type: string
+        ip:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    SessionList:
+      type: object
+      required: [sessions]
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+
+    ApiKeyScope:
+      type: string
+      enum: [read, write, admin, "metrics:read"]
+    ApiKey:
+      type: object
+      required: [id, name, prefix, scopes, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        prefix:
+          type: string
+          description: The start of the key, to tell keys apart.
+        scopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKeyScope"
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    ApiKeyList:
+      type: object
+      required: [api_keys]
+      properties:
+        api_keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKey"
+    CreateApiKeyRequest:
+      type: object
+      required: [name, scopes]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        scopes:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ApiKeyScope"
+        expires_at:
+          type: string
+          format: date-time
+          description: Optional. The key stops working then.
+    ApiKeyCreated:
+      type: object
+      required: [api_key, key]
+      properties:
+        api_key:
+          $ref: "#/components/schemas/ApiKey"
+        key:
+          type: string
+          description: The key. Shown only here.
+
+    InviteToken:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 200
+    InviteCheck:
+      type: object
+      required: [role, expires_at]
+      properties:
+        role:
+          $ref: "#/components/schemas/Role"
+        expires_at:
+          type: string
+          format: date-time
+    AcceptInviteRequest:
+      type: object
+      required: [token, username, password]
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 200
+        username:
+          $ref: "#/components/schemas/Username"
+        password:
+          $ref: "#/components/schemas/Password"
+        display_name:
+          $ref: "#/components/schemas/DisplayName"
+    Invite:
+      type: object
+      required: [id, role, grants, note, created_at, expires_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/Role"
+        grants:
+          $ref: "#/components/schemas/Grants"
+        note:
+          type: string
+          description: The admin's note, e.g. who it's for.
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    InviteList:
+      type: object
+      required: [invites]
+      properties:
+        invites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invite"
+    CreateInviteRequest:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/Role"
+        grants:
+          $ref: "#/components/schemas/GrantsPatch"
+        note:
+          type: string
+          maxLength: 200
+        expires_in_hours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          description: Default 72.
+    InviteCreated:
+      type: object
+      required: [invite, token]
+      properties:
+        invite:
+          $ref: "#/components/schemas/Invite"
+        token:
+          type: string
+          description: The invite token. Shown only here.
