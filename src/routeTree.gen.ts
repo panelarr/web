@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as ReaderRouteImport } from './routes/_reader'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SetupRouteImport } from './routes/setup'
@@ -25,6 +26,7 @@ import { Route as AppAdminSystemRouteImport } from './routes/_app/admin/system'
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
 import { Route as AppCatalogEntryIdRouteImport } from './routes/_app/catalog/$entryId'
 import { Route as AppWorksWorkIdRouteImport } from './routes/_app/works/$workId'
+import { Route as ReaderReadChapterIdRouteImport } from './routes/_reader/read/$chapterId'
 import { Route as AppAdminJobsIndexRouteImport } from './routes/_app/admin/jobs/index'
 import { Route as AppAdminPluginsIndexRouteImport } from './routes/_app/admin/plugins/index'
 import { Route as AppAdminPluginsPluginIdRouteImport } from './routes/_app/admin/plugins/$pluginId'
@@ -38,6 +40,10 @@ import { Route as AppAdminJobsJobIdRunsRunIdRouteImport } from './routes/_app/ad
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReaderRoute = ReaderRouteImport.update({
+  id: '/_reader',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InviteRoute = InviteRouteImport.update({
@@ -115,6 +121,11 @@ const AppWorksWorkIdRoute = AppWorksWorkIdRouteImport.update({
   path: '/works/$workId',
   getParentRoute: () => AppRoute,
 } as any)
+const ReaderReadChapterIdRoute = ReaderReadChapterIdRouteImport.update({
+  id: '/read/$chapterId',
+  path: '/read/$chapterId',
+  getParentRoute: () => ReaderRoute,
+} as any)
 const AppAdminJobsIndexRoute = AppAdminJobsIndexRouteImport.update({
   id: '/jobs/',
   path: '/jobs/',
@@ -183,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/admin/system': typeof AppAdminSystemRoute
   '/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/works/$workId': typeof AppWorksWorkIdRoute
+  '/read/$chapterId': typeof ReaderReadChapterIdRoute
   '/admin/': typeof AppAdminIndexRoute
   '/browse/': typeof AppBrowseIndexRoute
   '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
@@ -197,18 +209,19 @@ export interface FileRoutesByFullPath {
   '/admin/jobs/$jobId/runs/$runId': typeof AppAdminJobsJobIdRunsRunIdRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof AppIndexRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/downloads': typeof AppDownloadsRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
-  '/': typeof AppIndexRoute
   '/admin/queue': typeof AppAdminQueueRoute
   '/admin/sources': typeof AppAdminSourcesRoute
   '/admin/system': typeof AppAdminSystemRoute
   '/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/works/$workId': typeof AppWorksWorkIdRoute
+  '/read/$chapterId': typeof ReaderReadChapterIdRoute
   '/admin': typeof AppAdminIndexRoute
   '/browse': typeof AppBrowseIndexRoute
   '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
@@ -225,6 +238,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/_reader': typeof ReaderRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
@@ -238,6 +252,7 @@ export interface FileRoutesById {
   '/_app/admin/system': typeof AppAdminSystemRoute
   '/_app/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/_app/works/$workId': typeof AppWorksWorkIdRoute
+  '/_reader/read/$chapterId': typeof ReaderReadChapterIdRoute
   '/_app/admin/': typeof AppAdminIndexRoute
   '/_app/browse/': typeof AppBrowseIndexRoute
   '/_app/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
@@ -267,6 +282,7 @@ export interface FileRouteTypes {
     | '/admin/system'
     | '/catalog/$entryId'
     | '/works/$workId'
+    | '/read/$chapterId'
     | '/admin/'
     | '/browse/'
     | '/admin/plugins/$pluginId'
@@ -281,18 +297,19 @@ export interface FileRouteTypes {
     | '/admin/jobs/$jobId/runs/$runId'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/invite'
     | '/login'
     | '/setup'
     | '/downloads'
     | '/more'
     | '/settings'
-    | '/'
     | '/admin/queue'
     | '/admin/sources'
     | '/admin/system'
     | '/catalog/$entryId'
     | '/works/$workId'
+    | '/read/$chapterId'
     | '/admin'
     | '/browse'
     | '/admin/plugins/$pluginId'
@@ -308,6 +325,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/_reader'
     | '/invite'
     | '/login'
     | '/setup'
@@ -321,6 +339,7 @@ export interface FileRouteTypes {
     | '/_app/admin/system'
     | '/_app/catalog/$entryId'
     | '/_app/works/$workId'
+    | '/_reader/read/$chapterId'
     | '/_app/admin/'
     | '/_app/browse/'
     | '/_app/admin/plugins/$pluginId'
@@ -337,6 +356,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  ReaderRoute: typeof ReaderRouteWithChildren
   InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
@@ -349,6 +369,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_reader': {
+      id: '/_reader'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ReaderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/invite': {
@@ -455,6 +482,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/works/$workId'
       preLoaderRoute: typeof AppWorksWorkIdRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_reader/read/$chapterId': {
+      id: '/_reader/read/$chapterId'
+      path: '/read/$chapterId'
+      fullPath: '/read/$chapterId'
+      preLoaderRoute: typeof ReaderReadChapterIdRouteImport
+      parentRoute: typeof ReaderRoute
     }
     '/_app/admin/jobs/': {
       id: '/_app/admin/jobs/'
@@ -591,8 +625,20 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface ReaderRouteChildren {
+  ReaderReadChapterIdRoute: typeof ReaderReadChapterIdRoute
+}
+
+const ReaderRouteChildren: ReaderRouteChildren = {
+  ReaderReadChapterIdRoute: ReaderReadChapterIdRoute,
+}
+
+const ReaderRouteWithChildren =
+  ReaderRoute._addFileChildren(ReaderRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  ReaderRoute: ReaderRouteWithChildren,
   InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,

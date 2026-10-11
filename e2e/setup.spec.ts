@@ -88,3 +88,29 @@ test("adds a series from a source, then fixes its match on another source", asyn
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("reads a chapter: swipe and tap through pages, right to left", async ({ page }) => {
+  await page.goto("/catalog/ent_1000?mock=ready");
+  await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
+  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await page.goto("/");
+  await page.getByText("The Lantern Keeper").click();
+  await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 10_000 });
+  const status = page.locator("[aria-live=polite]").filter({ hasText: /Page \d+ of \d+/ });
+  await expect(status).toHaveText(/Page 1 of \d+/);
+
+  // Swipe right to go forward in right-to-left reading.
+  const box = (await page.getByTestId("paged-viewer").boundingBox()) ?? { x: 0, y: 0, width: 360, height: 700 };
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width * 0.3, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, y, { steps: 8 });
+  await page.mouse.up();
+  await expect(status).toHaveText(/Page 2 of \d+/);
+
+  // A tap on the left edge also goes forward.
+  await page.mouse.click(box.x + 20, y);
+  await expect(status).toHaveText(/Page 3 of \d+/);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

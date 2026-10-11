@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowDownNarrowWide,
   ArrowUpNarrowWide,
+  BookOpen,
   CheckCheck,
   CircleCheck,
   EllipsisVertical,
@@ -96,8 +98,20 @@ export function ChaptersPanel({
   if (chapters.error) return <ErrorAlert error={chapters.error} onRetry={() => void chapters.refetch()} />;
   if (chapters.isPending) return <Loading />;
 
+  const continueId = progress.data?.continue_chapter_id;
+  const continueChapter = all.find((c) => c.id === continueId);
+  const started = (progress.data?.chapters.length ?? 0) > 0;
+
   return (
     <div className="grid gap-3">
+      {continueChapter ? (
+        <Button asChild size="lg" className="w-full sm:w-auto sm:justify-self-start">
+          <Link to="/read/$chapterId" params={{ chapterId: continueChapter.id }}>
+            <BookOpen aria-hidden />
+            {started ? "Continue" : "Start reading"}: {chapterLabel(continueChapter)}
+          </Link>
+        </Button>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <p className="mr-auto text-sm text-muted-foreground">
           {all.length} {all.length === 1 ? "chapter" : "chapters"}
@@ -183,7 +197,13 @@ function ChapterRow({
       <div className="flex items-start gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
           <p className={cn("flex flex-wrap items-center gap-x-2 gap-y-1", read && "text-muted-foreground")}>
-            <span className="font-medium [overflow-wrap:anywhere]">{chapterLabel(chapter)}</span>
+            <Link
+              to="/read/$chapterId"
+              params={{ chapterId: chapter.id }}
+              className="font-medium underline-offset-4 [overflow-wrap:anywhere] hover:underline"
+            >
+              {chapterLabel(chapter)}
+            </Link>
             {chapter.new ? <Badge>New</Badge> : null}
             {chapter.pinned ? (
               <Pin className="size-3.5 text-muted-foreground" aria-label="Copy chosen by hand" />

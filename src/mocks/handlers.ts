@@ -10,6 +10,7 @@ import { commit, currentUser, db, type MockInvite, newId } from "./db";
 import { emit, onMockEvent } from "./events";
 import { finishRun, queueState, startRun, taskEvent } from "./jobs";
 import { type MockOperation, mockUrl, op, problem } from "./op";
+import { pageCount, pageSvg } from "./reader";
 import { FILTERS, listSeries, seriesIndex, sourceChapters, sourceSeries } from "./sources";
 import { entryCandidates, matchSeries, resolveUrl, startMatching } from "./works";
 
@@ -188,6 +189,17 @@ function workView(user: S["User"], workId: string): S["Work"] | undefined {
     ...(entry ? { added_at: entry.added_at } : {}),
     sources: (d.matching[workId] ?? []).filter((row) => canUseSource(user, row.source)),
   };
+}
+
+/** A chapter the user may see, with its work and its place in the work's reading order. */
+function findChapter(user: S["User"], chapterId: string) {
+  for (const work of db().works) {
+    if (!workView(user, work.id)) continue;
+    const list = unifiedChapters(db(), work.id, user.id);
+    const index = list.findIndex((c) => c.chapter.id === chapterId);
+    if (index >= 0) return { work, list, index };
+  }
+  return undefined;
 }
 
 function findSeries(workId: string, seriesId: string): S["MatchSeries"] | undefined {
@@ -1142,6 +1154,149 @@ export const operations: MockOperation[] = [
     return new HttpResponse(null, { status: 204 });
   }),
 
+  // The reader
+
+  op("get", "/chapters/{chapter_id}/pages", ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const found = findChapter(user, String(params.chapter_id));
+    if (!found) return problem(404, "not_found", "Not found");
+    const { work, list, index } = found;
+    const { chapter, variants } = list[index] as { chapter: S["UnifiedChapter"]; variants: S["ChapterVariant"][] };
+    const variantId = new URL(request.url).searchParams.get("variant_id");
+    const variant = variants.find((v) => v.id === variantId) ?? chapter.chosen ?? variants[0];
+    if (!variant) return problem(404, "no_copy", "No copy", "No source you may use has this chapter.");
+    const progress = db().progress[user.id]?.[chapter.id];
+    const prev = list[index - 1]?.chapter.id;
+    const next = list[index + 1]?.chapter.id;
+    return json<S["ChapterPages"]>({
+      work_id: work.id,
+      chapter,
+      variant,
+      origin: chapter.downloaded ? "file" : "source",
+      pages: Array.from({ length: pageCount(chapter) }, (_, i) => ({
+        index: i,
+        url: `/api/v1/chapters/${chapter.id}/pages/${i}`,
+      })),
+      ...(prev ? { prev_chapter_id: prev } : {}),
+      ...(next ? { next_chapter_id: next } : {}),
+      ...(progress ? { progress } : {}),
+    });
+  }),
+
+  op("get", "/chapters/{chapter_id}/pages/{index}", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const found = findChapter(user, String(params.chapter_id));
+    const chapter = found?.list[found.index]?.chapter;
+    if (!found || !chapter) return problem(404, "not_found", "Not found");
+    const strip = ["manhwa", "manhua", "webtoon"].includes(found.work.type ?? "");
+    return new HttpResponse(pageSvg(chapter, Number(params.index), strip), {
+      headers: { "Content-Type": "image/svg+xml", "Cache-Control": "private, max-age=3600" },
+    });
+  }),
+
+  op("put", "/chapters/{chapter_id}/progress", async ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const found = findChapter(user, String(params.chapter_id));
+    if (!found) return problem(404, "not_found", "Not found");
+    const body = (await request.json()) as S["SetProgressRequest"];
+    const d = db();
+    d.progress[user.id] ??= {};
+    const mine = d.progress[user.id] as Record<string, S["ChapterProgress"]>;
+    const id = String(params.chapter_id);
+    const completed =
+      body.completed ??
+      (body.pages !== undefined && body.page >= body.pages - 1 ? true : (mine[id]?.completed ?? false));
+    mine[id] = {
+      chapter_id: id,
+      page: body.page,
+      ...(body.pages ? { pages: body.pages } : {}),
+      completed,
+      updated_at: now(),
+    };
+    emit("progress.synced", { work_id: found.work.id, chapter_id: id, page: body.page, completed });
+    commit();
+    return json(mine[id]);
+  }),
+
+  op("get", "/me/history", () => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const items: S["HistoryItem"][] = [];
+    for (const p of Object.values(db().progress[user.id] ?? {})) {
+      const found = findChapter(user, p.chapter_id);
+      const chapter = found?.list[found.index]?.chapter;
+      if (!found || !chapter) continue;
+      items.push({
+        work_id: found.work.id,
+        work_title: found.work.title,
+        ...(found.work.cover_url ? { work_cover_url: found.work.cover_url } : {}),
+        chapter_id: chapter.id,
+        ...(chapter.number !== undefined ? { chapter_number: chapter.number } : {}),
+        chapter_title: chapter.title,
+        page: p.page,
+        ...(p.pages ? { pages: p.pages } : {}),
+        completed: p.completed,
+        updated_at: p.updated_at,
+      });
+    }
+    items.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    return json<S["HistoryPage"]>({ items, next_page_token: "" });
+  }),
+
+  op("get", "/me/reader-settings", ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const url = new URL(request.url);
+    const mine = db().readerSettings[user.id] ?? {};
+    const sourceId = url.searchParams.get("source_id");
+    const workId = url.searchParams.get("work_id");
+    const global = mine.global;
+    const source = sourceId ? mine[`source:${sourceId}`] : undefined;
+    const work = workId ? mine[`work:${workId}`] : undefined;
+    return json<S["ReaderSettings"]>({
+      ...(global ? { global } : {}),
+      ...(source ? { source } : {}),
+      ...(work ? { work } : {}),
+      effective: { ...global, ...source, ...work },
+    });
+  }),
+
+  op("put", "/me/reader-settings/{scope}", async ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const d = db();
+    d.readerSettings[user.id] ??= {};
+    (d.readerSettings[user.id] as Record<string, Record<string, unknown>>)[String(params.scope)] =
+      (await request.json()) as Record<string, unknown>;
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("delete", "/me/reader-settings/{scope}", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    delete db().readerSettings[user.id]?.[String(params.scope)];
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("get", "/me/preferences", () => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    return json(db().preferences[user.id] ?? {});
+  }),
+
+  op("put", "/me/preferences", async ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    db().preferences[user.id] = (await request.json()) as Record<string, unknown>;
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
   // Browsing sources
 
   op("get", "/sources/{source_id}/popular", ({ params, request }) => {
@@ -1350,7 +1505,17 @@ type MockEventMap = { message: string; ready: string } & { [K in EventType]: str
 export function createEventsHandler() {
   return sse<MockEventMap>(mockUrl("/events"), ({ client, request }) => {
     client.send({ event: "ready", data: "{}" });
-    const off = onMockEvent((type, data) => client.send({ event: type as EventType, data: JSON.stringify(data) }));
-    request.signal.addEventListener("abort", off);
+    const off = onMockEvent((type, data) => {
+      if (request.signal.aborted) {
+        off();
+        return;
+      }
+      try {
+        client.send({ event: type as EventType, data: JSON.stringify(data) });
+      } catch {
+        off(); // the page went away without closing the stream
+      }
+    });
+    request.signal.addEventListener("abort", () => off());
   });
 }

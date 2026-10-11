@@ -26,8 +26,7 @@ function seedWork() {
   return work?.id ?? "";
 }
 
-const chapterRow = (label: string) =>
-  screen.getByText(label, { selector: "span.font-medium" }).closest("li") as HTMLElement;
+const chapterRow = (label: string) => screen.getByRole("link", { name: label }).closest("li") as HTMLElement;
 
 let workId = "";
 beforeEach(() => {
@@ -96,7 +95,7 @@ describe("a work's chapters", () => {
     };
     const { router } = await renderApp(`/works/${workId}?unread=true&order=desc`);
     await screen.findByText(/^15 chapters · 1 read$/);
-    expect(screen.queryByText("Vol. 1 · Chapter 1", { selector: "span.font-medium" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Vol. 1 · Chapter 1" })).not.toBeInTheDocument();
     const rows = within(screen.getByRole("list", { name: "Chapters" })).getAllByRole("listitem");
     expect(rows[0]).toHaveTextContent("Extra: Character sketches");
     await userEvent.click(screen.getByRole("button", { name: "Unread only" }));

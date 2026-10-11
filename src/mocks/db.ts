@@ -54,6 +54,10 @@ export interface MockDb extends JobsState {
   progress: Record<string, Record<string, S["ChapterProgress"]>>;
   fresh: Record<string, Record<string, string[]>>;
   downloaded: string[];
+  /** Per user: reader settings by scope ("global", "source:<id>", "work:<id>"). */
+  readerSettings: Record<string, Record<string, Record<string, unknown>>>;
+  /** Per user: app preferences. */
+  preferences: Record<string, Record<string, unknown>>;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -90,6 +94,8 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     progress: {},
     fresh: {},
     downloaded: [],
+    readerSettings: {},
+    preferences: {},
     jobs: initialJobs(),
     runs: initialRuns(),
     tasks: initialTasks(),
