@@ -11,6 +11,7 @@
 // In the browser, pick one with `?mock=<scenario>`; it lasts for the tab (sessionStorage).
 import type { components } from "@/api/schema.gen";
 import { adminUser, apiKey, invite, metaConnection, plugin, pluginConfig, readerUser, session, sources } from "./data";
+import { initialJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
 
 type S = components["schemas"];
 
@@ -24,9 +25,10 @@ export interface MockLibraryEntry {
   work_id: string;
   added_at: string;
   new_chapters: number;
+  auto_download: boolean;
 }
 
-export interface MockDb {
+export interface MockDb extends JobsState {
   users: S["User"][];
   passwords: Record<string, string>;
   /** The signed-in user's ID; undefined when signed out. */
@@ -77,7 +79,15 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     failedLogins: 0,
     works: [],
     library: [],
+    jobs: initialJobs(),
+    runs: initialRuns(),
+    tasks: initialTasks(),
+    pausedKinds: [],
   };
+  for (const job of ready.jobs) {
+    const last = ready.runs.find((r) => r.summary.job_id === job.id);
+    if (last) job.last_run = last.summary;
+  }
   switch (scenario) {
     case "fresh":
       return {

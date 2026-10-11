@@ -2,6 +2,7 @@
 
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { isApiError } from "@/api/errors";
+import { EventsProvider } from "@/api/events-context";
 import { meQuery, setupQuery } from "@/auth/session";
 import { AppShell } from "@/components/app-shell";
 
@@ -20,8 +21,10 @@ export const Route = createFileRoute("/_app")({
     return { me };
   },
   component: () => (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <EventsProvider>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </EventsProvider>
   ),
 });

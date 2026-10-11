@@ -78,7 +78,18 @@ message, the code and a copyable request ID.
 
 ## Live events
 
-`src/api/events.ts` keeps one `EventSource` on `/api/v1/events`. Each event invalidates the
-cached queries it affects (the `INVALIDATIONS` table), and components can subscribe to an
-event's data for live progress. The server doesn't replay events, so after a reconnect every
-active query refetches.
+`src/api/events.ts` keeps one `EventSource` on `/api/v1/events` while the user is signed in
+(`EventsProvider` in the app shell).
+
+- **Invalidations.** Each event marks the cached queries it affects as stale (the
+  `INVALIDATIONS` table). They are batched for half a second, so a burst refetches once.
+- **Patches.** Progress events change cached data in place instead (the `PATCHES` table):
+  refetching task lists several times a second would swamp the server.
+- **Listeners.** `useEvent(type, fn)` hands a component an event's data, e.g. a run's live
+  progress (`useRun`).
+- **Reconnects.** The server doesn't replay events, so after a reconnect every active query
+  refetches. A refused stream (signed out) is retried with back-off.
+
+The data of each event is typed in `src/api/event-types.ts`, following the server. In tests a
+fake `EventSource` (`src/test/fake-event-source.ts`) receives the mock server's events, and in
+`make run-mock` the mock server streams them for real.

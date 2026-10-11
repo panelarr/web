@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { setupWorker } from "msw/browser";
-import { loadBrowserDb } from "./db";
-import { operations } from "./handlers";
+import { commit, db, loadBrowserDb } from "./db";
+import { createEventsHandler, operations } from "./handlers";
+import { tickJobs } from "./jobs";
 import { isDraft } from "./op";
 
 /**
@@ -14,7 +15,14 @@ export async function startMockWorker(mode: "all" | "drafts"): Promise<void> {
   const picked = mode === "all" ? operations : operations.filter(isDraft);
   if (picked.length === 0) return;
   const scenario = loadBrowserDb();
-  const worker = setupWorker(...picked.map((operation) => operation.handler));
+  const handlers = picked.map((operation) => operation.handler);
+  const worker = setupWorker(...(mode === "all" ? [...handlers, createEventsHandler()] : handlers));
+  if (mode === "all") {
+    // Running jobs move on every second, with live events, as on a real server.
+    setInterval(() => {
+      if (tickJobs(db())) commit();
+    }, 1_000);
+  }
   await worker.start({
     serviceWorker: { url: `${import.meta.env.BASE_URL}mockServiceWorker.js` },
     onUnhandledRequest: mode === "all" ? "warn" : "bypass",

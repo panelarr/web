@@ -38,6 +38,9 @@ test("never scrolls sideways", async ({ page }) => {
     "/admin/plugins/example",
     "/admin/sources",
     "/admin/system",
+    "/admin/jobs",
+    "/admin/jobs/update-check",
+    "/admin/queue",
   ];
   for (const path of [...paths, ...admin]) {
     await page.goto(path);

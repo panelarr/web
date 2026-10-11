@@ -59,3 +59,12 @@ test("finds a work in the catalogue and adds it", async ({ page }) => {
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
   await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
 });
+
+test("runs a job and watches it finish over the live event stream", async ({ page }) => {
+  await page.goto("/admin/jobs?mock=ready");
+  const card = page.locator("[data-slot=card]", { has: page.getByRole("heading", { name: "Refresh sources" }) });
+  await card.getByRole("button", { name: "Run now" }).click();
+  // Progress arrives as server-sent events (the mock server moves the run on every second).
+  await expect(card.getByText(/of 5/)).toBeVisible({ timeout: 5000 });
+  await expect(card.getByText(/Done: 12 works/)).toBeVisible({ timeout: 10_000 });
+});

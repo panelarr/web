@@ -6,6 +6,8 @@ export const ADMIN_PAGES = [
   { to: "/admin/users", label: "Users" },
   { to: "/admin/plugins", label: "Plugins" },
   { to: "/admin/sources", label: "Sources" },
+  { to: "/admin/jobs", label: "Jobs" },
+  { to: "/admin/queue", label: "Queue" },
   { to: "/admin/system", label: "System" },
 ] as const;
 

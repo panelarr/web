@@ -1,37 +1,83 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { Query, QueryClient } from "@tanstack/react-query";
+import type { EventMap, EventType, TaskEvent } from "./event-types";
 
 /**
- * Which cached API paths each server event makes stale. Keys match an event type exactly or
- * by prefix ("job." matches "job.done"); values are path prefixes of the queries to refetch.
+ * Which cached queries each server event makes stale: API path prefixes (the second part of
+ * an openapi-react-query key) or other query keys' first part.
  */
-export const INVALIDATIONS: ReadonlyArray<readonly [event: string, paths: readonly string[]]> = [
-  ["job.", ["/jobs", "/job-runs"]],
-  ["task.", ["/tasks", "/queue"]],
-];
+export const INVALIDATIONS: Partial<Record<EventType, readonly string[]>> = {
+  "job.started": ["/jobs", "/job-runs"],
+  "job.done": ["/jobs", "/job-runs"],
+  "job.failed": ["/jobs", "/job-runs"],
+  "task.queued": ["/tasks", "/queue", "/downloads"],
+  "task.started": ["/tasks", "/queue", "/downloads"],
+  "task.updated": ["/tasks", "/queue", "/downloads"],
+  "work.updated": ["/works", "/library", "library-index"],
+  "library.changed": ["/library", "library-index"],
+  "chapters.new": ["/works", "/library"],
+  "chapter.downloaded": ["/works", "/downloads", "/chapters"],
+  "progress.synced": ["/works", "/me/history", "/chapters"],
+};
 
-export type EventListener = (data: unknown, type: string) => void;
+/**
+ * Events applied to cached data in place instead of refetching: progress arrives many times
+ * a second, and refetching lists that often would swamp the server.
+ */
+export const PATCHES: Partial<Record<EventType, (client: QueryClient, data: never) => void>> = {
+  "task.progress": (client, task: TaskEvent) => {
+    const patch = <T extends { id: string }>(item: T): T =>
+      item.id === task.id ? { ...item, state: task.state, attempts: task.attempts, progress: task.progress } : item;
+    client.setQueriesData<TaskPage | Paged<TaskPage>>({ predicate: (q) => keyPath(q) === "/tasks" }, (old) =>
+      mapPages(old, (page) => (page.tasks ? { ...page, tasks: page.tasks.map(patch) } : page)),
+    );
+    client.setQueriesData<{ id: string }>({ predicate: (q) => keyPath(q) === "/tasks/{task_id}" }, (old) =>
+      old?.id === task.id ? patch(old) : old,
+    );
+  },
+};
+
+interface TaskPage {
+  tasks?: Array<{ id: string }>;
+}
+interface Paged<T> {
+  pages: T[];
+  pageParams: unknown[];
+}
+
+/** Applies `fn` to a list response, or to every page of an infinite one. */
+function mapPages<T extends object>(old: T | Paged<T> | undefined, fn: (page: T) => T): T | Paged<T> | undefined {
+  if (!old) return old;
+  if ("pages" in old && Array.isArray(old.pages)) return { ...old, pages: old.pages.map(fn) };
+  return fn(old as T);
+}
+
+export type EventListener<T extends EventType> = (data: EventMap[T], type: T) => void;
 
 const MIN_RETRY_MS = 1_000;
 const MAX_RETRY_MS = 60_000;
+/** Invalidations are batched: a burst of events refetches once. */
+const BATCH_MS = 500;
 
-function queryPath(query: Query): string | undefined {
-  const path = query.queryKey[1];
-  return typeof path === "string" ? path : undefined;
+function keyPath(query: Query): string | undefined {
+  const [first, second] = query.queryKey;
+  return typeof second === "string" ? second : typeof first === "string" ? first : undefined;
 }
 
 /**
- * The one connection to the server's event stream. Events turn into query invalidations, and
- * components may listen for the data itself (e.g. live progress). Events aren't replayed, so
- * after a reconnect every active query refetches.
+ * The one connection to the server's event stream. Events invalidate or patch cached
+ * queries, and components can listen for an event's data (e.g. live progress). The server
+ * doesn't replay events, so after a reconnect every active query refetches.
  */
 export class EventStream {
   private source: EventSource | undefined;
   private connectedBefore = false;
   private retryMs = MIN_RETRY_MS;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
-  private readonly listeners = new Map<string, Set<EventListener>>();
+  private batchTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly pending = new Set<string>();
+  private readonly listeners = new Map<string, Set<EventListener<EventType>>>();
   private readonly registered = new Set<string>();
 
   constructor(
@@ -45,18 +91,21 @@ export class EventStream {
     this.source = source;
     this.registered.clear();
     source.addEventListener("ready", () => this.onReady());
-    for (const [event] of INVALIDATIONS) this.register(event);
-    for (const type of this.listeners.keys()) this.register(type);
+    const types = new Set<string>([...Object.keys(INVALIDATIONS), ...Object.keys(PATCHES), ...this.listeners.keys()]);
+    for (const type of types) this.register(type);
     source.onerror = () => {
       // The browser reconnects by itself unless the server refused the stream (an HTTP
-      // error): then back off and try again.
+      // error, e.g. signed out): then back off and try again.
       if (source.readyState === EventSource.CLOSED) this.scheduleRetry();
     };
   }
 
   stop(): void {
     clearTimeout(this.retryTimer);
+    clearTimeout(this.batchTimer);
     this.retryTimer = undefined;
+    this.batchTimer = undefined;
+    this.pending.clear();
     this.source?.close();
     this.source = undefined;
     this.connectedBefore = false;
@@ -64,18 +113,18 @@ export class EventStream {
   }
 
   /** Calls `listener` for every event of `type`. Returns the unsubscribe function. */
-  subscribe(type: string, listener: EventListener): () => void {
+  subscribe<T extends EventType>(type: T, listener: EventListener<T>): () => void {
     let set = this.listeners.get(type);
     if (!set) {
       set = new Set();
       this.listeners.set(type, set);
     }
-    set.add(listener);
+    set.add(listener as EventListener<EventType>);
     this.register(type);
-    return () => set.delete(listener);
+    return () => set.delete(listener as EventListener<EventType>);
   }
 
-  /** Handles one event; public so tests and mocks can feed events without a stream. */
+  /** Handles one event; public so tests can feed events without a stream. */
   dispatch(type: string, raw: string): void {
     let data: unknown = raw;
     try {
@@ -83,16 +132,27 @@ export class EventStream {
     } catch {
       // Not JSON: hand over the text.
     }
-    const prefixes = INVALIDATIONS.filter(([event]) => matches(type, event)).flatMap(([, paths]) => paths);
-    if (prefixes.length > 0) {
-      void this.queryClient.invalidateQueries({
-        predicate: (query) => {
-          const path = queryPath(query);
-          return path !== undefined && prefixes.some((prefix) => path.startsWith(prefix));
-        },
-      });
+    PATCHES[type as EventType]?.(this.queryClient, data as never);
+    for (const prefix of INVALIDATIONS[type as EventType] ?? []) this.pending.add(prefix);
+    if (this.pending.size > 0 && this.batchTimer === undefined) {
+      this.batchTimer = setTimeout(() => this.flush(), BATCH_MS);
     }
-    for (const listener of this.listeners.get(type) ?? []) listener(data, type);
+    for (const listener of this.listeners.get(type) ?? []) listener(data as never, type as EventType);
+  }
+
+  /** Runs the batched invalidations now. */
+  flush(): void {
+    clearTimeout(this.batchTimer);
+    this.batchTimer = undefined;
+    const prefixes = [...this.pending];
+    this.pending.clear();
+    if (prefixes.length === 0) return;
+    void this.queryClient.invalidateQueries({
+      predicate: (query) => {
+        const path = keyPath(query);
+        return path !== undefined && prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+      },
+    });
   }
 
   private onReady(): void {
@@ -102,14 +162,9 @@ export class EventStream {
   }
 
   private register(type: string): void {
-    // EventSource has no wildcard, so prefixes ("job.") register when a concrete type is seen
-    // in the table; prefix entries also need their concrete names, listed by the server.
-    const names = type.endsWith(".") ? (KNOWN_EVENTS[type] ?? []) : [type];
-    for (const name of names) {
-      if (this.registered.has(name) || !this.source) continue;
-      this.registered.add(name);
-      this.source.addEventListener(name, (event) => this.dispatch(name, (event as MessageEvent<string>).data));
-    }
+    if (this.registered.has(type) || !this.source) return;
+    this.registered.add(type);
+    this.source.addEventListener(type, (event) => this.dispatch(type, (event as MessageEvent<string>).data));
   }
 
   private scheduleRetry(): void {
@@ -119,14 +174,4 @@ export class EventStream {
     this.retryTimer = setTimeout(() => this.start(), this.retryMs);
     this.retryMs = Math.min(this.retryMs * 2, MAX_RETRY_MS);
   }
-}
-
-/** The event names the server documents for each prefix in INVALIDATIONS. */
-export const KNOWN_EVENTS: Record<string, readonly string[]> = {
-  "job.": ["job.started", "job.progress", "job.done", "job.failed"],
-  "task.": ["task.queued", "task.started", "task.progress", "task.updated"],
-};
-
-function matches(type: string, event: string): boolean {
-  return event.endsWith(".") ? type.startsWith(event) : type === event;
 }

@@ -2,9 +2,11 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 import { apiBaseUrl } from "@/api/client";
 import { resetDb } from "@/mocks/db";
+import { FakeEventSource } from "./fake-event-source";
 import { server } from "./server";
 import { SpecValidator } from "./spec-validator";
 
@@ -32,6 +34,7 @@ afterEach(() => {
   const problems = responseProblems;
   responseProblems = [];
   if (typeof window !== "undefined") {
+    toast.dismiss(); // the toast list is global
     cleanup();
     localStorage.clear();
     sessionStorage.clear();
@@ -45,7 +48,10 @@ afterEach(() => {
 
 afterAll(() => server.close());
 
-// jsdom lacks these; Radix and the theme code use them.
+// jsdom lacks these; the event stream, Radix and the theme code use them.
+if (typeof window !== "undefined" && typeof window.EventSource !== "function") {
+  window.EventSource = FakeEventSource as unknown as typeof EventSource;
+}
 if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
   window.matchMedia = (query: string) =>
     ({

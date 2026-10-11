@@ -1523,10 +1523,256 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Storage endpoints for downloads */
+        get: operations["listStorages"];
+        put?: never;
+        /**
+         * Add a storage
+         * @description The server writes, reads and deletes a probe first; a storage that fails answers `422` with code `storage_check_failed` and the reason.
+         */
+        post: operations["createStorage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storages/{storage_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storage_id: components["parameters"]["StorageId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove an empty storage
+         * @description `409` with code `storage_in_use` while files are on it, or `storage_default` for the default.
+         */
+        delete: operations["deleteStorage"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a storage, or make it the default
+         * @description New settings are checked first. Making a storage the default sends new downloads there; existing files stay where they are (move them with a task).
+         */
+        patch: operations["updateStorage"];
+        trace?: never;
+    };
+    "/storages/{storage_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a storage now */
+        post: operations["testStorage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storages/{storage_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move every file to another storage
+         * @description Runs as a task (with progress); files stay readable throughout.
+         */
+        post: operations["moveStorage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/downloads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Download chapters of a work
+         * @description Give `chapter_ids`, or `scope`: `all` or `unread` (chapters you
+         *     haven't finished). Chapters downloaded or queued already (by
+         *     anyone) aren't queued again; files are stored once for everyone.
+         *     Needs `may_download`.
+         */
+        post: operations["downloadChapters"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/downloads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download queue and history
+         * @description Your downloads (admins see everyone's with `all=true`), newest first, with live progress over the event stream (`task.progress`, `chapter.downloaded`). Admins cancel, retry and pause through the task endpoints.
+         */
+        get: operations["listDownloads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/{work_id}/auto-download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Download new chapters of a work automatically
+         * @description New chapters found by update checks are queued for download. Needs `may_download`.
+         */
+        put: operations["setAutoDownload"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chapters/{chapter_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a chapter's downloaded file
+         * @description Files are only deleted by admins; removing works from libraries never deletes them.
+         */
+        delete: operations["deleteChapterFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        StorageInfo: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "local" | "s3";
+            default: boolean;
+            /** @description Local storages' directory. */
+            root?: string;
+            endpoint?: string;
+            region?: string;
+            bucket?: string;
+            prefix?: string;
+            path_style?: boolean;
+            access_key?: string;
+            /** @description A secret key is stored (never shown). */
+            has_secret: boolean;
+            /** Format: int64 */
+            files: number;
+        };
+        StorageList: {
+            storages: components["schemas"]["StorageInfo"][];
+        };
+        StorageSettings: {
+            name?: string;
+            /** @description Local storages; an absolute path. */
+            root?: string;
+            /** @description S3, e.g. "https://s3.example.com". */
+            endpoint?: string;
+            region?: string;
+            bucket?: string;
+            prefix?: string;
+            path_style?: boolean;
+            access_key?: string;
+            /** @description Leave out to keep the stored one. */
+            secret_key?: string;
+        };
+        CreateStorageRequest: components["schemas"]["StorageSettings"] & {
+            id: string;
+            /** @enum {string} */
+            kind: "local" | "s3";
+        };
+        UpdateStorageRequest: components["schemas"]["StorageSettings"] & {
+            /** @description true makes it the default storage. */
+            default?: boolean;
+        };
+        StorageTest: {
+            ok: boolean;
+            error?: string;
+        };
+        MoveStorageRequest: {
+            to: string;
+        };
+        DownloadChaptersRequest: {
+            chapter_ids?: string[];
+            /** @enum {string} */
+            scope?: "all" | "unread";
+        };
+        DownloadsQueued: {
+            queued: number;
+            /** @description Already downloaded; nothing to do. */
+            downloaded: number;
+            /** @description No source lists them. */
+            unavailable: number;
+        };
+        DownloadItem: {
+            task: components["schemas"]["Task"];
+            /** Format: uuid */
+            work_id: string;
+            work_title: string;
+            chapter_number?: number;
+            chapter_title: string;
+        };
+        DownloadPage: {
+            items: components["schemas"]["DownloadItem"][];
+            next_page_token: string;
+        };
+        AutoDownloadRequest: {
+            enabled: boolean;
+        };
         ReaderPage: {
             index: number;
             /** @description The server's URL for the page image. */
@@ -1644,6 +1890,8 @@ export interface components {
             /** @description Why the chosen copy won. */
             reason: string;
             pinned: boolean;
+            /** @description Stored in the library (read from the file). */
+            downloaded: boolean;
             chosen?: components["schemas"]["ChapterVariant"];
             /**
              * Format: date-time
@@ -1706,6 +1954,8 @@ export interface components {
             attached_sources: number;
         };
         LibraryEntry: {
+            /** @description New chapters are downloaded automatically. */
+            auto_download: boolean;
             work: components["schemas"]["WorkSummary"];
             /** Format: date-time */
             added_at: string;
@@ -2530,6 +2780,7 @@ export interface components {
         };
     };
     parameters: {
+        StorageId: string;
         /** @description Read this copy instead of the chosen one. */
         VariantIdQuery: string;
         ChapterId: string;
@@ -4811,6 +5062,251 @@ export interface operations {
         };
         responses: {
             /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listStorages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Storages, the default first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStorageRequest"];
+            };
+        };
+        responses: {
+            /** @description Added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageInfo"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storage_id: components["parameters"]["StorageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storage_id: components["parameters"]["StorageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStorageRequest"];
+            };
+        };
+        responses: {
+            /** @description The storage. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageInfo"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storage_id: components["parameters"]["StorageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageTest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    moveStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storage_id: components["parameters"]["StorageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveStorageRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRef"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    downloadChapters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadChaptersRequest"];
+            };
+        };
+        responses: {
+            /** @description What was queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadsQueued"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listDownloads: {
+        parameters: {
+            query?: {
+                all?: boolean;
+                state?: components["schemas"]["TaskState"];
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of downloads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setAutoDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoDownloadRequest"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteChapterFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapter_id: components["parameters"]["ChapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
             204: {
                 headers: {
                     [name: string]: unknown;

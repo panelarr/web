@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { HttpResponse } from "msw";
+import { HttpResponse, sse } from "msw";
+import type { EventType } from "@/api/event-types";
 import type { components } from "@/api/schema.gen";
 import { CATALOG, coverSvg, summary, withinCeiling } from "./catalog";
 import { health, systemInfo } from "./data";
 import { commit, currentUser, db, type MockInvite, newId } from "./db";
-import { type MockOperation, op, problem } from "./op";
+import { onMockEvent } from "./events";
+import { finishRun, queueState, startRun, taskEvent } from "./jobs";
+import { type MockOperation, mockUrl, op, problem } from "./op";
 
 type S = components["schemas"];
 
@@ -749,7 +752,7 @@ export const operations: MockOperation[] = [
       .flatMap((e) => {
         const work = d.works.find((w) => w.id === e.work_id);
         if (!work || (q && !work.title.toLowerCase().includes(q))) return [];
-        return [{ work, added_at: e.added_at, new_chapters: e.new_chapters }];
+        return [{ work, added_at: e.added_at, new_chapters: e.new_chapters, auto_download: e.auto_download }];
       })
       .sort((a, b) => a.work.title.localeCompare(b.work.title));
     const { items, next } = paginate(entries, new URL(request.url));
@@ -784,13 +787,167 @@ export const operations: MockOperation[] = [
       d.works.push(work);
     }
     const existing = d.library.find((e) => e.user_id === user.id && e.work_id === work.id);
-    if (existing)
-      return json<S["LibraryEntry"]>({ work, added_at: existing.added_at, new_chapters: existing.new_chapters });
-    const added = { user_id: user.id, work_id: work.id, added_at: now(), new_chapters: 0 };
+    if (existing) {
+      const { added_at, new_chapters, auto_download } = existing;
+      return json<S["LibraryEntry"]>({ work, added_at, new_chapters, auto_download });
+    }
+    const added = { user_id: user.id, work_id: work.id, added_at: now(), new_chapters: 0, auto_download: false };
     d.library.push(added);
     commit();
-    return json<S["LibraryEntry"]>({ work, added_at: added.added_at, new_chapters: 0 }, 201);
+    return json<S["LibraryEntry"]>({ work, added_at: added.added_at, new_chapters: 0, auto_download: false }, 201);
+  }),
+
+  // Jobs
+
+  op("get", "/jobs", () => {
+    const admin = requireAdmin();
+    return admin instanceof Response ? admin : json<S["JobList"]>({ jobs: db().jobs });
+  }),
+
+  op("get", "/jobs/{job_id}", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const job = db().jobs.find((j) => j.id === params.job_id);
+    return job ? json(job) : problem(404, "not_found", "Not found", `No job "${params.job_id}".`);
+  }),
+
+  op("get", "/jobs/{job_id}/runs", ({ params, request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const url = new URL(request.url);
+    const status = url.searchParams.get("status");
+    const runs = db()
+      .runs.filter((r) => r.summary.job_id === params.job_id && (!status || r.summary.status === status))
+      .map((r) => r.summary);
+    const { items, next } = paginate(runs, url);
+    return json<S["JobRunList"]>({ runs: items, next_page_token: next });
+  }),
+
+  op("post", "/jobs/{job_id}/run", async ({ params, request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const d = db();
+    const job = d.jobs.find((j) => j.id === params.job_id);
+    if (!job) return problem(404, "not_found", "Not found");
+    if (job.running)
+      return problem(409, "already_running", "Already running", `the job is running as ${job.current_run_id}`);
+    const text = await request.text();
+    const given = (text ? (JSON.parse(text) as S["RunJobRequest"]).params : undefined) ?? {};
+    const unknown = Object.keys(given).filter((name) => !job.params.some((p) => p.name === name));
+    const missing = job.params.filter((p) => p.required && !given[p.name] && !p.default).map((p) => p.name);
+    if (unknown.length || missing.length) {
+      return problem(
+        400,
+        "invalid_request",
+        "Invalid parameters",
+        [...unknown.map((n) => `unknown parameter ${n}`), ...missing.map((n) => `${n} is required`)].join("; "),
+      );
+    }
+    const started = startRun(d, job, given, "manual", admin.username);
+    commit();
+    return json(started.summary, 202);
+  }),
+
+  op("get", "/job-runs/{run_id}", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const found = db().runs.find((r) => r.summary.id === params.run_id);
+    return found ? json(found) : problem(404, "not_found", "Not found");
+  }),
+
+  op("post", "/job-runs/{run_id}/cancel", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const d = db();
+    const found = d.runs.find((r) => r.summary.id === params.run_id);
+    if (!found) return problem(404, "not_found", "Not found");
+    if (found.summary.status !== "running") return problem(409, "not_running", "Not running", "The run has finished.");
+    const job = d.jobs.find((j) => j.id === found.summary.job_id);
+    if (!job?.cancellable) return problem(409, "not_cancellable", "Can't cancel", "This job can't stop midway.");
+    finishRun(d, found, "cancelled", `Cancelled by ${admin.username}`);
+    commit();
+    return json(found.summary, 202);
+  }),
+
+  // The task queue
+
+  op("get", "/tasks", ({ request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const url = new URL(request.url);
+    const kind = url.searchParams.get("kind");
+    const state = url.searchParams.get("state");
+    const tasks = [...db().tasks]
+      .filter((t) => (!kind || t.kind === kind) && (!state || t.state === state))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const { items, next } = paginate(tasks, url);
+    return json<S["TaskList"]>({ tasks: items, next_page_token: next });
+  }),
+
+  op("get", "/tasks/{task_id}", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const task = db().tasks.find((t) => t.id === params.task_id);
+    return task ? json(task) : problem(404, "not_found", "Not found");
+  }),
+
+  op("post", "/tasks/{task_id}/cancel", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const task = db().tasks.find((t) => t.id === params.task_id);
+    if (!task) return problem(404, "not_found", "Not found");
+    if (task.state !== "queued" && task.state !== "running") return problem(409, "task_finished", "Already finished");
+    task.state = "cancelled";
+    task.finished_at = now();
+    delete task.progress;
+    taskEvent("task.updated", task);
+    commit();
+    return json(task);
+  }),
+
+  op("post", "/tasks/{task_id}/retry", ({ params }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const task = db().tasks.find((t) => t.id === params.task_id);
+    if (!task) return problem(404, "not_found", "Not found");
+    if (task.state !== "failed" && task.state !== "cancelled")
+      return problem(409, "not_retryable", "Can't retry", "Only failed or cancelled tasks run again.");
+    task.state = "queued";
+    task.attempts = 0;
+    task.run_after = now();
+    delete task.last_error;
+    delete task.finished_at;
+    taskEvent("task.queued", task);
+    commit();
+    return json(task);
+  }),
+
+  op("get", "/queue", () => {
+    const admin = requireAdmin();
+    return admin instanceof Response ? admin : json(queueState(db()));
+  }),
+
+  op("patch", "/queue/kinds/{kind}", async ({ params, request }) => {
+    const admin = requireAdmin();
+    if (admin instanceof Response) return admin;
+    const { paused } = (await request.json()) as S["UpdateQueueKindRequest"];
+    const d = db();
+    const kind = String(params.kind);
+    d.pausedKinds = paused ? [...new Set([...d.pausedKinds, kind])] : d.pausedKinds.filter((k) => k !== kind);
+    commit();
+    return json(queueState(d));
   }),
 ];
 
 export const handlers = operations.map((operation) => operation.handler);
+
+type MockEventMap = { message: string; ready: string } & { [K in EventType]: string };
+
+/** The event stream, for the browser (tests use a fake EventSource fed by the same events). */
+export function createEventsHandler() {
+  return sse<MockEventMap>(mockUrl("/events"), ({ client, request }) => {
+    client.send({ event: "ready", data: "{}" });
+    const off = onMockEvent((type, data) => client.send({ event: type as EventType, data: JSON.stringify(data) }));
+    request.signal.addEventListener("abort", off);
+  });
+}
