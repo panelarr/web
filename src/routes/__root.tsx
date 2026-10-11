@@ -2,10 +2,12 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, Link, Outlet } from "@tanstack/react-router";
+import { useLayoutEffect } from "react";
 import { ErrorAlert } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { startTheming } from "@/theme/theme";
 
 export interface RouterContext {
   queryClient: QueryClient;
@@ -22,6 +24,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function Root() {
+  // theme-boot.js painted the saved theme already; from here the app keeps it applied.
+  useLayoutEffect(() => startTheming(), []);
   return (
     <TooltipProvider>
       <Outlet />

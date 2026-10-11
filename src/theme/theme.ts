@@ -2,6 +2,9 @@
 
 import { Store } from "@tanstack/react-store";
 import { parseHex, readableOn } from "./color";
+
+export { contrast } from "./color";
+
 import { DEFAULT_ACCENT, DEFAULT_FONT, DEFAULT_THEME } from "./defaults";
 import { findFont } from "./fonts";
 import { COLOR_TOKENS, findPreset, type ThemePreset } from "./presets";
@@ -11,6 +14,10 @@ export interface ThemePrefs {
   theme: string;
   accent: string;
   font: string;
+  /** Custom page background (hex) over the theme's; text colour follows for contrast. */
+  background?: string | undefined;
+  /** Custom surfaces (cards, menus, sidebar) over the theme's. */
+  surface?: string | undefined;
 }
 
 export const DEFAULT_PREFS: ThemePrefs = { theme: DEFAULT_THEME, accent: DEFAULT_ACCENT, font: DEFAULT_FONT };
@@ -44,6 +51,15 @@ export function resolve(preset: ThemePreset, prefs: ThemePrefs): ResolvedTheme {
   vars["--primary-foreground"] = onAccent;
   vars["--sidebar-primary-foreground"] = onAccent;
   vars["--font-ui"] = findFont(prefs.font).family;
+  if (prefs.background && parseHex(prefs.background)) {
+    const text = readableOn(prefs.background);
+    vars["--background"] = prefs.background;
+    for (const token of ["foreground", "card-foreground", "popover-foreground", "sidebar-foreground"])
+      vars[`--${token}`] = text;
+  }
+  if (prefs.surface && parseHex(prefs.surface)) {
+    for (const token of ["card", "popover", "sidebar"]) vars[`--${token}`] = prefs.surface;
+  }
   return { dark: preset.scheme === "dark", vars };
 }
 

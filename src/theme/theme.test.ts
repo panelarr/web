@@ -82,3 +82,25 @@ describe("applyTheme", () => {
     meta.remove();
   });
 });
+
+describe("custom colours", () => {
+  it("override the background and surfaces, keeping text readable", () => {
+    const dark = THEME_PRESETS.find((p) => p.id === "dark");
+    if (!dark) throw new Error("no dark preset");
+    const theme = resolve(dark, { ...DEFAULT_PREFS, background: "#f5f0e6", surface: "#ffffff" });
+    expect(theme.vars["--background"]).toBe("#f5f0e6");
+    expect(theme.vars["--foreground"]).toBe("#111111");
+    expect(theme.vars["--card"]).toBe("#ffffff");
+  });
+});
+
+describe("contrast", () => {
+  it("reads hex and the presets' oklch colours", async () => {
+    const { contrast, oklchToRgb } = await import("./color");
+    expect(oklchToRgb(1, 0, 0)).toEqual([255, 255, 255]);
+    expect(oklchToRgb(0, 0, 0)).toEqual([0, 0, 0]);
+    expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 0);
+    expect(contrast("oklch(1 0 0)", "oklch(0.145 0 0)")).toBeGreaterThan(15);
+    expect(contrast("nope", "#fff")).toBeUndefined();
+  });
+});

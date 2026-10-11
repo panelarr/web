@@ -8,7 +8,6 @@ import { createQueryClient } from "@/api/query-client";
 import { createAuthErrorHandler } from "@/auth/auth-errors";
 import { registerServiceWorker } from "@/pwa";
 import { createAppRouter } from "@/router";
-import { startTheming } from "@/theme/theme";
 import "@/styles.css";
 
 async function enableMocks(): Promise<void> {
@@ -18,7 +17,6 @@ async function enableMocks(): Promise<void> {
   await startMockWorker(mode === "all" ? "all" : "drafts");
 }
 
-startTheming();
 await enableMocks();
 
 let router: ReturnType<typeof createAppRouter> | undefined;

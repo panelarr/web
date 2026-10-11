@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 import { apiBaseUrl } from "@/api/client";
 import { resetDb } from "@/mocks/db";
+import { DEFAULT_PREFS, themeStore } from "@/theme/theme";
 import { FakeEventSource } from "./fake-event-source";
 import { server } from "./server";
 import { SpecValidator } from "./spec-validator";
@@ -27,7 +28,10 @@ beforeAll(async () => {
   });
 });
 
-beforeEach(() => resetDb("ready"));
+beforeEach(() => {
+  resetDb("ready");
+  themeStore.setState(() => DEFAULT_PREFS); // module state, shared by every test in a file
+});
 
 afterEach(() => {
   server.resetHandlers();

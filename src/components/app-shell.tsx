@@ -10,6 +10,7 @@ import { Logo } from "@/components/logo";
 import { NAV_ITEMS, type NavItem } from "@/components/nav";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
+import { usePreferencesSync } from "@/theme/sync";
 
 /** The navigation items this user may see. */
 export function useNavItems(): readonly NavItem[] {
@@ -23,6 +24,7 @@ export function useNavItems(): readonly NavItem[] {
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const isAdmin = useIsAdmin();
+  usePreferencesSync();
   return (
     <div className="min-h-dvh md:pl-60">
       <Sidebar />

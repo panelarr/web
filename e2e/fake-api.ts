@@ -17,11 +17,13 @@ export async function fakeApi(page: Page): Promise<void> {
     "GET /me/api-keys": { api_keys: [apiKey] },
     "GET /system/meta": metaConnection,
     "PATCH /me": me,
+    "GET /me/preferences": {},
   };
   await page.route(/\/api\/v1\//, async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.replace(/^.*\/api\/v1/, "");
     if (path === "/events") return route.fulfill({ status: 204 });
+    if (request.method() === "PUT" && path === "/me/preferences") return route.fulfill({ status: 204 });
     const body = answers[`${request.method()} ${path}`];
     if (body === undefined) {
       return route.fulfill({

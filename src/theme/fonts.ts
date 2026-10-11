@@ -21,6 +21,30 @@ export const UI_FONTS: readonly UiFont[] = [
     family: `'Inter Variable', ${fallback}`,
     load: () => import("@fontsource-variable/inter"),
   },
+  {
+    id: "atkinson",
+    name: "Atkinson Hyperlegible",
+    family: `'Atkinson Hyperlegible Next Variable', ${fallback}`,
+    load: () => import("@fontsource-variable/atkinson-hyperlegible-next"),
+  },
+  {
+    id: "lexend",
+    name: "Lexend",
+    family: `'Lexend Variable', ${fallback}`,
+    load: () => import("@fontsource-variable/lexend"),
+  },
+  {
+    id: "noto",
+    name: "Noto Sans",
+    family: `'Noto Sans Variable', ${fallback}`,
+    load: () => import("@fontsource-variable/noto-sans"),
+  },
+  {
+    id: "nunito",
+    name: "Nunito",
+    family: `'Nunito Variable', ${fallback}`,
+    load: () => import("@fontsource-variable/nunito"),
+  },
   { id: "system", name: "System", family: fallback },
 ];
 
