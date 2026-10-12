@@ -8,6 +8,7 @@ import { $api } from "@/api/client";
 import { errorMessage, isApiError } from "@/api/errors";
 import type { components } from "@/api/schema.gen";
 import { useMe } from "@/auth/session";
+import { ScrollStrip } from "@/components/scroll-strip";
 import { EmptyState, ErrorAlert, Loading } from "@/components/states";
 import {
   AlertDialog,
@@ -111,7 +112,7 @@ function WorkDetails({ work }: { work: Work }) {
           })
         }
       >
-        <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+        <ScrollStrip>
           <TabsList>
             <TabsTrigger value="chapters">Chapters</TabsTrigger>
             {attached.map((state) => (
@@ -121,7 +122,7 @@ function WorkDetails({ work }: { work: Work }) {
             ))}
             <TabsTrigger value="sources">Sources</TabsTrigger>
           </TabsList>
-        </div>
+        </ScrollStrip>
         <TabsContent value="chapters" className="mt-4">
           <ChaptersPanel
             work={work}

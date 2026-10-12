@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ScrollStrip } from "@/components/scroll-strip";
 import { PageHeader } from "@/components/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiKeysCard } from "@/features/account/api-keys-card";
@@ -31,7 +32,7 @@ function SettingsPage() {
     <>
       <PageHeader title="Settings" />
       <Tabs value={tab} onValueChange={(value) => void navigate({ search: { tab: value as Tab }, replace: true })}>
-        <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+        <ScrollStrip>
           <TabsList>
             {TABS.map((t) => (
               <TabsTrigger key={t.id} value={t.id}>
@@ -39,7 +40,7 @@ function SettingsPage() {
               </TabsTrigger>
             ))}
           </TabsList>
-        </div>
+        </ScrollStrip>
         <TabsContent value="profile" className="mt-4">
           <ProfileCard />
         </TabsContent>

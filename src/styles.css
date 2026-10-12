@@ -72,6 +72,11 @@
 @utility pr-safe {
   padding-right: env(safe-area-inset-right);
 }
+/* A thin scrollbar, where the platform shows one at all. */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
 /* The page's side gutter: 16px, or more where a notch needs it. */
 @utility px-gutter {
   padding-left: max(1rem, env(safe-area-inset-left));

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { LinkTabs } from "@/components/scroll-strip";
 
 export const ADMIN_PAGES = [
   { to: "/admin/users", label: "Users" },
@@ -23,20 +24,11 @@ export const Route = createFileRoute("/_app/admin")({
 function AdminLayout() {
   return (
     <>
-      <nav aria-label="Admin" className="-mx-4 mb-6 overflow-x-auto border-b px-4 md:mx-0 md:px-0">
-        <ul className="flex gap-1">
-          {ADMIN_PAGES.map((page) => (
-            <li key={page.to}>
-              <Link
-                to={page.to}
-                className="-mb-px inline-block border-b-2 border-transparent px-3 py-2.5 text-sm font-medium whitespace-nowrap text-muted-foreground hover:text-foreground data-[status=active]:border-primary data-[status=active]:text-foreground"
-              >
-                {page.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <LinkTabs
+        label="Admin"
+        className="mb-6"
+        tabs={ADMIN_PAGES.map((page) => ({ key: page.to, label: page.label, link: { to: page.to } }))}
+      />
       <Outlet />
     </>
   );
