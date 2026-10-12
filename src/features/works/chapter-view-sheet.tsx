@@ -39,7 +39,7 @@ export function ChapterViewSheet({
           <SheetDescription>Filter, sort and show the chapters.</SheetDescription>
         </SheetHeader>
         <Tabs defaultValue="filter" className="flex min-h-0 flex-1 flex-col gap-0 pt-2">
-          <TabsList className="mx-4 grid grid-cols-3">
+          <TabsList className="mx-4 grid w-auto grid-cols-3">
             <TabsTrigger value="filter">Filter</TabsTrigger>
             <TabsTrigger value="sort">Sort</TabsTrigger>
             <TabsTrigger value="display">Display</TabsTrigger>

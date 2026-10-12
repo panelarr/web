@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { RotateCcw } from "lucide-react";
 import { useId } from "react";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { isContinuous, type Level, type ReaderSettings } from "./settings";
@@ -72,6 +74,7 @@ export function ReaderSettingsSheet({
   sourceName,
   onChange,
   onReset,
+  onClear,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -82,8 +85,12 @@ export function ReaderSettingsSheet({
   sourceName: string;
   onChange: (change: Partial<ReaderSettings>) => void;
   onReset: (level: SaveLevel) => void;
+  /** Drops one setting at the level being changed. */
+  onClear: (setting: keyof ReaderSettings) => void;
 }) {
   const desktop = useIsDesktop();
+  const scopeName = level === "source" ? sourceName : LEVEL_LABEL[level].toLowerCase();
+  const row = { level, scopeName, onClear };
   const continuous = isContinuous(settings.mode);
   const select = <K extends keyof ReaderSettings>(
     key: K,
@@ -91,7 +98,7 @@ export function ReaderSettingsSheet({
     options: Options<K>,
     disabled?: (v: ReaderSettings[K]) => boolean,
   ) => (
-    <Row key={key} label={label} origin={origin[key]}>
+    <Row key={key} setting={key} label={label} origin={origin[key]} {...row}>
       {(id) => (
         <NativeSelect
           id={id}
@@ -112,12 +119,12 @@ export function ReaderSettingsSheet({
     key: "stretch" | "invertTapZones" | "showPageNumber" | "offsetSpreads" | "keepAwake",
     label: string,
   ) => (
-    <Row key={key} label={label} origin={origin[key]} inline>
+    <Row key={key} setting={key} label={label} origin={origin[key]} inline {...row}>
       {(id) => <Switch id={id} checked={settings[key]} onCheckedChange={(checked) => onChange({ [key]: checked })} />}
     </Row>
   );
   const number = (key: "pageGap" | "maxWidth" | "preload", label: string, min: number, max: number, step: number) => (
-    <Row key={key} label={label} origin={origin[key]}>
+    <Row key={key} setting={key} label={label} origin={origin[key]} {...row}>
       {(id) => (
         <Input
           id={id}
@@ -142,13 +149,13 @@ export function ReaderSettingsSheet({
         side={desktop ? "right" : "bottom"}
         className={cn("flex flex-col gap-0", desktop ? "w-full sm:max-w-md" : "max-h-[80dvh] rounded-t-2xl pb-safe")}
       >
-        <SheetHeader>
+        <SheetHeader className="pb-2">
           <SheetTitle>Reader settings</SheetTitle>
           <SheetDescription>Changes apply right away.</SheetDescription>
         </SheetHeader>
-        <div className="grid flex-1 content-start gap-5 overflow-y-auto px-4 pb-6">
+        <div className="grid gap-2 px-4">
           <fieldset>
-            <legend className="mb-2 text-sm font-medium">Save changes for</legend>
+            <legend className="sr-only">Save changes for</legend>
             <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
               {(
                 [
@@ -177,77 +184,106 @@ export function ReaderSettingsSheet({
               ))}
             </div>
           </fieldset>
-          <section className="grid gap-3">
-            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Reading</h3>
-            {select("mode", "Mode", MODE)}
-            {settings.mode === "vertical" || settings.mode === "webtoon"
-              ? null
-              : select("direction", "Direction", DIRECTION)}
-            {settings.mode === "double" ? toggle("offsetSpreads", "Cover alone (pairs printed pages)") : null}
-          </section>
-          <section className="grid gap-3">
-            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Display</h3>
-            {continuous || settings.mode === "double" ? null : select("fit", "Fit", FIT)}
-            {continuous ? null : toggle("stretch", "Stretch small pages")}
-            {settings.mode === "vertical" || settings.mode === "horizontal"
-              ? number("pageGap", "Gap between pages (px)", 0, 64, 2)
-              : null}
-            {settings.mode === "vertical" || settings.mode === "webtoon"
-              ? number("maxWidth", "Widest page (px, 0 for none)", 0, 4000, 50)
-              : null}
-            {select("background", "Background", BACKGROUND)}
-            {toggle("showPageNumber", "Page number")}
-            {toggle("keepAwake", "Keep the screen on")}
-          </section>
-          <section className="grid gap-3">
-            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Controls</h3>
-            {select("tapZones", "Tap zones", TAP)}
-            {continuous ? null : toggle("invertTapZones", "Swap tap sides")}
-            {continuous ? null : select("transition", "Page turn", TRANSITION)}
-            {number("preload", "Pages to load ahead", 0, 20, 1)}
-          </section>
-          <section className="grid gap-2 border-t pt-4">
-            <p className="text-xs text-muted-foreground">Back to the broader settings:</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => onReset("work")}>
-                Reset this series
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => onReset("source")}>
-                Reset {sourceName}
-              </Button>
-            </div>
-          </section>
+          <p className="text-xs text-muted-foreground">
+            <span className="font-semibold text-primary">•</span> set for {scopeName}; the others come from broader
+            settings.
+          </p>
         </div>
+        <Tabs defaultValue="layout" className="flex min-h-0 flex-1 flex-col gap-0 pt-3">
+          <TabsList className="mx-4 grid w-auto grid-cols-2">
+            <TabsTrigger value="layout">Layout</TabsTrigger>
+            <TabsTrigger value="general">General</TabsTrigger>
+          </TabsList>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-6">
+            <TabsContent value="layout" className="grid gap-4">
+              {select("mode", "Mode", MODE)}
+              {settings.mode === "vertical" || settings.mode === "webtoon"
+                ? null
+                : select("direction", "Direction", DIRECTION)}
+              {settings.mode === "double" ? toggle("offsetSpreads", "Cover alone (pairs printed pages)") : null}
+              {continuous || settings.mode === "double" ? null : select("fit", "Fit", FIT)}
+              {continuous ? null : toggle("stretch", "Stretch small pages")}
+              {settings.mode === "vertical" || settings.mode === "horizontal"
+                ? number("pageGap", "Gap between pages (px)", 0, 64, 2)
+                : null}
+              {settings.mode === "vertical" || settings.mode === "webtoon"
+                ? number("maxWidth", "Widest page (px, 0 for none)", 0, 4000, 50)
+                : null}
+              {select("tapZones", "Tap zones", TAP)}
+              {continuous ? null : toggle("invertTapZones", "Swap tap sides")}
+            </TabsContent>
+            <TabsContent value="general" className="grid gap-4">
+              {select("background", "Background", BACKGROUND)}
+              {toggle("showPageNumber", "Page number")}
+              {toggle("keepAwake", "Keep the screen on")}
+              {continuous ? null : select("transition", "Page turn", TRANSITION)}
+              {number("preload", "Pages to load ahead", 0, 20, 1)}
+              <section className="grid gap-2 border-t pt-4">
+                <p className="text-xs text-muted-foreground">Back to the broader settings:</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => onReset("work")}>
+                    Reset this series
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => onReset("source")}>
+                    Reset {sourceName}
+                  </Button>
+                </div>
+              </section>
+            </TabsContent>
+          </div>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );
 }
 
 function Row({
+  setting,
   label,
   origin,
   inline,
+  level,
+  scopeName,
+  onClear,
   children,
 }: {
+  setting: keyof ReaderSettings;
   label: string;
   origin: Level;
   inline?: boolean;
+  level: SaveLevel;
+  scopeName: string;
+  onClear: (setting: keyof ReaderSettings) => void;
   children: (id: string) => React.ReactNode;
 }) {
   const id = useId();
+  const here = origin === level;
   return (
     <div className={cn(inline ? "flex items-center justify-between gap-3" : "grid gap-1.5")}>
-      <div className="flex items-center gap-2">
-        <Label htmlFor={id}>{label}</Label>
-        <span
-          className={cn(
-            "rounded px-1.5 py-0.5 text-[10px] font-medium",
-            origin === "default" ? "text-muted-foreground" : "bg-primary/10 text-primary",
-          )}
-          title={`Set for: ${LEVEL_LABEL[origin]}`}
-        >
-          {LEVEL_LABEL[origin]}
-        </span>
+      <div className="flex min-w-0 items-center gap-2">
+        <Label htmlFor={id}>
+          {label}
+          {here ? (
+            <span className="text-primary" title={`Set for ${scopeName}`}>
+              {" "}
+              •<span className="sr-only"> (set for {scopeName})</span>
+            </span>
+          ) : null}
+        </Label>
+        {here ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 text-muted-foreground"
+            aria-label={`Reset ${label}`}
+            title="Reset"
+            onClick={() => onClear(setting)}
+          >
+            <RotateCcw className="size-3.5" aria-hidden />
+          </Button>
+        ) : origin !== "default" ? (
+          <span className="truncate text-[10px] text-muted-foreground">from {LEVEL_LABEL[origin].toLowerCase()}</span>
+        ) : null}
       </div>
       {children(id)}
     </div>

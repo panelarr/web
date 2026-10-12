@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useRef } from "react";
 import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
+import { MANUAL } from "@/api/events";
 import { ErrorAlert, Loading } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { ReaderScreen } from "@/features/reader/reader-screen";
@@ -43,7 +44,8 @@ function ReadPage() {
     "get",
     "/chapters/{chapter_id}/pages",
     { params: { path: { chapter_id: chapterId }, query: variant ? { variant_id: variant } : {} } },
-    { staleTime: 5 * 60_000 },
+    // Fetched once per chapter: progress saves echo back as events, which mustn't reload it.
+    { staleTime: 5 * 60_000, meta: MANUAL },
   );
   const work = $api.useQuery(
     "get",

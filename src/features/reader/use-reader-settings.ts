@@ -61,5 +61,15 @@ export function useReaderSettings(workId: string | undefined, sourceId: string |
     remove.mutate({ params: { path: { scope: scopeOf(level) } } });
   };
 
-  return { ...resolved, loading: query.isPending && !!workId, levels, update, reset };
+  /** Drops one setting at one level, so it falls back to the broader ones. */
+  const clear = (setting: keyof ReaderSettings, level: SaveLevel) => {
+    const key = keyOf(level);
+    const current = (levels as Record<string, Record<string, unknown> | undefined>)[key] ?? {};
+    const { [setting]: _gone, ...next } = current;
+    if (Object.keys(next).length === 0) return reset(level);
+    queryClient.setQueryData(options.queryKey, { ...levels, [key]: next, effective: {} });
+    put.mutate({ params: { path: { scope: scopeOf(level) } }, body: next });
+  };
+
+  return { ...resolved, loading: query.isPending && !!workId, levels, update, reset, clear };
 }

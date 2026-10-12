@@ -2,7 +2,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BookOpen, Columns3, File, GalleryVertical, Rows3 } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { $api, api } from "@/api/client";
 import { useEvent } from "@/api/events-context";
@@ -10,7 +11,7 @@ import type { components } from "@/api/schema.gen";
 import { useBookmarks } from "@/features/works/use-bookmarks";
 import { serverUrl } from "@/lib/server-url";
 import { cn } from "@/lib/utils";
-import { ChapterEdge, PageNumber, ReaderOverlay } from "./chrome";
+import { ChapterEdge, ChapterJumpSheet, PageNumber, ReaderOverlay } from "./chrome";
 import { HorizontalViewer } from "./horizontal-viewer";
 import { PagedViewer } from "./paged-viewer";
 import { edgeColor, TapZonePreview, useFullscreen, useWakeLock } from "./screen-helpers";
@@ -33,6 +34,22 @@ const BACKGROUNDS: Record<ReaderSettings["background"], string> = {
 };
 
 type Size = { width: number; height: number };
+
+/** The reading modes, as the layout button names and shows them, and the one it switches to. */
+const LAYOUTS: Record<Mode, { label: string; icon: ReactNode }> = {
+  single: { label: "Single page", icon: <File aria-hidden /> },
+  double: { label: "Double page", icon: <BookOpen aria-hidden /> },
+  vertical: { label: "Vertical scroll", icon: <Rows3 aria-hidden /> },
+  webtoon: { label: "Webtoon", icon: <GalleryVertical aria-hidden /> },
+  horizontal: { label: "Horizontal scroll", icon: <Columns3 aria-hidden /> },
+};
+const NEXT_MODE: Record<Mode, Mode> = {
+  single: "double",
+  double: "vertical",
+  vertical: "webtoon",
+  webtoon: "horizontal",
+  horizontal: "single",
+};
 
 /** A page this much taller than wide is part of a long strip. */
 const STRIP_RATIO = 2.5;
@@ -97,6 +114,7 @@ export function ReaderScreen({
   const [index, setIndex] = useState(() => startPage(data, asked));
   const [overlay, setOverlay] = useState(true);
   const [sheet, setSheet] = useState(false);
+  const [jumping, setJumping] = useState(false);
   const [level, setLevel] = useState<SaveLevel>("work");
   const [turn, setTurn] = useState<{ direction: "next" | "prev"; id: number }>();
   const [scroll, setScroll] = useState<{ to: number | "forward" | "back"; id: number }>();
@@ -403,6 +421,25 @@ export function ReaderScreen({
         onFullscreen={toggleFullscreen}
         bookmarked={bookmarked}
         onBookmark={toggleBookmark}
+        onChapters={() => setJumping(true)}
+        layout={LAYOUTS[settings.mode]}
+        onLayout={() => {
+          const next = NEXT_MODE[settings.mode];
+          reader.update({ mode: next }, "work");
+          toast(`${LAYOUTS[next].label}, for this series.`);
+        }}
+        keepAwake={settings.keepAwake}
+        onKeepAwake={(keepAwake) => reader.update({ keepAwake }, level)}
+      />
+      <ChapterJumpSheet
+        open={jumping}
+        onOpenChange={setJumping}
+        chapters={chapters.data?.chapters ?? []}
+        currentId={data.chapter.id}
+        onPick={(id) => {
+          setJumping(false);
+          if (id !== data.chapter.id) goToChapter(id, 0);
+        }}
       />
       <ReaderSettingsSheet
         open={sheet}
@@ -414,6 +451,7 @@ export function ReaderScreen({
         sourceName={data.variant.source_name}
         onChange={(change) => reader.update(change, level)}
         onReset={(l) => reader.reset(l)}
+        onClear={(setting) => reader.clear(setting, level)}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { $api } from "@/api/client";
+import { MANUAL } from "@/api/events";
 import type { components } from "@/api/schema.gen";
 import { PageImage } from "./page-image";
 import type { ReaderSettings } from "./settings";
@@ -30,7 +31,7 @@ export const chapterPagesOptions = (chapterId: string) =>
     "get",
     "/chapters/{chapter_id}/pages",
     { params: { path: { chapter_id: chapterId }, query: {} } },
-    { staleTime: 5 * 60_000 },
+    { staleTime: 5 * 60_000, meta: MANUAL },
   );
 
 /**
