@@ -22,6 +22,11 @@ export interface ChaptersState {
   downloaded: string[];
 }
 
+/** A chapter's own name, without "Vol. 2", "Chapter 12" and the like (empty when that's all). */
+export function displayTitle(name: string): string {
+  return name.replace(/^\s*(vol(ume)?\.?\s*[\d.]+\s*[·:,-]?\s*)?(ch(apter)?\.?\s*[\d.]+)?\s*[·:,-]?\s*/i, "").trim();
+}
+
 export function chapterId(workId: string, number: number | undefined, key: string): string {
   return stableUuid(`${workId}|${number ?? key}`);
 }
@@ -35,6 +40,7 @@ function variant(row: S["WorkSourceState"], chapter: S["SourceChapter"], workId:
     source_name: row.source.name,
     key: chapter.key,
     name: chapter.name,
+    display_title: displayTitle(chapter.name),
     ...(chapter.number !== undefined ? { number: chapter.number } : {}),
     ...(chapter.volume ? { volume: chapter.volume } : {}),
     ...(chapter.scanlator ? { scanlator: chapter.scanlator } : {}),
@@ -86,6 +92,7 @@ export function unifiedChapters(
       ...(number !== undefined ? { number } : {}),
       ...(first.volume ? { volume: first.volume } : {}),
       title: first.name,
+      display_title: displayTitle(first.name),
       extra: number === undefined,
       available: true,
       new: fresh.has(id),
@@ -124,6 +131,7 @@ export function seriesChapters(
     chapters: sourceChapters(row.source.id, seriesIndex(row.attached.key)).map((chapter) => ({
       key: chapter.key,
       name: chapter.name,
+      display_title: displayTitle(chapter.name),
       ...(chapter.number !== undefined ? { number: chapter.number } : {}),
       ...(chapter.volume ? { volume: chapter.volume } : {}),
       ...(chapter.scanlator ? { scanlator: chapter.scanlator } : {}),

@@ -193,11 +193,7 @@ describe("plugins", () => {
     expect(await screen.findByText(/its health here updates when it's done/)).toBeInTheDocument();
     // The server checks the plugin after the save and says so on the event stream: no Sync now.
     expect(
-      await screen.findByText(
-        "adding store https://unreachable.example.net/index.json: can't be reached",
-        {},
-        { timeout: 3000 },
-      ),
+      await screen.findByText("adding store https://unreachable.example.net/index.json: can't be reached"),
     ).toBeInTheDocument();
     expect(screen.getByText("Degraded")).toBeInTheDocument();
   });

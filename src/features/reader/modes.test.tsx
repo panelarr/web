@@ -54,6 +54,6 @@ describe("reading modes", () => {
     const sheet = await screen.findByRole("dialog", { name: "Reader settings" });
     await userEvent.selectOptions(within(sheet).getByLabelText(/^Tap zones/), "kindle");
     expect(await screen.findByTestId("tap-zone-preview")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByTestId("tap-zone-preview")).not.toBeInTheDocument(), { timeout: 2500 });
+    await waitFor(() => expect(screen.queryByTestId("tap-zone-preview")).not.toBeInTheDocument());
   });
 });

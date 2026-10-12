@@ -14,6 +14,14 @@ describe("chapter labels", () => {
     expect(chapterLabel({ title: "Extra: Sketches" })).toBe("Extra: Sketches");
   });
 
+  it("use the server's cleaned-up name when there is one", () => {
+    const named = { number: 1, volume: "1", title: "Vol. 1 Volume 1 Chapter 1: Double Dungeon" };
+    expect(chapterLabel({ ...named, display_title: "Double Dungeon" })).toBe("Vol. 1 · Chapter 1: Double Dungeon");
+    expect(chapterLabel({ number: 192, title: "Chapter 192", display_title: "" })).toBe("Chapter 192");
+    expect(chapterLabel({ title: "Side Story: The Lake", display_title: "" })).toBe("Side Story: The Lake");
+    expect(chapterLabel({ title: "Side Story: The Lake", display_title: "The Lake" })).toBe("The Lake");
+  });
+
   it("explain reasons", () => {
     expect(reasonText("only_source")).toBe("only source");
     expect(reasonText("something_new")).toBe("something new");

@@ -13,11 +13,16 @@ export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  // One retry everywhere: a run on a busy machine shouldn't fail on one slow moment, and the
+  // retry records a trace, so a real failure still shows what happened.
+  retries: process.env.CI ? 2 : 1,
+  // The pages are served by the dev server; give it room when the machine is busy.
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: `http://localhost:${port}`,
-    trace: "retain-on-failure",
+    trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
   projects: [

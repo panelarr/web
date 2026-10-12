@@ -170,7 +170,7 @@ describe("fixing matches", () => {
     act(() => {
       tickMatching(db());
     });
-    expect(await screen.findByText("Attached on 1 of 2 sources.", {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(await screen.findByText("Attached on 1 of 2 sources.")).toBeInTheDocument();
   });
 
   it("removes a work from the library after confirming", async () => {

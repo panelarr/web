@@ -47,7 +47,7 @@ describe("a work's chapters", () => {
     await userEvent.click(screen.getByRole("radio", { name: "Oldest first" }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ order: "asc" }));
     await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(labels()[0]).toMatch(/Chapter 1\b/), { timeout: 3000 });
+    await waitFor(() => expect(labels()[0]).toMatch(/Chapter 1\b/));
     await waitFor(() =>
       expect((db().preferences[db().currentUserId ?? ""] as { chapters?: unknown }).chapters).toEqual({
         order: "asc",

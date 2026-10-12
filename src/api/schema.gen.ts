@@ -1643,6 +1643,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plugins/{plugin_id}/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A plugin's background jobs
+         * @description Needs a plugin with the `jobs` capability (else `422`, code `no_jobs`) that is turned on (else `409`, code `plugin_disabled`). The plugin's jobs in the same shape as the server's own (`/jobs`), except that run IDs are the plugin's own strings (`PluginJob*`). No events come for them: poll a running run.
+         */
+        get: operations["listPluginJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        /** One of a plugin's jobs */
+        get: operations["getPluginJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/jobs/{job_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        /** A plugin job's runs, newest first */
+        get: operations["listPluginJobRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/jobs/{job_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run one of a plugin's jobs now
+         * @description `409`, code `already_running`, with `current_run`, when it runs already. The plugin records the admin as who started it.
+         */
+        post: operations["runPluginJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/job-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        /** One run of a plugin's job, in full */
+        get: operations["getPluginJobRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/job-runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a running run of a plugin's job */
+        post: operations["cancelPluginJobRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sources": {
         parameters: {
             query?: never;
@@ -2962,6 +3085,8 @@ export interface components {
             };
         };
         ChapterVariant: {
+            /** @description The chapter's own name without its number, volume or scanlator noise ("Vol. 1 Chapter 1: Double Dungeon" → "Double Dungeon"); empty when the name says nothing else, so show "Chapter N". */
+            display_title: string;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -2981,6 +3106,8 @@ export interface components {
             source_health: "ok" | "failing" | "unknown";
         };
         UnifiedChapter: {
+            /** @description The chapter's own name without its number, volume or scanlator noise ("Vol. 1 Chapter 1: Double Dungeon" → "Double Dungeon"); empty when the name says nothing else, so show "Chapter N". */
+            display_title: string;
             /** @description You bookmarked it. */
             bookmarked: boolean;
             /** Format: uuid */
@@ -3019,6 +3146,8 @@ export interface components {
             variant_id: string | null;
         };
         SeriesChapter: {
+            /** @description The chapter's own name without its number, volume or scanlator noise ("Vol. 1 Chapter 1: Double Dungeon" → "Double Dungeon"); empty when the name says nothing else, so show "Chapter N". */
+            display_title: string;
             key: string;
             name: string;
             number?: number;
@@ -3071,6 +3200,38 @@ export interface components {
             new_chapters: number;
             /** @description Chapters of it you bookmarked. */
             bookmarks: number;
+            /**
+             * Format: int64
+             * @description Its available chapters (as in its chapter list).
+             */
+            chapters: number;
+            /**
+             * Format: int64
+             * @description Its available chapters you haven't finished (the cover badge).
+             */
+            unread: number;
+            /**
+             * Format: int64
+             * @description Its chapters stored as files.
+             */
+            downloaded: number;
+            /** @description You read some of it. */
+            started: boolean;
+            /**
+             * Format: uuid
+             * @description The chapter "Continue" opens (as GET /works/{work_id}/progress says); absent when there's nothing to read.
+             */
+            continue_chapter_id?: string;
+            /**
+             * Format: date-time
+             * @description When you last read in it.
+             */
+            last_read_at?: string;
+            /**
+             * Format: date-time
+             * @description When its newest chapter came out (or was first seen, when the source gives no date).
+             */
+            latest_chapter_at?: string;
         };
         LibraryPage: {
             entries: components["schemas"]["LibraryEntry"][];
@@ -4133,6 +4294,57 @@ export interface components {
         SetHealthCheckRequest: {
             enabled: boolean;
         };
+        /** @description As `Job`, field for field, except that run IDs are the plugin's own strings. */
+        PluginJob: {
+            id: string;
+            name: string;
+            description: string;
+            group: string;
+            schedule: components["schemas"]["JobSchedule"];
+            running: boolean;
+            current_run_id?: string;
+            last_run?: components["schemas"]["PluginJobRunSummary"];
+            /** Format: date-time */
+            next_run_at?: string;
+            cancellable: boolean;
+            params: components["schemas"]["JobParam"][];
+        };
+        /** @description As `JobRunSummary`, field for field, except that run IDs are the plugin's own strings. */
+        PluginJobRunSummary: {
+            /** @description The plugin's own run ID (not always a UUID). */
+            id: string;
+            job_id: string;
+            status: components["schemas"]["JobRunStatus"];
+            /** @enum {string} */
+            trigger: "schedule" | "manual" | "startup" | "system";
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at?: string;
+            message: string;
+            counts: {
+                [key: string]: number;
+            };
+            triggered_by?: string;
+        };
+        /** @description As `JobRun`, field for field, except that run IDs are the plugin's own strings. */
+        PluginJobRun: {
+            summary: components["schemas"]["PluginJobRunSummary"];
+            params: {
+                [key: string]: string;
+            };
+            notes: components["schemas"]["JobRunNote"][];
+            progress?: components["schemas"]["JobProgress"];
+        };
+        /** @description As `JobList`, field for field, except that run IDs are the plugin's own strings. */
+        PluginJobList: {
+            jobs: components["schemas"]["PluginJob"][];
+        };
+        /** @description As `JobRunList`, field for field, except that run IDs are the plugin's own strings. */
+        PluginJobRunList: {
+            runs: components["schemas"]["PluginJobRunSummary"][];
+            next_page_token: string;
+        };
         /** @description How a work already knows a series. */
         SeriesMatchRef: {
             /**
@@ -4395,6 +4607,8 @@ export interface components {
              * @description With code `already_running`, the run that is going on.
              */
             current_run_id?: string;
+            /** @description With code `already_running` from a plugin's jobs, the run that is going on (the plugin's own ID). */
+            current_run?: string;
             /** @description Per-field validation errors. */
             errors?: components["schemas"]["FieldError"][];
         };
@@ -7203,6 +7417,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SourceInfo"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPluginJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The jobs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginJobList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPluginJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginJob"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPluginJobRuns: {
+        parameters: {
+            query?: {
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+                status?: components["schemas"]["JobRunStatus"];
+            };
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginJobRunList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    runPluginJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RunJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginJobRunSummary"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPluginJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginJobRun"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    cancelPluginJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelling. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginJobRunSummary"];
                 };
             };
             default: components["responses"]["Problem"];

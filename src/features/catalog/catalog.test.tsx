@@ -88,7 +88,7 @@ describe("browsing the catalogue", () => {
       ),
     );
     await renderApp("/browse");
-    expect(await screen.findByText("Metadata key rejected", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText("Metadata key rejected")).toBeInTheDocument();
     expect(screen.getByText("The metadata service refused Panelarr's API key.")).toBeInTheDocument();
   });
 

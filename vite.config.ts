@@ -96,6 +96,9 @@ export default defineConfig(({ command, mode }) => {
     optimizeDeps: { entries: ["index.html", "src/routes/**/*.tsx"] },
     server: {
       port: Number(env.WEB_PORT || 5173),
+      // Compile the app up front instead of on the first request for each module: on a busy
+      // machine, browser tests otherwise wait on the server and time out.
+      warmup: { clientFiles: ["./src/main.tsx", "./src/routes/**/*.tsx", "./src/features/**/*.tsx"] },
       proxy: mock === "all" ? undefined : { "/api": { target: backend, changeOrigin: false } },
     },
     // The production build, with the headers the server sends (see csp.config.mjs).
@@ -116,6 +119,9 @@ export default defineConfig(({ command, mode }) => {
       setupFiles: ["src/test/setup.ts"],
       include: ["src/**/*.test.{ts,tsx}"],
       restoreMocks: true,
+      // The UI tests render the whole app; on a loaded machine they need more than the default.
+      testTimeout: 20_000,
+      hookTimeout: 20_000,
     },
   };
 });

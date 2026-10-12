@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { toast } from "sonner";
 import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 import { apiBaseUrl } from "@/api/client";
@@ -10,6 +10,9 @@ import { DEFAULT_PREFS, themeStore } from "@/theme/theme";
 import { FakeEventSource } from "./fake-event-source";
 import { server } from "./server";
 import { SpecValidator } from "./spec-validator";
+
+// findBy… and waitFor wait for a condition, not a fixed time: give it room on a busy machine.
+configure({ asyncUtilTimeout: 5_000 });
 
 // Every JSON answer the mock server gives in a test is checked against the spec, so the
 // mocks (and the tests built on them) can't drift from what the real server sends.

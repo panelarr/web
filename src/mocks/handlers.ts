@@ -306,7 +306,14 @@ export function addToLibrary(
   if (existing) {
     const { added_at, new_chapters, auto_download } = existing;
     return {
-      entry: { work, added_at, new_chapters, auto_download, bookmarks: bookmarksOf(user.id, work.id).length },
+      entry: {
+        work,
+        added_at,
+        new_chapters,
+        auto_download,
+        bookmarks: bookmarksOf(user.id, work.id).length,
+        ...readingStats(user.id, work.id),
+      },
       created: false,
     };
   }
@@ -314,7 +321,18 @@ export function addToLibrary(
   d.library.push(added);
   emit("library.changed", { work_id: work.id });
   return {
-    entry: { work, added_at: added.added_at, new_chapters: 0, auto_download: false, bookmarks: 0 },
+    entry: {
+      work,
+      added_at: added.added_at,
+      new_chapters: 0,
+      auto_download: false,
+      bookmarks: 0,
+      // As the server: zeros here; the list has the real numbers.
+      chapters: 0,
+      unread: 0,
+      downloaded: 0,
+      started: false,
+    },
     created: true,
   };
 }
@@ -322,6 +340,35 @@ export function addToLibrary(
 /** A user's bookmarked chapters in a work, oldest bookmark first. */
 function bookmarksOf(userId: string, workId: string): string[] {
   return db().bookmarks[userId]?.[workId] ?? [];
+}
+
+/** A user's reading in a work, as the library lists it. */
+function readingStats(userId: string, workId: string) {
+  const d = db();
+  const chapters = unifiedChapters(d, workId, userId)
+    .map((c) => c.chapter)
+    .filter((c) => c.available);
+  const mine = d.progress[userId] ?? {};
+  const progress = chapters.map((c) => mine[c.id]).filter((p) => p !== undefined);
+  const next = continueChapter(chapters, mine);
+  const latest = chapters
+    .map((c) => c.chosen?.uploaded_at ?? c.created_at)
+    .sort()
+    .at(-1);
+  const lastRead = progress
+    .map((p) => p.updated_at)
+    .sort()
+    .at(-1);
+  const unread = chapters.filter((c) => !mine[c.id]?.completed).length;
+  return {
+    chapters: chapters.length,
+    unread,
+    downloaded: chapters.filter((c) => c.downloaded).length,
+    started: progress.length > 0,
+    ...(next && unread > 0 ? { continue_chapter_id: next } : {}),
+    ...(lastRead ? { last_read_at: lastRead } : {}),
+    ...(latest ? { latest_chapter_at: latest } : {}),
+  };
 }
 
 // --- the operations -----------------------------------------------------------------------
@@ -1329,6 +1376,7 @@ export const operations: MockOperation[] = [
             new_chapters: e.new_chapters,
             auto_download: e.auto_download,
             bookmarks: bookmarksOf(user.id, work.id).length,
+            ...readingStats(user.id, work.id),
           },
         ];
       })

@@ -35,9 +35,7 @@ describe("the jobs page", () => {
     act(() => {
       for (let i = 0; i < 5; i++) tickJobs(db());
     });
-    expect(
-      await within(card("Refresh sources")).findByText(/Done: 12 works/, {}, { timeout: 2000 }),
-    ).toBeInTheDocument();
+    expect(await within(card("Refresh sources")).findByText(/Done: 12 works/)).toBeInTheDocument();
   });
 
   it("asks for a job's parameters and sends only what changed", async () => {

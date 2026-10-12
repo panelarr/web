@@ -43,9 +43,7 @@ describe("downloading from a work", () => {
       tickDownloads(db());
       tickDownloads(db());
     });
-    expect(
-      await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/· Downloaded/, {}, { timeout: 2000 }),
-    ).toBeInTheDocument();
+    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/· Downloaded/)).toBeInTheDocument();
   });
 
   it("queues a chapter and the ones after it, never twice", async () => {

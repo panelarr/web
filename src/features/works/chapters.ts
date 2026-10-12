@@ -23,8 +23,20 @@ export function reasonText(reason: string): string {
 
 const NUMBER = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
-/** "Vol. 2 · Chapter 12: The fall", without repeating a number the title already has. */
-export function chapterLabel(chapter: Pick<Chapter, "number" | "volume" | "title">): string {
+/**
+ * "Vol. 2 · Chapter 12: The fall". With the server's cleaned-up name (`display_title`, empty
+ * when a chapter has none of its own) it's built from that; an extra keeps its own title.
+ * Without it, the source's title is used, without repeating a number it already has.
+ */
+export function chapterLabel(
+  chapter: Pick<Chapter, "number" | "volume" | "title"> & { display_title?: string | undefined },
+): string {
+  if (chapter.display_title !== undefined) {
+    const name = chapter.display_title || (chapter.number === undefined ? chapter.title : "");
+    const number = chapter.number !== undefined ? `Chapter ${NUMBER.format(chapter.number)}` : undefined;
+    const main = number && name ? `${number}: ${name}` : (number ?? name);
+    return chapter.volume ? `Vol. ${chapter.volume} · ${main}` : main;
+  }
   const parts: string[] = [];
   if (chapter.volume) parts.push(`Vol. ${chapter.volume}`);
   const number = chapter.number !== undefined ? NUMBER.format(chapter.number) : undefined;
