@@ -72,6 +72,30 @@ describe("a plugin's jobs", () => {
     );
   });
 
+  it("that can't run now say why, paused, without Run now", async () => {
+    await renderApp("/admin/plugins/stores?tab=jobs");
+    const sync = await waitFor(() => card("Keep the configuration"));
+    expect(within(sync).getByText(/Paused \(every 15 minutes\)/)).toBeInTheDocument();
+    expect(within(sync).queryByText(/next/)).not.toBeInTheDocument();
+    expect(
+      within(sync).getByText(/Nothing to keep: no stores, extensions or health-check interval/),
+    ).toBeInTheDocument();
+    expect(within(sync).getByRole("button", { name: "Run now" })).toBeDisabled();
+  });
+
+  it("say why when one can no longer run, and show it as it is now", async () => {
+    await renderApp("/admin/plugins/stores?tab=jobs");
+    const refresh = await waitFor(() => card("Refresh stores"));
+    // Its plugin disabled it since the page loaded.
+    const job = db().pluginJobs.stores?.jobs.find((j) => j.id === "store-refresh");
+    if (!job) throw new Error("no store-refresh job");
+    job.disabled_reason = "No stores are configured";
+    await userEvent.click(within(refresh).getByRole("button", { name: "Run now" }));
+    expect(await screen.findByText("Refresh stores can't run now.")).toBeInTheDocument();
+    expect(await within(card("Refresh stores")).findByText(/No stores are configured/)).toBeInTheDocument();
+    expect(within(card("Refresh stores")).getByRole("button", { name: "Run now" })).toBeDisabled();
+  });
+
   it("aren't offered by a plugin without them", async () => {
     await renderApp("/admin/plugins/example");
     expect(await screen.findByRole("tab", { name: "Network" })).toBeInTheDocument();
@@ -104,6 +128,14 @@ describe("the metadata service's jobs", () => {
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Status" }), "succeeded");
     expect(await screen.findByText("No runs with this status")).toBeInTheDocument();
     expect(router.state.location.search).toMatchObject({ status: "succeeded" });
+  });
+
+  it("can't rebuild a search index while the database searches directly", async () => {
+    db().searchEngine.settings.backend = "postgres";
+    await renderApp("/admin/metadata?tab=jobs");
+    const rebuild = await waitFor(() => card("Rebuild the search index"));
+    expect(await within(rebuild).findByText(/Only with a search engine/)).toBeInTheDocument();
+    expect(within(rebuild).getByRole("button", { name: "Run now" })).toBeDisabled();
   });
 
   it("cancel a running run", async () => {

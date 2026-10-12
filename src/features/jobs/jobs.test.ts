@@ -65,6 +65,14 @@ describe("schedules", () => {
     expect(cronText("0 25 * * *")).toBe("on schedule 0 25 * * * (the service's time zone)");
   });
 
+  it("of a job that can't run now read as paused, as configured", () => {
+    expect(scheduleText({ enabled: true, interval_seconds: 900 }, "Nothing to keep")).toBe("Paused (every 15 minutes)");
+    expect(scheduleText({ enabled: false, interval_seconds: 900 }, "Nothing to keep")).toBe(
+      "Schedule off (every 15 minutes)",
+    );
+    expect(scheduleText({ enabled: false }, "Nothing to keep")).toBe("Runs by hand only");
+  });
+
   it("show a cron schedule, on or off, never as by hand only", () => {
     expect(scheduleText({ enabled: true, cron: "0 3 * * *", time_zone: "UTC" })).toBe("Runs daily at 03:00 UTC");
     expect(scheduleText({ enabled: false, cron: "30 4 * * 1", time_zone: "UTC" })).toBe(
@@ -123,6 +131,10 @@ describe("per-source jobs", () => {
     expect(perSourceJobs([refresh, reindex])).toEqual([reindex]);
     expect(perSourceJobs([refresh])).toEqual([]);
     expect(perSourceJobs([job("x", "", "X", [{ ...sourceIds, type: "string" }])])).toEqual([]);
+  });
+
+  it("leave out a job that can't run now", () => {
+    expect(perSourceJobs([{ ...check, disabled_reason: "Checks are off" }, reindex])).toEqual([reindex]);
   });
 
   it("prefer health checks, by group or name, else offer them all", () => {

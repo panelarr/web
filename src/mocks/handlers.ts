@@ -2546,6 +2546,9 @@ async function runJob(
 ): Promise<Response> {
   const job = store.jobs.find((j) => j.id === jobId);
   if (!job) return problem(404, "not_found", "Not found");
+  if (job.disabled_reason) {
+    return problem(409, "job_disabled", "Job disabled", `${job.id} is disabled: ${job.disabled_reason}`);
+  }
   if (job.running) {
     return HttpResponse.json(
       {
@@ -2599,8 +2602,18 @@ function metaJobStore(): JobStore | Response {
   if (!db().meta.check.configured) {
     return problem(503, "meta_unavailable", "The metadata service isn't connected", "Connect it first.");
   }
-  return db().metaJobs;
+  const store = db().metaJobs;
+  // As meta does, per request: with the database searching directly, there's no index to work on.
+  const postgres = db().searchEngine.settings.backend === "postgres";
+  for (const job of store.jobs.filter((j) => j.id === "search-rebuild" || j.id === "search-indexer")) {
+    if (postgres) job.disabled_reason = SEARCH_ENGINE_ONLY;
+    else delete job.disabled_reason;
+  }
+  return store;
 }
+
+const SEARCH_ENGINE_ONLY =
+  "Only with a search engine (Typesense or Meilisearch): PostgreSQL searches the database directly and needs no index.";
 
 /** A plugin's jobs: for admins, on a plugin with the jobs capability that is turned on. */
 function pluginJobStore(pluginId: string): JobStore | Response {

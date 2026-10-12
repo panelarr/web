@@ -45,6 +45,13 @@ How runs stay live differs, and the service says which:
 - The **metadata service and plugins** send none, so the app polls: a running run every 2 s,
   the job list and a running job's runs every 5 s. Polling stops when nothing runs.
 
+A job the service can't run now carries a `disabled_reason` (e.g. the metadata service's index
+jobs while the database searches directly, or a plugin's sync with nothing configured). The
+service decides; the app shows the reason, disables Run now, and shows the schedule as paused
+(it stays as configured, but doesn't fire). Such a job is never offered for "Check now". If it
+becomes disabled after the page loaded, starting it answers `409 job_disabled` and the app says
+why and shows the job as it is now.
+
 Starting a job that is already running answers `409 already_running` with the run that is
 going. The server and the metadata service name it in `current_run_id`; a plugin in
 `current_run`, with its own ID. Either way the app offers to watch that run.

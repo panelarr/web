@@ -134,15 +134,19 @@ export function cronText(cron: string, timeZone?: string): string {
   return fallback;
 }
 
-/** How a job runs on its own, in a few words. */
-export function scheduleText(schedule: Job["schedule"]): string {
+/**
+ * How a job runs on its own, in a few words. A job that can't run now (`disabled_reason`) keeps
+ * its schedule as configured but doesn't fire: paused.
+ */
+export function scheduleText(schedule: Job["schedule"], disabledReason?: string): string {
   const text = schedule.cron
     ? cronText(schedule.cron, schedule.time_zone)
     : schedule.interval_seconds
       ? every(schedule.interval_seconds)
       : undefined;
   if (!text) return "Runs by hand only";
-  return schedule.enabled ? `Runs ${text}` : `Schedule off (${text})`;
+  if (!schedule.enabled) return `Schedule off (${text})`;
+  return disabledReason ? `Paused (${text})` : `Runs ${text}`;
 }
 
 export type ParamValue = boolean | string | string[];
@@ -191,9 +195,11 @@ export const SOURCE_IDS_PARAM = "source_ids";
  * health checks come first (by group or name); one left means a plain "Check now", more a menu.
  */
 export function perSourceJobs(jobs: readonly Job[]): Job[] {
-  const candidates = jobs.filter((job) =>
+  let candidates = jobs.filter((job) =>
     job.params.some((param) => param.name === SOURCE_IDS_PARAM && param.type === "string_list"),
   );
+  // One that can't run now is no use for "Check now".
+  candidates = candidates.filter((job) => !job.disabled_reason);
   const health = candidates.filter((job) => /health/i.test(job.group) || /health/i.test(job.name));
   return health.length > 0 ? health : candidates;
 }

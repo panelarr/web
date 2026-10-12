@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Link, type LinkOptions } from "@tanstack/react-router";
-import { ArrowLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, Ban, ChevronRight, Clock, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { NativeSelect } from "@/components/native-select";
 import { EmptyState, ErrorAlert, Loading, PageHeader } from "@/components/states";
@@ -73,9 +73,10 @@ function JobCard({ job }: { job: Job }) {
       </CardHeader>
       <CardContent className="grid gap-3">
         <p className="text-xs text-muted-foreground">
-          {scheduleText(job.schedule)}
+          {scheduleText(job.schedule, job.disabled_reason)}
           {job.next_run_at && job.schedule.enabled ? ` · next ${formatRelative(job.next_run_at)}` : ""}
         </p>
+        {job.disabled_reason ? <DisabledReason reason={job.disabled_reason} /> : null}
         {job.running ? (
           <div className="grid gap-2 rounded-md border border-info/30 bg-info/5 p-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -119,6 +120,19 @@ function BackLink({ link, children }: { link: LinkOptions; children: ReactNode }
   );
 }
 
+/** Why a job can't run now, as its service says. */
+function DisabledReason({ reason }: { reason: string }) {
+  return (
+    <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm">
+      <Ban className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+      <span className="[overflow-wrap:anywhere]">
+        <span className="font-medium">Can't run now: </span>
+        {reason}
+      </span>
+    </p>
+  );
+}
+
 /** One job: what it does, how it's scheduled, and its runs (filtered by status). */
 export function JobView({
   jobId,
@@ -149,7 +163,7 @@ export function JobView({
               {job.data.description}
               <span className="mt-1 block text-xs">
                 {[
-                  scheduleText(job.data.schedule),
+                  scheduleText(job.data.schedule, job.data.disabled_reason),
                   job.data.schedule.source ? `set by ${job.data.schedule.source}` : undefined,
                   defaultsText(job.data.params),
                 ]
@@ -167,6 +181,11 @@ export function JobView({
             </>
           }
         />
+      ) : null}
+      {job.data?.disabled_reason ? (
+        <div className="mb-4">
+          <DisabledReason reason={job.data.disabled_reason} />
+        </div>
       ) : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <Heading className="text-lg font-semibold">Runs</Heading>

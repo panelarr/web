@@ -193,6 +193,9 @@ function RebuildButton() {
   });
   // A service without the job has no rebuild to offer.
   if (job.error || !job.data) return null;
+  if (job.data.disabled_reason) {
+    return <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{job.data.disabled_reason}</p>;
+  }
   if (job.data.running) {
     return (
       <p role="status" className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

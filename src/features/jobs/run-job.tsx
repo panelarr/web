@@ -41,6 +41,13 @@ export function RunJobButton({ job, size = "sm" }: { job: Job; size?: "sm" | "de
       toast.success(`${job.name} started.`, { action: { label: "Watch", onClick: () => goToRun(started.id) } });
     },
     onError: async (error) => {
+      // It became unrunnable since the page loaded: show why, and the job as it is now.
+      if (isApiError(error, "job_disabled")) {
+        setOpen(false);
+        invalidate();
+        toast.error(`${job.name} can't run now.`, { description: errorMessage(error) });
+        return;
+      }
       if (!isApiError(error, "already_running")) return;
       // Someone else started it: offer the run that is going.
       setOpen(false);
@@ -66,13 +73,13 @@ export function RunJobButton({ job, size = "sm" }: { job: Job; size?: "sm" | "de
       <Button
         size={size}
         variant="outline"
-        disabled={job.running || run.isPending}
+        disabled={job.running || run.isPending || !!job.disabled_reason}
         onClick={() => (job.params.length > 0 ? setOpen(true) : start({}))}
       >
         {run.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
         Run now
       </Button>
-      {run.error && !isApiError(run.error, "already_running") && !open ? (
+      {run.error && !isApiError(run.error, "already_running") && !isApiError(run.error, "job_disabled") && !open ? (
         <span role="alert" className="text-xs text-destructive">
           {errorMessage(run.error)}
         </span>

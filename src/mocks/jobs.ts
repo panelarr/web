@@ -420,6 +420,17 @@ export function initialPluginJobs(): Record<string, JobStore> {
           params: [],
         },
         {
+          id: "plugin.sync",
+          name: "Keep the configuration",
+          description: "Writes the plugin's settings into the service it drives, and keeps them there.",
+          group: "Maintenance",
+          schedule: { interval_seconds: 900, enabled: true, source: "PLUGIN_SYNC_INTERVAL" },
+          running: false,
+          cancellable: false,
+          params: [],
+          disabled_reason: "Nothing to keep: no stores, extensions or health-check interval are configured",
+        },
+        {
           id: "source-health",
           name: "Check sources",
           description: "Asks each source for a page of results to see that it works.",

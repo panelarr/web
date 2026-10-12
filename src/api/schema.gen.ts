@@ -3435,6 +3435,8 @@ export interface components {
             next_page_token: string;
         };
         Job: {
+            /** @description Why the job can't run now (e.g. a feature it needs is off); absent when it can. Running it answers `409`, code `job_disabled`, and its schedule doesn't fire meanwhile. */
+            disabled_reason?: string;
             id: string;
             name: string;
             description: string;
@@ -4298,6 +4300,8 @@ export interface components {
         };
         /** @description As `Job`, field for field, except that run IDs are the plugin's own strings. */
         PluginJob: {
+            /** @description Why the job can't run now (e.g. a feature it needs is off); absent when it can. Running it answers `409`, code `job_disabled`, and its schedule doesn't fire meanwhile. */
+            disabled_reason?: string;
             id: string;
             name: string;
             description: string;
