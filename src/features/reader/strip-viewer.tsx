@@ -71,7 +71,9 @@ export function StripViewer({
   const [segments, setSegments] = useState<ChapterPages[]>([first]);
   const sizes = useRef(new Map<string, Size>());
   const [settled, setSettled] = useState<ReadonlySet<string>>(() => new Set());
-  const [position, setPosition] = useState({ seg: 0, page: Math.max(0, startIndex), ordinal: Math.max(0, startIndex) });
+  // Where the reader is, as the key of the page in the middle of the screen: keys don't move when
+  // a chapter is added above (positions in the list would).
+  const [current, setCurrent] = useState(() => `${first.chapter.id}:${Math.max(0, startIndex)}`);
 
   const items = useMemo(() => {
     const list: Item[] = [{ key: "start", kind: "start", seg: 0 }];
@@ -88,6 +90,29 @@ export function StripViewer({
     });
     return list;
   }, [segments]);
+  const pageKeys = useMemo(() => items.filter((i) => i.kind === "page").map((i) => i.key), [items]);
+  const here = items.find((item) => item.key === current);
+  const position =
+    here?.kind === "page"
+      ? { seg: here.seg, page: here.page, ordinal: here.ordinal }
+      : { seg: 0, page: 0, ordinal: Math.max(0, pageKeys.indexOf(current)) };
+
+  // Space kept for pages not loaded yet: the shape of this chapter's pages seen so far (or the
+  // last page seen anywhere), decided once per page so that only a page arriving changes the
+  // layout, and the strip keeps what's on screen in place when that happens above it.
+  const ratios = useRef(new Map<string, number>());
+  const lastRatio = useRef(1.45);
+  const guesses = useRef(new Map<string, number>());
+  const ratioOf = (key: string, chapterId: string) => {
+    const size = sizes.current.get(key);
+    if (size) return size.height / size.width;
+    let guess = guesses.current.get(key);
+    if (guess === undefined) {
+      guess = ratios.current.get(chapterId) ?? lastRatio.current;
+      guesses.current.set(key, guess);
+    }
+    return guess;
+  };
 
   useLayoutEffect(() => {
     const element = container.current;
@@ -107,11 +132,13 @@ export function StripViewer({
     estimateSize: (i) => {
       const item = items[i];
       if (item?.kind !== "page") return BAND;
-      const size = sizes.current.get(item.key);
-      return (size ? (width * size.height) / size.width : (width || 360) * 1.45) + gap;
+      const chapterId = segments[item.seg]?.chapter.id ?? "";
+      return (width || 360) * ratioOf(item.key, chapterId) + gap;
     },
     overscan: Math.max(2, settings.preload),
   });
+  // The strip keeps the page being read in place itself (below), not the virtualizer.
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () => false;
 
   // Open at the page asked for.
   const started = useRef(false);
@@ -121,9 +148,76 @@ export function StripViewer({
     if (startIndex > 0) virtualizer.scrollToIndex(startIndex + 1, { align: "start" });
   }, [width, startIndex, virtualizer]);
 
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+  // The page being read stays put. Whenever pages around it change size (they load, or a
+  // chapter is added above), the strip scrolls by exactly as much as that page moved, before the
+  // browser paints. This works the same in every browser (iOS Safari has no scroll anchoring).
+  const anchor = useRef<{ key: string; top: number } | undefined>(undefined);
+  /** The scroll position the anchor has taken into account. */
+  const seen = useRef(0);
+  // The reader's own scrolling moves the page being read with it. Browsers fire "scroll" a frame
+  // after the position changed, so this is also checked before every correction: anything that
+  // re-renders in between must not pull the page back.
+  const account = useCallback(() => {
+    const element = container.current;
+    if (!element) return;
+    const top = element.scrollTop;
+    if (top !== seen.current && anchor.current) {
+      anchor.current = { ...anchor.current, top: anchor.current.top - (top - seen.current) };
+    }
+    seen.current = top;
+  }, []);
+  /** Takes the page in the middle of the screen, where it is now, as the one to keep in place. */
+  const pickAnchor = useCallback(() => {
+    const element = container.current;
+    if (!element) return;
+    const box = element.getBoundingClientRect();
+    const page = document
+      .elementFromPoint?.(box.left + element.clientWidth / 2, box.top + element.clientHeight / 2)
+      ?.closest<HTMLElement>("[data-key]");
+    if (!page?.dataset.key) return;
+    anchor.current = { key: page.dataset.key, top: page.getBoundingClientRect().top - box.top };
+    seen.current = element.scrollTop;
+  }, []);
+  const holdAnchor = useCallback(() => {
+    const element = container.current;
+    account();
+    // Nothing read yet (just opened, not scrolled): what's in the middle now is the page to keep.
+    if (!anchor.current) return pickAnchor();
+    const kept = anchor.current;
+    if (!element || !kept) return;
+    const page = [...element.querySelectorAll<HTMLElement>("[data-key]")].find((e) => e.dataset.key === kept.key);
+    if (!page) {
+      // Not rendered (a chapter was just added above, and the strip renders around where it was
+      // scrolled): place it from the layout, then the next pass places it exactly.
+      const index = itemsRef.current.findIndex((item) => item.key === kept.key);
+      const start = index >= 0 ? virtualizerRef.current.getOffsetForIndex(index, "start")?.[0] : undefined;
+      if (start === undefined) return;
+      element.scrollTop = start + kept.top * -1;
+      seen.current = element.scrollTop;
+      return;
+    }
+    const moved = page.getBoundingClientRect().top - element.getBoundingClientRect().top - kept.top;
+    if (Math.abs(moved) < 0.5) return;
+    element.scrollTop += moved;
+    // The strip's own correction: what's on screen didn't move.
+    seen.current = element.scrollTop;
+  }, [account, pickAnchor]);
+  useLayoutEffect(holdAnchor);
+  useEffect(() => {
+    const element = container.current;
+    const content = element?.firstElementChild;
+    if (!content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(holdAnchor);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [holdAnchor]);
+
   // Reading on: load the next chapter below, or the previous one above.
   const loading = useRef(false);
-  const anchor = useRef<{ key: string; offset: number } | undefined>(undefined);
   const load = useCallback(
     async (direction: "next" | "prev") => {
       const edge = direction === "next" ? segments[segments.length - 1] : segments[0];
@@ -135,13 +229,8 @@ export function StripViewer({
         if (direction === "next") {
           setSegments((prev) => (prev.some((s) => s.chapter.id === id) ? prev : [...prev, chapter]));
         } else {
-          // Keep what's on screen where it is while a chapter is added above it.
-          // Anchored on a page: the band at the top moves up to the new first chapter.
-          const element = container.current;
-          const top = virtualizer
-            .getVirtualItems()
-            .find((v) => v.end > (element?.scrollTop ?? 0) && items[v.index]?.kind === "page");
-          if (element && top) anchor.current = { key: String(top.key), offset: element.scrollTop - top.start };
+          // What's on screen stays where it is (see the anchor below).
+          pickAnchor();
           setSegments((prev) => (prev.some((s) => s.chapter.id === id) ? prev : [chapter, ...prev]));
         }
       } catch {
@@ -150,32 +239,32 @@ export function StripViewer({
         loading.current = false;
       }
     },
-    [segments, items, queryClient, virtualizer],
+    [segments, queryClient, pickAnchor],
   );
-
-  useLayoutEffect(() => {
-    const element = container.current;
-    const kept = anchor.current;
-    if (!element || !kept) return;
-    anchor.current = undefined;
-    const index = items.findIndex((item) => item.key === kept.key);
-    const measured = virtualizer.measurementsCache[index];
-    if (measured) element.scrollTop = measured.start + kept.offset;
-  }, [items, virtualizer]);
 
   // Report where the reader is, and read on near either end.
   const reported = useRef("");
-  const scrolled = useRef(false);
+  const loadRef = useRef(load);
+  loadRef.current = load;
   useEffect(() => {
     const element = container.current;
     if (!element) return;
     let frame = 0;
+    let lastTop = element.scrollTop;
     const onScroll = () => {
-      scrolled.current = true;
+      // The reader's scrolling, not the strip's own corrections (already taken into account).
+      const byReader = element.scrollTop !== seen.current;
+      account();
+      const top = element.scrollTop;
+      // Scrolling up into the first chapter's start: the one before it is wanted.
+      if (byReader && top < lastTop && top < element.clientHeight / 2) void loadRef.current("prev");
+      lastTop = top;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const atBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 4;
         const middle = element.scrollTop + element.clientHeight / 2;
+        // The new anchor: the page in the middle of the screen, where it now is.
+        pickAnchor();
         const virtual = atBottom
           ? virtualizer.getVirtualItems().at(-1)
           : virtualizer.getVirtualItems().find((v) => v.start <= middle && v.end > middle);
@@ -184,7 +273,7 @@ export function StripViewer({
         const segment = segments[item.seg];
         if (!segment) return;
         const page = item.kind === "page" ? item.page : item.kind === "start" ? -1 : segment.pages.length;
-        if (item.kind === "page") setPosition({ seg: item.seg, page: item.page, ordinal: item.ordinal });
+        if (item.kind === "page") setCurrent(item.key);
         const at = `${segment.chapter.id}:${page}`;
         if (at !== reported.current) {
           reported.current = at;
@@ -197,16 +286,43 @@ export function StripViewer({
       element.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(frame);
     };
-  }, [virtualizer, items, segments, onPosition]);
+  }, [virtualizer, items, segments, onPosition, account, pickAnchor]);
 
-  // Near the end of the last chapter, the next one is loaded below; near the start of the first,
-  // the one before it above (also right after opening there, when there's nothing to scroll).
+  // At the very top there's nothing to scroll: a wheel or a pull down asks for the chapter before.
   useEffect(() => {
-    const segment = segments[position.seg];
-    if (!segment) return;
-    if (position.seg === segments.length - 1 && position.page >= segment.pages.length - NEXT_AT) void load("next");
-    if (position.seg === 0 && position.page <= 1 && width > 0) void load("prev");
-  }, [position, segments, width, load]);
+    const element = container.current;
+    if (!element) return;
+    let startY: number | undefined;
+    // At the start: the first chapter's band at, or just above, the top of the screen.
+    const atTop = () => element.scrollTop <= BAND + 8;
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0 && atTop()) void loadRef.current("prev");
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      startY = event.touches[0]?.clientY;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY;
+      if (startY !== undefined && y !== undefined && y - startY > 24 && atTop()) void loadRef.current("prev");
+    };
+    element.addEventListener("wheel", onWheel, { passive: true });
+    element.addEventListener("touchstart", onTouchStart, { passive: true });
+    element.addEventListener("touchmove", onTouchMove, { passive: true });
+    return () => {
+      element.removeEventListener("wheel", onWheel);
+      element.removeEventListener("touchstart", onTouchStart);
+      element.removeEventListener("touchmove", onTouchMove);
+    };
+  }, []);
+
+  // Near the end of the last chapter, the next one is loaded below (nothing on screen moves).
+  const { seg: currentSeg, page: currentPage } = position;
+  useEffect(() => {
+    const segment = segments[currentSeg];
+    if (segment && currentSeg === segments.length - 1 && currentPage >= segment.pages.length - NEXT_AT) {
+      void load("next");
+    }
+  }, [currentSeg, currentPage, segments, load]);
 
   // A scroll asked for from outside, read against the latest strip.
   const latest = useRef({ items, segments, position });
@@ -226,7 +342,6 @@ export function StripViewer({
 
   // Pages are fetched in reading order: those just behind, then up to AHEAD past the first one
   // ahead that hasn't loaded yet.
-  const pageKeys = useMemo(() => items.filter((i) => i.kind === "page").map((i) => i.key), [items]);
   let frontier = position.ordinal;
   while (frontier < pageKeys.length && settled.has(pageKeys[frontier] as string)) frontier++;
   const mayLoad = (ordinal: number) => ordinal >= position.ordinal - 2 && ordinal <= frontier + AHEAD;
@@ -242,7 +357,9 @@ export function StripViewer({
     <div
       ref={container}
       tabIndex={-1}
-      className="absolute inset-0 overflow-y-auto overscroll-contain outline-none"
+      // The strip keeps the page on screen in place itself (iOS Safari has no scroll anchoring),
+      // so the browser's own anchoring is off rather than adding a second correction.
+      className="absolute inset-0 overflow-y-auto overscroll-contain outline-none [overflow-anchor:none]"
       data-testid="strip-viewer"
       onClick={(event) => {
         // Top third back a screen, bottom third forward, the middle the menu.
@@ -261,6 +378,7 @@ export function StripViewer({
             <div
               key={virtual.key}
               data-index={virtual.index}
+              data-key={virtual.key}
               ref={virtualItems.length > 0 ? virtualizer.measureElement : undefined}
               className="absolute top-0 left-0 w-full"
               style={{
@@ -277,9 +395,12 @@ export function StripViewer({
                   eager
                   hold={!mayLoad(item.ordinal)}
                   className="items-start"
-                  placeholderHeight={`${Math.round((width || 360) * 1.45)}px`}
+                  placeholderHeight={`${Math.round((width || 360) * ratioOf(item.key, segment.chapter.id))}px`}
                   onSize={(size) => {
                     if (!sizes.current.has(item.key)) sizes.current.set(item.key, size);
+                    const ratio = size.height / size.width;
+                    if (!ratios.current.has(segment.chapter.id)) ratios.current.set(segment.chapter.id, ratio);
+                    lastRatio.current = ratio;
                     onPageSize?.(segment.chapter.id, item.page, size);
                   }}
                   onSettled={() => setSettled((prev) => (prev.has(item.key) ? prev : new Set(prev).add(item.key)))}

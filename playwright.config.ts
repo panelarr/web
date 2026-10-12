@@ -26,6 +26,16 @@ export default defineConfig({
       testIgnore: /csp\.spec/,
       use: { ...devices["Pixel 7"], viewport: { width: 360, height: 740 } },
     },
+    // The reader on iOS Safari's engine, when WebKit is installed (`make e2e-webkit`).
+    ...(process.env.E2E_WEBKIT
+      ? [
+          {
+            name: "phone-webkit",
+            testMatch: /reader(-stability)?\.spec/,
+            use: { ...devices["iPhone 13"], viewport: { width: 375, height: 740 } },
+          },
+        ]
+      : []),
     {
       name: "csp",
       testMatch: /csp\.spec/,

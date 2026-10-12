@@ -8,6 +8,7 @@
 //   user        set up, signed in as a user without admin rights
 //   degraded    set up and signed in, but the metadata service has no entries yet
 //   big-store   like ready, with a store of 1,500 extensions
+//   slow-pages  like ready, with page images arriving slowly, in any order, of varied heights
 //
 // In the browser, pick one with `?mock=<scenario>`; it lasts for the tab (sessionStorage).
 import type { components } from "@/api/schema.gen";
@@ -30,7 +31,7 @@ import { initialPackageSources, initialPackages, type MockPackage } from "./pack
 
 type S = components["schemas"];
 
-export const SCENARIOS = ["ready", "fresh", "signed-out", "user", "degraded", "big-store"] as const;
+export const SCENARIOS = ["ready", "fresh", "signed-out", "user", "degraded", "big-store", "slow-pages"] as const;
 export type Scenario = (typeof SCENARIOS)[number];
 
 export type MockInvite = S["Invite"] & { token: string };
@@ -75,6 +76,8 @@ export interface MockDb extends JobsState {
   /** Per user: app preferences. */
   preferences: Record<string, Record<string, unknown>>;
   storages: S["StorageInfo"][];
+  /** Page images take 100–1500 ms and long-strip pages vary in height (the slow-pages scenario). */
+  slowPages?: boolean;
   /** Per source with the settings capability: its settings. */
   sourceSettings: Record<string, S["SourceSettings"]>;
   /** Per plugin with the packages capability: its packages. */
@@ -160,6 +163,8 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
         packages: {},
         invites: [],
       };
+    case "slow-pages":
+      return { ...ready, slowPages: true };
     case "big-store":
       return { ...ready, packages: { [storePlugin.id]: initialPackages(1_500) } };
     case "signed-out":

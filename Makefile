@@ -6,7 +6,7 @@ PNPM ?= pnpm
 SERVER_REPO ?= ../server
 export SERVER_REPO
 
-.PHONY: help setup build test e2e lint fmt typecheck gen gen-check spec-sync spec-check run run-mock preview clean check
+.PHONY: help setup build test e2e e2e-webkit lint fmt typecheck gen gen-check spec-sync spec-check run run-mock preview clean check
 
 help: ## List targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_.-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -23,6 +23,9 @@ test: ## Run the unit and component tests
 
 e2e: ## Run the Playwright smoke tests (desktop and phone) against the mock server
 	$(PNPM) e2e
+
+e2e-webkit: ## The reader's tests on iOS Safari's engine too (needs `pnpm exec playwright install webkit`)
+	E2E_WEBKIT=1 $(PNPM) e2e --project phone-webkit
 
 lint: ## Lint and check formatting (Biome)
 	$(PNPM) lint

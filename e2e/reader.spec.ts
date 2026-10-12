@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { expect, type Page, test } from "@playwright/test";
+import { scrollStrip } from "./strip";
 
 /** A webtoon-type work in the library, opened in the reader (a long strip by its type). */
 async function openStrip(page: Page) {
@@ -27,9 +28,8 @@ test("a long strip reads on into the next chapter, without a click", async ({ pa
   await expect(page.getByRole("img", { name: "Page 1" })).toBeVisible();
 
   // Scroll on: the pages follow one another, then the next chapter's.
-  await page.mouse.move(180, 400);
   for (let i = 0; i < 80 && chapterOf(page.url()) === first; i++) {
-    await page.mouse.wheel(0, 700);
+    await scrollStrip(page, 700);
     await page.waitForTimeout(120);
   }
   expect(chapterOf(page.url())).not.toBe(first);
@@ -45,9 +45,8 @@ test("a long strip reads on into the next chapter, without a click", async ({ pa
 test("scrolling up past a chapter's start loads the one before it", async ({ page }) => {
   await openStrip(page);
   const first = chapterOf(page.url());
-  await page.mouse.move(180, 400);
   for (let i = 0; i < 80 && chapterOf(page.url()) === first; i++) {
-    await page.mouse.wheel(0, 700);
+    await scrollStrip(page, 700);
     await page.waitForTimeout(120);
   }
   const second = chapterOf(page.url());
@@ -56,7 +55,7 @@ test("scrolling up past a chapter's start loads the one before it", async ({ pag
   await page.goto(`/read/${second}`);
   await expect(page.getByTestId("strip-viewer")).toBeVisible();
   for (let i = 0; i < 60 && chapterOf(page.url()) === second; i++) {
-    await page.mouse.wheel(0, -700);
+    await scrollStrip(page, -700);
     await page.waitForTimeout(150);
   }
   expect(chapterOf(page.url())).toBe(first);

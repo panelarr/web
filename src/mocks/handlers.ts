@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { HttpResponse, sse } from "msw";
+import { delay, HttpResponse, sse } from "msw";
 import type { EventType } from "@/api/event-types";
 import type { components } from "@/api/schema.gen";
 import { CATALOG, coverSvg, summary, withinCeiling } from "./catalog";
@@ -1394,14 +1394,16 @@ export const operations: MockOperation[] = [
     });
   }),
 
-  op("get", "/chapters/{chapter_id}/pages/{index}", ({ params }) => {
+  op("get", "/chapters/{chapter_id}/pages/{index}", async ({ params }) => {
     const user = requireUser();
     if (user instanceof Response) return user;
     const found = findChapter(user, String(params.chapter_id));
     const chapter = found?.list[found.index]?.chapter;
     if (!found || !chapter) return problem(404, "not_found", "Not found");
     const strip = ["manhwa", "manhua", "webtoon"].includes(found.work.type ?? "");
-    return new HttpResponse(pageSvg(chapter, Number(params.index), strip), {
+    const slow = db().slowPages === true;
+    if (slow) await delay(100 + Math.floor(Math.random() * 1400));
+    return new HttpResponse(pageSvg(chapter, Number(params.index), strip, slow), {
       headers: { "Content-Type": "image/svg+xml", "Cache-Control": "private, max-age=3600" },
     });
   }),

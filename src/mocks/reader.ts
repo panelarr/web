@@ -15,9 +15,11 @@ export function isSpread(index: number, strip: boolean): boolean {
   return !strip && index === 5;
 }
 
-export function pageSvg(chapter: S["UnifiedChapter"], index: number, strip: boolean): string {
+export function pageSvg(chapter: S["UnifiedChapter"], index: number, strip: boolean, varied = false): string {
   const spread = isSpread(index, strip);
-  const [w, h] = strip ? [800, 2400] : spread ? [1600, 1150] : [800, 1150];
+  // Varied: long-strip pages of different heights, as real chapters have.
+  const tall = varied ? 1400 + ((index * 731) % 2200) : 2400;
+  const [w, h] = strip ? [800, tall] : spread ? [1600, 1150] : [800, 1150];
   const hue = Math.round(((chapter.number ?? 0) * 47 + index * 13) % 360);
   const panels = strip
     ? `<rect x="40" y="120" width="720" height="900" rx="8" fill="hsl(${hue} 40% 85%)"/><rect x="40" y="1300" width="720" height="900" rx="8" fill="hsl(${hue} 40% 78%)"/>`
