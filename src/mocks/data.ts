@@ -111,6 +111,23 @@ export const plugin = {
   created_at: "2026-10-01T12:30:00Z",
 } satisfies Schemas["Plugin"];
 
+/** A plugin that hosts many sites, with packages (extensions) from stores. */
+export const storePlugin = {
+  id: "stores",
+  url: "http://store-plugin:8904",
+  enabled: true,
+  name: "Example Store Plugin",
+  plugin_id: "stores",
+  version: "dev",
+  contracts: ["panelarr.source.v1"],
+  capabilities: ["latest", "search", "packages"],
+  has_config: false,
+  health: "ok",
+  checked_at: "2026-10-11T08:00:00Z",
+  source_count: 1,
+  created_at: "2026-10-02T09:00:00Z",
+} satisfies Schemas["Plugin"];
+
 export const health = {
   status: "ok",
   version: "dev",

@@ -118,7 +118,11 @@ function SourcePage() {
             </Badge>
             {source.health.status !== "ok" ? <HealthBadge status={source.health.status} /> : null}
             {source.enabled ? null : <Badge variant="secondary">Off</Badge>}
-            {source.present ? null : <Badge variant="destructive">Absent</Badge>}
+            {source.present ? null : source.unavailable_reason === "language" ? (
+              <Badge variant="outline">Not available</Badge>
+            ) : (
+              <Badge variant="destructive">Absent</Badge>
+            )}
           </p>
         </div>
       </header>
@@ -130,12 +134,19 @@ function SourcePage() {
     return (
       <>
         {top}
-        <EmptyState title="No longer listed by its plugin">
-          {source.present
-            ? "Its plugin is turned off, or no longer offers it."
-            : "Its plugin doesn't offer it any more."}{" "}
-          Works keep the chapters they had from it.
-        </EmptyState>
+        {source.unavailable_reason === "language" ? (
+          <EmptyState title="Not available">
+            Its language is turned off for its plugin or extension, so it can't be browsed. Works keep the chapters they
+            had from it.
+          </EmptyState>
+        ) : (
+          <EmptyState title="No longer listed by its plugin">
+            {source.present
+              ? "Its plugin is turned off, or no longer offers it."
+              : "Its plugin doesn't offer it any more."}{" "}
+            Works keep the chapters they had from it.
+          </EmptyState>
+        )}
       </>
     );
   }

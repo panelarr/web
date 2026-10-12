@@ -10,6 +10,7 @@ import { renderApp } from "@/test/render";
 import { server } from "@/test/server";
 
 const reader = () => db().users.find((u) => u.username === "reader");
+const pluginCard = (name: string) => screen.getByText(name).closest("[data-slot=card]") as HTMLElement;
 
 describe("the admin area", () => {
   it("is for admins only", async () => {
@@ -143,7 +144,7 @@ describe("plugins", () => {
     await renderApp("/admin/plugins");
     await userEvent.click(await screen.findByRole("switch", { name: "Example Source Plugin enabled" }));
     await waitFor(() => expect(db().plugins[0]?.enabled).toBe(false));
-    await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    await userEvent.click(within(pluginCard("Example Source Plugin")).getByRole("button", { name: "Sync now" }));
     expect(await screen.findByText("Example Source Plugin: 3 sources, ok.")).toBeInTheDocument();
   });
 
@@ -204,7 +205,7 @@ describe("plugins", () => {
   it("shows a development build's version as it is, not as vdev", async () => {
     for (const plugin of db().plugins) plugin.version = "dev";
     const { router } = await renderApp("/admin/plugins");
-    expect(await screen.findByText("dev")).toBeInTheDocument();
+    expect((await screen.findAllByText("dev")).length).toBe(2);
     await router.navigate({ to: "/admin/plugins/$pluginId", params: { pluginId: "example" } });
     expect(await screen.findByText(/example · dev/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/vdev/);
@@ -212,10 +213,11 @@ describe("plugins", () => {
 
   it("removes a plugin and its sources", async () => {
     await renderApp("/admin/plugins");
-    await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    await screen.findByText("Example Source Plugin");
+    await userEvent.click(within(pluginCard("Example Source Plugin")).getByRole("button", { name: "Remove" }));
     await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }));
-    expect(await screen.findByText("No plugins yet")).toBeInTheDocument();
-    expect(db().sources).toHaveLength(0);
+    await waitFor(() => expect(screen.queryByText("Example Source Plugin")).not.toBeInTheDocument());
+    expect(db().sources.filter((source) => source.plugin_id === "example")).toHaveLength(0);
   });
 });
 

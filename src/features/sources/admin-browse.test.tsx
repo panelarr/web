@@ -27,6 +27,27 @@ describe("browsing sources", () => {
     expect(screen.getByRole("option", { name: "Example Source Plugin" })).toBeInTheDocument();
   });
 
+  it("shows each source's extension, and tells Not available apart", async () => {
+    const { router } = await renderApp("/admin/sources?package=org.example.polyglot");
+    expect(await screen.findByText("Extension:")).toBeInTheDocument();
+    const rows = await screen.findAllByText("via Polyglot Comics");
+    expect(rows).toHaveLength(3);
+    const row = (lang: string) =>
+      rows.map((el) => el.closest("li") as HTMLElement).find((li) => within(li).queryByText(lang)) as HTMLElement;
+    // English: its language is turned off for the extension.
+    expect(within(row("en")).getByText("Not available")).toBeInTheDocument();
+    expect(within(row("en")).getByText(/Its language is turned off/)).toBeInTheDocument();
+    expect(within(row("en")).queryByText("Absent")).not.toBeInTheDocument();
+    // Japanese: listed, but the admin turned it off.
+    expect(within(row("ja")).getByText("Off")).toBeInTheDocument();
+    expect(within(row("ja")).queryByText("Not available")).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "unavailable");
+    await waitFor(() => expect(screen.getAllByText("via Polyglot Comics")).toHaveLength(2));
+    await userEvent.click(screen.getByRole("button", { name: "Show every extension's sources" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ status: "unavailable" }));
+  });
+
   it("browses a source that's turned off, to test it, but not one that's absent", async () => {
     const { router } = await renderApp("/admin/sources/example:1003");
     expect(await screen.findByRole("heading", { name: "Demo Comics" })).toBeInTheDocument();

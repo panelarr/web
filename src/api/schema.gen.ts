@@ -630,6 +630,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plugins/{plugin_id}/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The packages a plugin offers and has installed
+         * @description For plugins that host many sites, packages (e.g. extensions from
+         *     the stores in the plugin's settings) provide its sources. One list,
+         *     filtered by the plugin. Rows with an install, update or uninstall
+         *     queued or running carry its `task_id`. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        get: operations["listPackages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/packages/{package_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One of a plugin's packages
+         * @description Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        get: operations["getPackage"];
+        put?: never;
+        post?: never;
+        /**
+         * Uninstall a package
+         * @description Queues the uninstall as a `plugin.package` task (progress on the
+         *     task's events). Its sources become absent: works keep their series
+         *     and chapters, and read from other sources meanwhile. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        delete: operations["uninstallPackage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/packages/{package_id}/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install a package
+         * @description Queues the install as a `plugin.package` task; the plugin checks
+         *     the package (signature, checksum) and the task fails with its
+         *     reason when it doesn't pass. The plugin is synced when it's done,
+         *     so the package's sources appear within seconds. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        post: operations["installPackage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/packages/{package_id}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update an installed package to its newest offered version
+         * @description Queued as a `plugin.package` task, like an install. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        post: operations["updatePackage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/packages/{package_id}/languages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose the languages a package offers sources in
+         * @description A subset of the package's `langs`; empty means every language the
+         *     plugin allows (its own `languages` setting). "all" and "multi" are
+         *     languages like any other. Sources outside both become absent. The
+         *     plugin is synced right away. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        put: operations["setPackageLanguages"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sources": {
         parameters: {
             query?: never;
@@ -2318,6 +2451,7 @@ export interface components {
             plugin_id?: string;
             version: string;
             contracts: string[];
+            /** @description What the plugin supports beyond the contract, e.g. `packages` (it installs packages that provide sources; show its packages) or `network_profiles`. */
             capabilities: string[];
             /** @description How many calls per source the plugin takes at once, when it says. */
             max_concurrency_per_source?: number;
@@ -2392,12 +2526,78 @@ export interface components {
             enabled: boolean;
             /** @description The plugin still lists it. */
             present: boolean;
+            /**
+             * @description Why a source the plugin no longer lists (`present: false`) is
+             *     missing, when known: `language` means its package is still
+             *     installed but its language is turned off (the plugin's or the
+             *     package's languages), so show it as "not available" rather than
+             *     gone. Absent without a reason: no longer provided (e.g. its
+             *     package was uninstalled). Either way it isn't used and nothing
+             *     of it is deleted.
+             * @enum {string}
+             */
+            unavailable_reason?: "language";
+            /** @description The package (e.g. extension) that provides it, on plugins with the `packages` capability. */
+            package_id?: string;
+            package_name?: string;
         };
         SourceList: {
             sources: components["schemas"]["SourceInfo"][];
         };
         UpdateSourceRequest: {
             enabled: boolean;
+        };
+        PackageList: {
+            packages: components["schemas"]["Package"][];
+        };
+        /** @description A package that provides sources, e.g. an extension. */
+        Package: {
+            id: string;
+            name: string;
+            /** @description Languages its sources cover (BCP 47, or "all"/"multi"). */
+            langs: string[];
+            /** @description The newest version offered. */
+            version: string;
+            installed: boolean;
+            installed_version?: string;
+            update_available: boolean;
+            /** @enum {string} */
+            content_rating: "safe" | "mixed" | "nsfw" | "unknown";
+            /** @description The plugin can run the version offered. */
+            supported: boolean;
+            /** @description Where it can come from (e.g. stores). */
+            offers: components["schemas"]["PackageOffer"][];
+            sources: components["schemas"]["PackageSource"][];
+            /** @description The languages chosen for it; empty means every language the plugin allows. */
+            enabled_langs: string[];
+            /** @description Why an installed package isn't working. */
+            error?: string;
+            /**
+             * Format: uuid
+             * @description An install, update or uninstall of it that is queued or running.
+             */
+            task_id?: string;
+        };
+        PackageOffer: {
+            origin_id: string;
+            origin_name: string;
+            version: string;
+            supported: boolean;
+        };
+        PackageSource: {
+            /** @description The source's ID on the server ("plugin:source") once installed. */
+            id: string;
+            name: string;
+            lang: string;
+            /** @description Its language is turned on at the plugin's and the package's level, so it is listed while the package is installed. An admin may still turn the source off. */
+            available: boolean;
+        };
+        InstallPackageRequest: {
+            /** @description Which offer to install; empty lets the plugin pick the best one. */
+            origin_id?: string;
+        };
+        PackageLanguages: {
+            enabled_langs: string[];
         };
         /** @description How a work already knows a series. */
         SeriesMatchRef: {
@@ -2925,6 +3125,8 @@ export interface components {
         RunId: string;
         TaskId: string;
         PluginId: string;
+        /** @description The package's ID on its plugin. */
+        PackageId: string;
         /** @description The source's ID, "plugin:source". */
         SourceId: string;
         /** @description The page, from 1. */
@@ -3945,6 +4147,173 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    listPackages: {
+        parameters: {
+            query?: {
+                /** @description Matches the package's or its sources' names. */
+                q?: string;
+                /** @description Only packages with a source in this language. */
+                lang?: string;
+                /** @description Only installed packages. */
+                installed?: boolean;
+                /** @description Only installed packages with an update. */
+                updates?: boolean;
+                /** @description Only packages this origin (e.g. a store) offers. */
+                origin_id?: string;
+            };
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The packages. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackageList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The package. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Package"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    uninstallPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued (or already queued). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRef"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    installPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["InstallPackageRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued (or already queued). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRef"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updatePackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued (or already queued). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRef"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setPackageLanguages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackageLanguages"];
+            };
+        };
+        responses: {
+            /** @description The package as the plugin now reports it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Package"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     listSources: {
         parameters: {
             query?: {
@@ -3953,6 +4322,8 @@ export interface operations {
                 lang?: string;
                 /** @description Only this plugin's sources. */
                 plugin_id?: string;
+                /** @description Only sources this package provides. */
+                package_id?: string;
                 /** @description Only sources turned on (`true`) or off (`false`) by an admin. Turned-off sources show only with `all=true`. */
                 enabled?: boolean;
                 /** @description Only sources their plugin lists (`true`) or no longer lists (`false`). Absent sources show only with `all=true`. */

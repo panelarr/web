@@ -10,9 +10,21 @@
 //
 // In the browser, pick one with `?mock=<scenario>`; it lasts for the tab (sessionStorage).
 import type { components } from "@/api/schema.gen";
-import { adminUser, apiKey, invite, metaConnection, plugin, pluginConfig, readerUser, session, sources } from "./data";
+import {
+  adminUser,
+  apiKey,
+  invite,
+  metaConnection,
+  plugin,
+  pluginConfig,
+  readerUser,
+  session,
+  sources,
+  storePlugin,
+} from "./data";
 import { initialStorages } from "./downloads";
 import { initialJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
+import { initialPackageSources, initialPackages, type MockPackage } from "./packages";
 
 type S = components["schemas"];
 
@@ -60,11 +72,14 @@ export interface MockDb extends JobsState {
   /** Per user: app preferences. */
   preferences: Record<string, Record<string, unknown>>;
   storages: S["StorageInfo"][];
+  /** Per plugin with the packages capability: its packages. */
+  packages: Record<string, MockPackage[]>;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
 
 export function createDb(scenario: Scenario = "ready"): MockDb {
+  const packages = initialPackages();
   const ready: MockDb = {
     users: [clone(adminUser), clone(readerUser)],
     passwords: { admin: "password123", reader: "password123" },
@@ -84,9 +99,10 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     apiKeys: [clone(apiKey)],
     meta: clone(metaConnection),
     syncing: [],
-    plugins: [clone(plugin)],
+    plugins: [clone(plugin), clone(storePlugin)],
     pluginConfigs: { [plugin.id]: clone(pluginConfig) },
-    sources: clone(sources),
+    sources: [...clone(sources), ...initialPackageSources(packages)],
+    packages: { [storePlugin.id]: packages },
     invites: [{ ...clone(invite), token: "open-invite-token" }],
     failedLogins: 0,
     works: [],
@@ -134,6 +150,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
         plugins: [],
         pluginConfigs: {},
         sources: [],
+        packages: {},
         invites: [],
       };
     case "signed-out":

@@ -11,6 +11,7 @@ import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
 import { finishRun, queueState, startRun, taskEvent } from "./jobs";
 import { type MockOperation, mockUrl, op, problem } from "./op";
+import { type MockPackage, packageView, queuePackageTask, syncPackageSources } from "./packages";
 import { pageCount, pageSvg } from "./reader";
 import { FILTERS, listSeries, seriesIndex, sourceChapters, sourceSeries } from "./sources";
 import { entryCandidates, matchSeries, resolveUrl, startMatching } from "./works";
@@ -671,6 +672,79 @@ export const operations: MockOperation[] = [
     if (!found) return problem(404, "not_found", "Not found");
     checkPlugin(found);
     return json(found);
+  }),
+
+  // Packages (e.g. extensions) of a plugin that hosts many sites.
+  op("get", "/plugins/{plugin_id}/packages", ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const plugin = packagesPlugin(String(params.plugin_id));
+    if (plugin instanceof Response) return plugin;
+    const url = new URL(request.url);
+    const q = url.searchParams.get("q")?.toLowerCase();
+    const lang = url.searchParams.get("lang");
+    const list = (db().packages[plugin.id] ?? []).filter(
+      (p) =>
+        (!q || [p.name, ...p.sources.map((s) => s.name)].some((name) => name.toLowerCase().includes(q))) &&
+        (!lang || p.sources.some((s) => s.lang === lang)) &&
+        (url.searchParams.get("installed") !== "true" || p.installed) &&
+        (url.searchParams.get("updates") !== "true" || p.update_available) &&
+        (!url.searchParams.get("origin_id") || p.offers.some((o) => o.origin_id === url.searchParams.get("origin_id"))),
+    );
+    return json<S["PackageList"]>({ packages: list.map((p) => packageView(db(), plugin.id, p)) });
+  }),
+
+  op("get", "/plugins/{plugin_id}/packages/{package_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = pluginPackage(String(params.plugin_id), String(params.package_id));
+    if (found instanceof Response) return found;
+    return json(packageView(db(), found.plugin.id, found.pkg));
+  }),
+
+  op("post", "/plugins/{plugin_id}/packages/{package_id}/install", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = pluginPackage(String(params.plugin_id), String(params.package_id));
+    if (found instanceof Response) return found;
+    const body = (await request.json().catch(() => ({}))) as S["InstallPackageRequest"];
+    const task = queuePackageTask(db(), found.plugin.id, found.pkg, "install", user.id, body.origin_id);
+    commit();
+    return json<S["TaskRef"]>({ task_id: task.id }, 202);
+  }),
+
+  op("post", "/plugins/{plugin_id}/packages/{package_id}/update", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = pluginPackage(String(params.plugin_id), String(params.package_id));
+    if (found instanceof Response) return found;
+    const task = queuePackageTask(db(), found.plugin.id, found.pkg, "update", user.id);
+    commit();
+    return json<S["TaskRef"]>({ task_id: task.id }, 202);
+  }),
+
+  op("delete", "/plugins/{plugin_id}/packages/{package_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = pluginPackage(String(params.plugin_id), String(params.package_id));
+    if (found instanceof Response) return found;
+    const task = queuePackageTask(db(), found.plugin.id, found.pkg, "uninstall", user.id);
+    commit();
+    return json<S["TaskRef"]>({ task_id: task.id }, 202);
+  }),
+
+  op("put", "/plugins/{plugin_id}/packages/{package_id}/languages", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = pluginPackage(String(params.plugin_id), String(params.package_id));
+    if (found instanceof Response) return found;
+    const pkg = found.pkg;
+    const { enabled_langs } = (await request.json()) as S["PackageLanguages"];
+    pkg.enabled_langs = enabled_langs.filter((lang) => pkg.langs.includes(lang));
+    // The server syncs the plugin before answering.
+    syncPackageSources(db(), found.plugin.id);
+    commit();
+    return json(packageView(db(), found.plugin.id, pkg));
   }),
 
   op("get", "/plugins/{plugin_id}/config", ({ params }) => {
@@ -1750,6 +1824,25 @@ export const operations: MockOperation[] = [
     return json(queueState(d));
   }),
 ];
+
+/** A plugin with the packages capability, turned on; or the problem. */
+function packagesPlugin(pluginId: string): S["Plugin"] | Response {
+  const plugin = db().plugins.find((p) => p.id === pluginId);
+  if (!plugin) return problem(404, "not_found", "Not found", "No such plugin.");
+  if (!plugin.capabilities.includes("packages")) {
+    return problem(422, "no_packages", "No packages", "This plugin doesn't manage packages.");
+  }
+  if (!plugin.enabled) return problem(409, "plugin_disabled", "Plugin turned off", "Turn the plugin on first.");
+  return plugin;
+}
+
+/** One of such a plugin's packages; or the problem. */
+function pluginPackage(pluginId: string, packageId: string): { plugin: S["Plugin"]; pkg: MockPackage } | Response {
+  const plugin = packagesPlugin(pluginId);
+  if (plugin instanceof Response) return plugin;
+  const pkg = db().packages[pluginId]?.find((p) => p.id === packageId);
+  return pkg ? { plugin, pkg } : problem(404, "not_found", "Not found", "No such package.");
+}
 
 /** The server checks a plugin seconds after its settings are saved; the mock, sooner. */
 const PLUGIN_RECHECK_MS = 300;

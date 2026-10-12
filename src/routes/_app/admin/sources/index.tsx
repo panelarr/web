@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Library } from "lucide-react";
+import { Library, X } from "lucide-react";
 import { useMemo } from "react";
 import { $api } from "@/api/client";
 import type { components } from "@/api/schema.gen";
@@ -16,12 +16,14 @@ import { HealthBadge } from "@/features/admin/health-badge";
 
 type Source = components["schemas"]["SourceInfo"];
 
-const STATUSES = ["ok", "failing", "unknown", "off", "gone"] as const;
+const STATUSES = ["ok", "failing", "unknown", "off", "unavailable", "gone"] as const;
 type StatusFilter = (typeof STATUSES)[number];
 
 interface SourcesSearch {
   q?: string;
   plugin?: string;
+  /** Only one package's (extension's) sources, e.g. from the plugin's Extensions tab. */
+  package?: string;
   lang?: string;
   status?: StatusFilter;
 }
@@ -30,6 +32,7 @@ export const Route = createFileRoute("/_app/admin/sources/")({
   validateSearch: (search: Record<string, unknown>): SourcesSearch => ({
     ...(typeof search.q === "string" && search.q ? { q: search.q } : {}),
     ...(typeof search.plugin === "string" && search.plugin ? { plugin: search.plugin } : {}),
+    ...(typeof search.package === "string" && search.package ? { package: search.package } : {}),
     ...(typeof search.lang === "string" && search.lang ? { lang: search.lang } : {}),
     ...(STATUSES.includes(search.status as StatusFilter) ? { status: search.status as StatusFilter } : {}),
   }),
@@ -38,13 +41,16 @@ export const Route = createFileRoute("/_app/admin/sources/")({
 
 function matches(source: Source, search: SourcesSearch): boolean {
   if (search.plugin && source.plugin_id !== search.plugin) return false;
+  if (search.package && source.package_id !== search.package) return false;
   if (search.lang && source.lang !== search.lang) return false;
   if (search.q && !`${source.name} ${source.id}`.toLowerCase().includes(search.q.toLowerCase())) return false;
   switch (search.status) {
     case "off":
       return !source.enabled;
+    case "unavailable":
+      return !source.present && source.unavailable_reason === "language";
     case "gone":
-      return !source.present;
+      return !source.present && !source.unavailable_reason;
     case undefined:
       return true;
     default:
@@ -119,9 +125,26 @@ function SourcesPage() {
           <option value="failing">Failing</option>
           <option value="unknown">Not checked</option>
           <option value="off">Off</option>
+          <option value="unavailable">Not available (language off)</option>
           <option value="gone">Absent (no longer listed)</option>
         </NativeSelect>
       </div>
+      {search.package ? (
+        <p className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          Extension:
+          <Badge variant="secondary" className="gap-1">
+            {all.find((source) => source.package_id === search.package)?.package_name ?? search.package}
+            <button
+              type="button"
+              aria-label="Show every extension's sources"
+              className="-mr-1 rounded-full p-0.5 hover:bg-background/60"
+              onClick={() => set({ package: undefined })}
+            >
+              <X className="size-3" aria-hidden />
+            </button>
+          </Badge>
+        </p>
+      ) : null}
       {sources.error ? <ErrorAlert error={sources.error} onRetry={() => void sources.refetch()} /> : null}
       {sources.isPending ? <Loading /> : null}
       {sources.data && shown.length === 0 ? (
@@ -164,16 +187,25 @@ function SourceRow({ source }: { source: Source }) {
           {source.content_rating === "nsfw" || source.content_rating === "mixed" ? (
             <Badge variant="secondary">{source.content_rating}</Badge>
           ) : null}
-          {/* Off is the admin's switch; Absent means the plugin no longer lists the source. */}
+          {/* Off is the admin's switch; Not available, its language is turned off; Absent, its
+              plugin no longer lists it. */}
           {source.enabled ? null : <Badge variant="secondary">Off</Badge>}
-          {source.present ? null : <Badge variant="destructive">Absent</Badge>}
+          {source.present ? null : source.unavailable_reason === "language" ? (
+            <Badge variant="outline">Not available</Badge>
+          ) : (
+            <Badge variant="destructive">Absent</Badge>
+          )}
         </p>
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <HealthBadge status={source.health.status} />
           <span className="[overflow-wrap:anywhere]">{source.id}</span>
+          {source.package_name ? <span className="[overflow-wrap:anywhere]">via {source.package_name}</span> : null}
           {source.present ? null : (
             <span className="basis-full [overflow-wrap:anywhere]">
-              No longer listed by its plugin. Works keep its chapters; copies come from other sources.
+              {source.unavailable_reason === "language"
+                ? "Its language is turned off for its plugin or extension."
+                : "No longer listed by its plugin."}{" "}
+              Works keep its chapters; copies come from other sources.
             </span>
           )}
           {source.health.status === "failing" && (source.health.message || source.health.reason) ? (

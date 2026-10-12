@@ -6,6 +6,7 @@ import { tickDownloads } from "./downloads";
 import { createEventsHandler, operations } from "./handlers";
 import { tickJobs } from "./jobs";
 import { isDraft } from "./op";
+import { tickPackages } from "./packages";
 import { tickMatching } from "./works";
 
 /**
@@ -25,7 +26,8 @@ export async function startMockWorker(mode: "all" | "drafts"): Promise<void> {
       const jobs = tickJobs(db());
       const matching = tickMatching(db());
       const downloads = tickDownloads(db());
-      if (jobs || matching || downloads) commit();
+      const packages = tickPackages(db());
+      if (jobs || matching || downloads || packages) commit();
     }, 1_000);
   }
   await worker.start({
