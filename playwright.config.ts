@@ -18,6 +18,7 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${port}`,
     trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   projects: [
     { name: "desktop", testIgnore: /csp\.spec/, use: { ...devices["Desktop Chrome"] } },
