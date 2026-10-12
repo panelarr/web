@@ -77,3 +77,9 @@ export function defaultsText(params: JobParam[]): string | undefined {
   const parts = params.filter((p) => p.default !== undefined && p.default !== "").map((p) => `${p.name}: ${p.default}`);
   return parts.length > 0 ? `With ${parts.join(", ")}` : undefined;
 }
+
+/** The spec names parameters for machines (keep_days); show them as words (Keep days). */
+export function paramLabel(name: string): string {
+  const words = name.replaceAll(/[_.-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}

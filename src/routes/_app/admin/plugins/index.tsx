@@ -73,12 +73,12 @@ function PluginsPage() {
         ))}
       </div>
       <Dialog open={adding} onOpenChange={setAdding}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Add a plugin</DialogTitle>
             <DialogDescription>The server checks that the plugin answers before saving it.</DialogDescription>
           </DialogHeader>
-          <RegisterPluginForm onAdded={() => setAdding(false)} />
+          <RegisterPluginForm onAdded={() => setAdding(false)} onCancel={() => setAdding(false)} />
         </DialogContent>
       </Dialog>
     </>

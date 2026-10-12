@@ -8,6 +8,7 @@ import { formValues, TextField } from "@/components/form";
 import { ErrorAlert, Loading } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
 import { formatVersion } from "@/lib/version";
 
 /** Registers source plugins running as services, and lists the ones registered. */
@@ -44,7 +45,7 @@ export function PluginsPanel() {
 }
 
 /** Adds a source plugin running as a service: checked by the server before it is saved. */
-export function RegisterPluginForm({ onAdded }: { onAdded?: () => void }) {
+export function RegisterPluginForm({ onAdded, onCancel }: { onAdded?: () => void; onCancel?: () => void }) {
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const register = $api.useMutation("post", "/plugins", {
@@ -93,12 +94,25 @@ export function RegisterPluginForm({ onAdded }: { onAdded?: () => void }) {
           error={register.error}
         />
       </div>
-      <div>
-        <Button type="submit" variant="outline" disabled={register.isPending}>
-          {register.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-          Add plugin
-        </Button>
-      </div>
+      {onCancel ? (
+        // In a dialog: the same actions as every other dialog.
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={register.isPending}>
+            {register.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+            Add plugin
+          </Button>
+        </DialogFooter>
+      ) : (
+        <div>
+          <Button type="submit" variant="outline" disabled={register.isPending}>
+            {register.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+            Add plugin
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

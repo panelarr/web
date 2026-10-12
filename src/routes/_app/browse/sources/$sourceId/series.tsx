@@ -170,7 +170,7 @@ function AddFromSource({ sourceId, seriesKey, title }: { sourceId: string; serie
       </Button>
       {find.error ? <ErrorAlert error={find.error} title="Not added" /> : null}
       <Dialog open={candidates !== undefined} onOpenChange={(open) => !open && setCandidates(undefined)}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Which work is it?</DialogTitle>
             <DialogDescription>

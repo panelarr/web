@@ -25,7 +25,9 @@ export function Field({
   const errorId = `${id}-error`;
   const describedBy = [hint ? hintId : undefined, error ? errorId : undefined].filter(Boolean).join(" ");
   return (
-    <div className={cn("grid gap-1.5", className)}>
+    // content-start: in a row of fields, a taller neighbour (one with a hint or an error)
+    // stretches this one; without it the grid would spread its label and control apart.
+    <div data-slot="field" className={cn("grid content-start gap-1.5", className)}>
       <Label htmlFor={id}>{label}</Label>
       {children({
         id,

@@ -1,0 +1,132 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import { expect, type Page, test } from "@playwright/test";
+
+/** Fields side by side (same parent, same row) whose labels or controls don't share a top edge. */
+async function misalignedFields(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const rows = new Map<string, Element[]>();
+    for (const field of document.querySelectorAll("[data-slot=field]")) {
+      const rect = field.getBoundingClientRect();
+      if (rect.width === 0 || !field.parentElement) continue;
+      const key = `${[...document.querySelectorAll("*")].indexOf(field.parentElement)}:${Math.round(rect.top)}`;
+      rows.set(key, [...(rows.get(key) ?? []), field]);
+    }
+    for (const fields of rows.values()) {
+      if (fields.length < 2) continue;
+      const tops = fields.map((field) => {
+        const label = field.querySelector("label");
+        const control = label?.htmlFor ? document.getElementById(label.htmlFor) : null;
+        return {
+          name: label?.textContent ?? "?",
+          label: label?.getBoundingClientRect().top ?? 0,
+          control: control?.getBoundingClientRect().top ?? 0,
+          height: control?.getBoundingClientRect().height ?? 0,
+        };
+      });
+      const [first, ...rest] = tops;
+      for (const other of rest) {
+        if (!first) continue;
+        for (const part of ["label", "control", "height"] as const) {
+          if (Math.abs(first[part] - other[part]) > 1) {
+            out.push(`${first.name} / ${other.name}: ${part} ${first[part].toFixed(1)} vs ${other[part].toFixed(1)}`);
+          }
+        }
+      }
+    }
+    return out;
+  });
+}
+
+/**
+ * Anything that scrolls sideways (tab strips) but would also scroll up and down: with scrollbars
+ * always shown (a setting on macOS, the default on Windows and Linux) that's a stray vertical
+ * scrollbar. `overflow-x: auto` alone makes `overflow-y` auto too.
+ */
+async function strayScrollbars(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    // Only what is meant to scroll sideways: dialogs and lists may scroll up and down.
+    [...document.querySelectorAll('[data-slot="scroll-strip"], [class*="overflow-x-auto"]')]
+      .filter((element) => {
+        const vertical = getComputedStyle(element).overflowY;
+        return (vertical === "auto" || vertical === "scroll") && element.scrollHeight > element.clientHeight;
+      })
+      .map((element) => `${element.textContent?.slice(0, 40)}: ${element.scrollHeight} > ${element.clientHeight}`),
+  );
+}
+
+async function check(page: Page, where: string, found: string[]) {
+  await page.waitForTimeout(250);
+  for (const problem of await misalignedFields(page)) found.push(`${where}: ${problem}`);
+  for (const problem of await strayScrollbars(page)) found.push(`${where}: also scrolls vertically: ${problem}`);
+}
+
+test("fields side by side line up, and tab strips only scroll sideways", async ({ page }) => {
+  test.setTimeout(90_000);
+  const found: string[] = [];
+  const dialog = () => page.getByRole("dialog");
+  const open = async (path: string) => {
+    await page.goto(path);
+    await expect(page.getByRole("heading").first()).toBeVisible();
+  };
+
+  await open("/admin/storage?mock=ready");
+  await check(page, "storage", found);
+  await page.getByRole("button", { name: "Add storage" }).click();
+  await check(page, "add storage (local)", found);
+  await dialog().getByLabel("Kind").selectOption("s3");
+  await check(page, "add storage (S3)", found);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Edit" }).last().click();
+  await check(page, "edit storage (S3)", found);
+  await page.keyboard.press("Escape");
+
+  await open("/admin/users");
+  await page.getByRole("button", { name: "Add user" }).click();
+  await check(page, "add user", found);
+  await dialog().getByRole("button", { name: "Add user" }).click(); // the browser marks the missing fields
+  await check(page, "add user (empty)", found);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Invite" }).click();
+  await check(page, "invite", found);
+  await page.keyboard.press("Escape");
+  await open("/admin/users/7c9d1e2f-3a4b-4c5d-8e6f-7a8b9c0d1e2f");
+  await check(page, "user", found);
+
+  await open("/admin/plugins");
+  await page.getByRole("button", { name: "Add plugin" }).click();
+  await check(page, "add plugin", found);
+  await page.keyboard.press("Escape");
+  await open("/admin/plugins/example");
+  await check(page, "plugin settings", found);
+
+  for (const path of ["/admin/sources", "/admin/jobs", "/admin/queue", "/admin/system"]) {
+    await open(path);
+    await check(page, path, found);
+  }
+  await open("/admin/jobs");
+  await page
+    .locator("[data-slot=card]", { has: page.getByRole("heading", { name: "Clean up" }) })
+    .getByRole("button", { name: "Run now" })
+    .click();
+  await check(page, "run job", found);
+  await page.keyboard.press("Escape");
+
+  for (const tab of ["profile", "security", "api-keys", "appearance"]) {
+    await open(`/settings?tab=${tab}`);
+    await check(page, `settings ${tab}`, found);
+  }
+  await page.goto("/settings?tab=api-keys");
+  await page.getByRole("button", { name: "New key" }).click();
+  await check(page, "new API key", found);
+  await page.keyboard.press("Escape");
+
+  await open("/browse");
+  await check(page, "browse", found);
+
+  await open("/?mock=fresh");
+  await check(page, "setup: admin", found);
+
+  expect(found).toEqual([]);
+});

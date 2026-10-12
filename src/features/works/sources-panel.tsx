@@ -387,7 +387,7 @@ function SearchSourceDialog({
         if (next && !search.data) run();
       }}
     >
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Search {state.source.name}</DialogTitle>
           <DialogDescription>Find {work.title} on this source and attach it.</DialogDescription>

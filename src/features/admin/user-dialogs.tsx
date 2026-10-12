@@ -23,7 +23,7 @@ import { formatDateTime } from "@/lib/format";
 import { DEFAULT_GRANTS, type Grants, type Role } from "./grants";
 import { GrantsEditor } from "./grants-editor";
 
-const dialogClass = "max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg";
+const dialogClass = "sm:max-w-lg";
 
 function RoleSelect({ value, onChange }: { value: Role; onChange: (role: Role) => void }) {
   return (

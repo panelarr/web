@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from "vitest";
-import { every, initialParamValue, type JobParam, paramsToSend, scheduleText } from "./jobs";
+import { every, initialParamValue, type JobParam, paramLabel, paramsToSend, scheduleText } from "./jobs";
 
 describe("schedules", () => {
   it("read like words", () => {
@@ -22,6 +22,11 @@ describe("run parameters", () => {
     { name: "keep_days", type: "int", required: true, default: "30" },
     { name: "note", type: "string", required: false },
   ];
+
+  it("are labelled in words", () => {
+    expect(paramLabel("keep_days")).toBe("Keep days");
+    expect(paramLabel("langs")).toBe("Langs");
+  });
 
   it("start from their defaults", () => {
     expect(params.map(initialParamValue)).toEqual([false, [], "30", ""]);

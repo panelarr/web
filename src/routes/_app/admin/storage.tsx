@@ -256,7 +256,7 @@ function StorageDialog({ storage, onClose }: { storage: Storage | undefined; onC
   const pending = create.isPending || update.isPending;
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+      <DialogContent>
         <form
           className="grid gap-4"
           onSubmit={(event) => {

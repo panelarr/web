@@ -45,7 +45,7 @@ describe("the jobs page", () => {
     const match = await waitFor(() => card("Match works on sources"));
     await userEvent.click(within(match).getByRole("button", { name: "Run now" }));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("switch", { name: "only_unmatched" }));
+    await userEvent.click(within(dialog).getByRole("switch", { name: "Only unmatched" }));
     await userEvent.click(within(dialog).getByRole("checkbox", { name: "example:1001" }));
     await userEvent.click(within(dialog).getByRole("checkbox", { name: "example:1003" }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Run now" }));

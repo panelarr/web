@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { initialParamValue, type Job, type JobParam, type ParamValue, paramsToSend } from "./jobs";
+import { initialParamValue, type Job, type JobParam, type ParamValue, paramLabel, paramsToSend } from "./jobs";
 
 function useInvalidateJobs() {
   const queryClient = useQueryClient();
@@ -118,7 +118,7 @@ function RunJobDialog({
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+      <DialogContent>
         <form
           className="grid gap-4"
           onSubmit={(event) => {
@@ -169,7 +169,7 @@ function ParamField({
     return (
       <div className="flex items-start justify-between gap-4">
         <div className="grid gap-1">
-          <Label htmlFor={id}>{param.name}</Label>
+          <Label htmlFor={id}>{paramLabel(param.name)}</Label>
           {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
         </div>
         <Switch id={id} checked={value === true} onCheckedChange={onChange} />
@@ -180,7 +180,7 @@ function ParamField({
     const list = Array.isArray(value) ? value : [];
     return (
       <fieldset className="grid gap-2">
-        <legend className="mb-1 text-sm font-medium">{param.name}</legend>
+        <legend className="mb-1 text-sm font-medium">{paramLabel(param.name)}</legend>
         {hint ? <p className="-mt-1 text-xs text-muted-foreground">{hint}</p> : null}
         <div className="flex flex-wrap gap-x-5 gap-y-2">
           {param.choices.map((choice) => (
@@ -200,7 +200,7 @@ function ParamField({
     );
   }
   return (
-    <Field label={param.name} hint={hint || undefined}>
+    <Field label={paramLabel(param.name)} hint={hint || undefined}>
       {(aria) =>
         param.type === "string_list" ? (
           <Textarea
