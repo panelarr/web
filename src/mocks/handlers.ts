@@ -10,6 +10,7 @@ import { commit, currentUser, db, type MockInvite, newId, syncSessionCookie } fr
 import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
 import { finishRun, queueState, startRun, taskEvent } from "./jobs";
+import { filterOwned, networkTest, profileView } from "./network";
 import { type MockOperation, mockUrl, op, problem } from "./op";
 import { type MockPackage, packageIconSvg, packageView, queuePackageTask, syncPackageSources } from "./packages";
 import { pageCount, pageSvg } from "./reader";
@@ -683,6 +684,235 @@ export const operations: MockOperation[] = [
     if (!found) return problem(404, "not_found", "Not found");
     checkPlugin(found);
     return json(found);
+  }),
+
+  // Shared network services: solvers, proxies, profiles and where they're assigned.
+  op("get", "/network/solvers", ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    return json<S["SolverList"]>({ solvers: filterOwned(db().solvers, new URL(request.url)) });
+  }),
+
+  op("post", "/network/solvers", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const body = (await request.json()) as S["NewSolver"];
+    if (db().solvers.some((s) => s.id === body.id)) return problem(409, "id_taken", "ID taken", "Pick another ID.");
+    const solver: S["Solver"] = { as_response_fallback: false, ...body, created_at: now(), updated_at: now() };
+    db().solvers.push(solver);
+    commit();
+    return json(solver, 201);
+  }),
+
+  op("post", "/network/solvers/test", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const body = (await request.json()) as S["NewSolver"];
+    return json(networkTest(body.url, "solver"));
+  }),
+
+  op("patch", "/network/solvers/{solver_id}", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const solver = db().solvers.find((s) => s.id === params.solver_id);
+    if (!solver) return problem(404, "not_found", "Not found");
+    Object.assign(solver, (await request.json()) as S["UpdateSolverRequest"], { updated_at: now() });
+    commit();
+    return json(solver);
+  }),
+
+  op("delete", "/network/solvers/{solver_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const users = db().profiles.filter((p) => p.solver_id === params.solver_id);
+    if (users.length > 0) {
+      return problem(409, "in_use", "In use", `Used by ${users.map((p) => p.name).join(", ")}.`);
+    }
+    db().solvers = db().solvers.filter((s) => s.id !== params.solver_id);
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("post", "/network/solvers/{solver_id}/test", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const solver = db().solvers.find((s) => s.id === params.solver_id);
+    return solver ? json(networkTest(solver.url, "solver")) : problem(404, "not_found", "Not found");
+  }),
+
+  op("get", "/network/proxies", ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    return json<S["ProxyList"]>({ proxies: filterOwned(db().proxies, new URL(request.url)) });
+  }),
+
+  op("post", "/network/proxies", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const { password, ...body } = (await request.json()) as S["NewProxy"];
+    if (db().proxies.some((p) => p.id === body.id)) return problem(409, "id_taken", "ID taken", "Pick another ID.");
+    const proxy: S["Proxy"] = { ...body, has_password: !!password, created_at: now(), updated_at: now() };
+    db().proxies.push(proxy);
+    if (password) db().proxyPasswords[proxy.id] = password;
+    commit();
+    return json(proxy, 201);
+  }),
+
+  op("post", "/network/proxies/test", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const body = (await request.json()) as S["ProxyTestRequest"];
+    return json(networkTest(body.url ? `${body.proxy.url} ${body.url}` : body.proxy.url, "proxy"));
+  }),
+
+  op("patch", "/network/proxies/{proxy_id}", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const proxy = d.proxies.find((p) => p.id === params.proxy_id);
+    if (!proxy) return problem(404, "not_found", "Not found");
+    const { password, username, ...rest } = (await request.json()) as S["UpdateProxyRequest"] & { password?: string };
+    Object.assign(proxy, rest, { updated_at: now() });
+    if (username === "") {
+      // No user: no credentials at all.
+      delete proxy.username;
+      delete d.proxyPasswords[proxy.id];
+    } else if (username !== undefined) proxy.username = username;
+    if (password) d.proxyPasswords[proxy.id] = password;
+    proxy.has_password = !!d.proxyPasswords[proxy.id];
+    commit();
+    return json(proxy);
+  }),
+
+  op("delete", "/network/proxies/{proxy_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const users = db().profiles.filter((p) => p.proxy_id === params.proxy_id);
+    if (users.length > 0) {
+      return problem(409, "in_use", "In use", `Used by ${users.map((p) => p.name).join(", ")}.`);
+    }
+    db().proxies = db().proxies.filter((p) => p.id !== params.proxy_id);
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("post", "/network/proxies/{proxy_id}/test", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const proxy = db().proxies.find((p) => p.id === params.proxy_id);
+    if (!proxy) return problem(404, "not_found", "Not found");
+    const body = (await request.json().catch(() => ({}))) as { url?: string };
+    return json(networkTest(body.url ? `${proxy.url} ${body.url}` : proxy.url, "proxy"));
+  }),
+
+  op("get", "/network/profiles", ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const profiles = filterOwned(d.profiles, new URL(request.url)).map((p) => profileView(d, p));
+    return json<S["NetworkProfileList"]>({ profiles });
+  }),
+
+  op("post", "/network/profiles", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const body = (await request.json()) as S["NewNetworkProfile"];
+    if (d.profiles.some((p) => p.id === body.id)) return problem(409, "id_taken", "ID taken", "Pick another ID.");
+    const bad = checkProfile(body);
+    if (bad) return bad;
+    const profile = {
+      headers: {},
+      timeouts: {},
+      user_agent: { mode: "default" as const },
+      ...body,
+      created_at: now(),
+      updated_at: now(),
+    };
+    d.profiles.push(profile);
+    commit();
+    return json(profileView(d, profile), 201);
+  }),
+
+  op("put", "/network/profiles/{profile_id}", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const profile = d.profiles.find((p) => p.id === params.profile_id);
+    if (!profile) return problem(404, "not_found", "Not found");
+    const body = (await request.json()) as S["NetworkProfileSettings"];
+    const bad = checkProfile(body);
+    if (bad) return bad;
+    // A PUT replaces every setting: anything left out goes back to the plugin's own.
+    const next = {
+      id: profile.id,
+      ...(profile.owner ? { owner: profile.owner } : {}),
+      headers: {},
+      timeouts: {},
+      user_agent: { mode: "default" as const },
+      ...body,
+      created_at: profile.created_at,
+      updated_at: now(),
+    };
+    d.profiles = d.profiles.map((p) => (p.id === profile.id ? next : p));
+    commit();
+    return json(profileView(d, next));
+  }),
+
+  op("delete", "/network/profiles/{profile_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    if (d.assignments.some((a) => a.profile_id === params.profile_id)) {
+      return problem(409, "in_use", "In use", "It's assigned somewhere: unassign it first.");
+    }
+    d.profiles = d.profiles.filter((p) => p.id !== params.profile_id);
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("get", "/network/assignments", () => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    return json<S["NetworkAssignmentList"]>({ assignments: db().assignments });
+  }),
+
+  op("put", "/network/assignments", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const body = (await request.json()) as S["NetworkAssignmentRequest"];
+    const targetId = body.target_id ?? "";
+    if (body.profile_id && !d.profiles.some((p) => p.id === body.profile_id)) {
+      return problem(400, "invalid_request", "Unknown profile", "No such profile.");
+    }
+    const assignment: S["NetworkAssignment"] = {
+      target_kind: body.target_kind,
+      target_id: targetId,
+      ...(body.profile_id ? { profile_id: body.profile_id } : {}),
+      plugin_default: body.plugin_default === true,
+      updated_at: now(),
+    };
+    d.assignments = [
+      ...d.assignments.filter((a) => !(a.target_kind === body.target_kind && a.target_id === targetId)),
+      assignment,
+    ];
+    commit();
+    return json(assignment);
+  }),
+
+  op("delete", "/network/assignments", ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const url = new URL(request.url);
+    const kind = url.searchParams.get("target_kind");
+    const id = url.searchParams.get("target_id") ?? "";
+    const before = d.assignments.length;
+    d.assignments = d.assignments.filter((a) => !(a.target_kind === kind && a.target_id === id));
+    if (d.assignments.length === before) return problem(404, "not_found", "Not found");
+    commit();
+    return new HttpResponse(null, { status: 204 });
   }),
 
   // Packages (e.g. extensions) of a plugin that hosts many sites.
@@ -1930,6 +2160,21 @@ function pluginPackage(pluginId: string, packageId: string): { plugin: S["Plugin
   if (plugin instanceof Response) return plugin;
   const pkg = db().packages[pluginId]?.find((p) => p.id === packageId);
   return pkg ? { plugin, pkg } : problem(404, "not_found", "Not found", "No such package.");
+}
+
+/** A profile's proxy and solver must exist; a fixed user agent needs a value. */
+function checkProfile(body: S["NetworkProfileSettings"]): Response | undefined {
+  const d = db();
+  if (body.proxy_id && !d.proxies.some((p) => p.id === body.proxy_id)) {
+    return problem(400, "invalid_request", "Unknown proxy", "proxy_id: no such proxy.");
+  }
+  if (body.solver_id && !d.solvers.some((s) => s.id === body.solver_id)) {
+    return problem(400, "invalid_request", "Unknown solver", "solver_id: no such solver.");
+  }
+  if (body.user_agent?.mode === "fixed" && !body.user_agent.value) {
+    return problem(400, "invalid_request", "No user agent", "user_agent: a fixed user agent needs a value.");
+  }
+  return undefined;
 }
 
 /** The server checks a plugin seconds after its settings are saved; the mock, sooner. */

@@ -100,6 +100,19 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
   await page.keyboard.press("Escape");
   await open("/admin/plugins/example");
   await check(page, "plugin settings", found);
+  for (const tab of ["profiles", "proxies", "solvers"]) {
+    await open(`/admin/network?tab=${tab}`);
+    await check(page, `network ${tab}`, found);
+  }
+  await open("/admin/network");
+  await page.getByRole("button", { name: "Add a profile" }).click();
+  await expect(dialog().getByLabel("Proxy")).toBeVisible();
+  await check(page, "a new profile", found);
+  await page.keyboard.press("Escape");
+  await open("/admin/network?tab=proxies");
+  await page.getByRole("button", { name: "Add a proxy" }).click();
+  await check(page, "a new proxy", found);
+  await page.keyboard.press("Escape");
   await open("/admin/sources");
   await page.getByRole("button", { name: "Settings for Example Source" }).click();
   await expect(dialog().getByLabel("Image quality")).toBeVisible();

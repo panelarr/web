@@ -1148,7 +1148,22 @@ paths:
       operationId: listSolvers
       tags: [network]
       summary: The solvers
+      description: Shared ones; with `include_custom` also custom ones; with `owner_kind` and `owner_id` only that owner's custom ones.
       x-panelarr-access: admin
+      parameters:
+        - name: include_custom
+          in: query
+          schema:
+            type: boolean
+        - name: owner_kind
+          in: query
+          schema:
+            $ref: "#/components/schemas/ProfileOwnerKind"
+        - name: owner_id
+          in: query
+          schema:
+            type: string
+            maxLength: 300
       responses:
         "200":
           description: The solvers.
@@ -1274,7 +1289,22 @@ paths:
       operationId: listProxies
       tags: [network]
       summary: The proxys
+      description: Shared ones; with `include_custom` also custom ones; with `owner_kind` and `owner_id` only that owner's custom ones.
       x-panelarr-access: admin
+      parameters:
+        - name: include_custom
+          in: query
+          schema:
+            type: boolean
+        - name: owner_kind
+          in: query
+          schema:
+            $ref: "#/components/schemas/ProfileOwnerKind"
+        - name: owner_id
+          in: query
+          schema:
+            type: string
+            maxLength: 300
       responses:
         "200":
           description: The proxys.
@@ -1611,6 +1641,523 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /system/meta/providers:
+    get:
+      operationId: listMetaProviders
+      tags: [meta]
+      summary: The metadata service's providers
+      description: Each with its plugin, health, sync schedules (set in meta's configuration, read-only here), record count and last sync runs. Start a sync with `POST /system/meta/providers/{provider}/sync` or through the jobs.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The providers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaProviderList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/sync-runs:
+    get:
+      operationId: listMetaSyncRuns
+      tags: [meta]
+      summary: Provider sync runs, newest first
+      x-panelarr-access: admin
+      parameters:
+        - name: provider
+          in: query
+          description: Only this provider's runs.
+          schema:
+            type: string
+            maxLength: 100
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: A page of runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaSyncRunList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/sync-runs/{sync_run_id}:
+    get:
+      operationId: getMetaSyncRun
+      tags: [meta]
+      summary: One sync run in full
+      x-panelarr-access: admin
+      parameters:
+        - name: sync_run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaSyncRun"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/health:
+    get:
+      operationId: getMetaHealth
+      tags: [meta]
+      summary: The metadata service's health, per component
+      description: Its database, its search backend and each provider's plugin.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The health.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaServiceHealth"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/entries/{entry_id}/refresh:
+    post:
+      operationId: refreshMetaEntry
+      tags: [meta]
+      summary: Fetch fresh data for one catalogue entry from its providers now
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/EntryId"
+      responses:
+        "200":
+          description: Which providers answered and which failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaEntryRefresh"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/duplicates:
+    get:
+      operationId: listMetaDuplicates
+      tags: [meta]
+      summary: Pairs of catalogue entries the metadata service suspects are one work
+      description: Open pairs by default. Confirming merges a pair for good; dismissing marks them different works (reopen takes that back).
+      x-panelarr-access: admin
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, confirmed, dismissed]
+        - name: min_score
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+        - name: judged_only
+          in: query
+          description: Only pairs the decision model rated.
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: A page of pairs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicatePage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/duplicates/{pair_id}:
+    get:
+      operationId: getMetaDuplicate
+      tags: [meta]
+      summary: One pair, both entries side by side
+      x-panelarr-access: admin
+      parameters:
+        - name: pair_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        "200":
+          description: The pair.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicatePair"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/duplicates/{pair_id}/confirm:
+    post:
+      operationId: confirmMetaDuplicate
+      tags: [meta]
+      summary: Merge a pair into one entry
+      description: "Can't be undone: the other entry's records move over and its ID points to the one that stays. Ask the admin to confirm first."
+      x-panelarr-access: admin
+      parameters:
+        - name: pair_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmDuplicateRequest"
+      responses:
+        "200":
+          description: Merged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmedDuplicate"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/duplicates/{pair_id}/dismiss:
+    post:
+      operationId: dismissMetaDuplicate
+      tags: [meta]
+      summary: Mark a pair as different works
+      x-panelarr-access: admin
+      parameters:
+        - name: pair_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuplicateNote"
+      responses:
+        "200":
+          description: Dismissed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicatePair"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/duplicates/{pair_id}/reopen:
+    post:
+      operationId: reopenMetaDuplicate
+      tags: [meta]
+      summary: Take back a dismissal
+      description: "Only dismissed pairs (`409`, code `pair_decided`, for others)."
+      x-panelarr-access: admin
+      parameters:
+        - name: pair_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        "200":
+          description: Open again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicatePair"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/duplicate-judge:
+    get:
+      operationId: getMetaDuplicateJudge
+      tags: [meta]
+      summary: The decision model that rates duplicate pairs
+      description: Its API key is never returned (`has_api_key`).
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The settings in force.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateJudge"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: putMetaDuplicateJudge
+      tags: [meta]
+      summary: Save the decision model settings
+      description: They win over meta's configuration until reset. An empty API key keeps the stored one. Off by default; nothing is sent to a model until it's on.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuplicateJudgeSettings"
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateJudge"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/duplicate-judge/test:
+    post:
+      operationId: testMetaDuplicateJudge
+      tags: [meta]
+      summary: Ask the model about a made-up pair, without saving
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuplicateJudgeSettings"
+      responses:
+        "200":
+          description: How it went.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateJudgeTest"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/duplicate-judge/reset:
+    post:
+      operationId: resetMetaDuplicateJudge
+      tags: [meta]
+      summary: Forget the saved settings; meta's configuration applies again
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The settings in force now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateJudge"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/search-engine:
+    get:
+      operationId: getMetaSearchEngine
+      tags: [meta]
+      summary: The metadata service's search engine and the state of its index
+      description: The engine's API key is never returned (`has_api_key`). Rebuild the index with the `search-rebuild` job.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The settings in force and the engine's state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaSearchEngine"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: putMetaSearchEngine
+      tags: [meta]
+      summary: Save the search engine settings
+      description: They win over meta's configuration until reset. An empty API key keeps the stored one.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchEngineSettings"
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaSearchEngine"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/search-engine/test:
+    post:
+      operationId: testMetaSearchEngine
+      tags: [meta]
+      summary: Check search engine settings without saving them
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchEngineSettings"
+      responses:
+        "200":
+          description: How it went.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchEngineTest"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/search-engine/reset:
+    post:
+      operationId: resetMetaSearchEngine
+      tags: [meta]
+      summary: Forget the saved settings; meta's configuration applies again
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The settings in force now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaSearchEngine"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/jobs:
+    get:
+      operationId: listMetaJobs
+      tags: [meta]
+      summary: The metadata service's background jobs
+      description: "meta's jobs, in the same shape as the server's own (`/jobs`). Calls meta: `503` when it isn't connected or can't be reached. Schedules are set in meta's configuration and shown read-only (`schedule.source`)."
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The jobs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/jobs/{job_id}:
+    get:
+      operationId: getMetaJob
+      tags: [meta]
+      summary: One of the metadata service's jobs
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/jobs/{job_id}/runs:
+    get:
+      operationId: listMetaJobRuns
+      tags: [meta]
+      summary: A metadata service job's runs, newest first
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobRunStatus'
+      responses:
+        "200":
+          description: A page of runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRunList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/jobs/{job_id}/run:
+    post:
+      operationId: runMetaJob
+      tags: [meta]
+      summary: Run one of the metadata service's jobs now
+      description: "`409`, code `already_running`, with `current_run_id`, when it runs already; e.g. `search-rebuild` rebuilds the search index."
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunJobRequest"
+      responses:
+        "202":
+          description: Started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRunSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/job-runs/{run_id}:
+    get:
+      operationId: getMetaJobRun
+      tags: [meta]
+      summary: One run of a metadata service job, in full
+      description: No events come for meta's runs; poll while it runs.
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRun"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /system/meta/job-runs/{run_id}/cancel:
+    post:
+      operationId: cancelMetaJobRun
+      tags: [meta]
+      summary: Cancel a running run of a metadata service job
+      x-panelarr-access: admin
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "202":
+          description: Cancelling.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRunSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /sources/{source_id}/settings:
     parameters:
       - $ref: "#/components/parameters/SourceId"
@@ -1671,6 +2218,96 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SourceNetwork"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /plugins/{plugin_id}/origins:
+    parameters:
+      - $ref: "#/components/parameters/PluginId"
+    get:
+      operationId: listPackageOrigins
+      tags: [plugins]
+      summary: Where a plugin's packages come from (e.g. its stores)
+      description: "With each origin's state: last refresh, its error, how many packages it offers, the pinned signing key. Origins are added and removed in the plugin's settings. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`)."
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The origins.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackageOriginList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /plugins/{plugin_id}/origins/{origin_id}/refresh:
+    parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - name: origin_id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 200
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    post:
+      operationId: refreshPackageOrigin
+      tags: [plugins]
+      summary: Fetch an origin's package list again now
+      description: "A store that can't be reached answers `502`, code `store_fetch_failed`; a broken one `store_invalid`. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`)."
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The origin after the refresh.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackageOrigin"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /plugins/{plugin_id}/packages/{package_id}/reload:
+    parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/PackageId"
+    post:
+      operationId: reloadPackage
+      tags: [plugins]
+      summary: Load an installed package again
+      description: "Without downloading it: retries a failed load or applies settings that need a reload. `409`, code `not_installed`, for a package that isn't installed. The plugin is synced after. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`)."
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The package after the reload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/health-check:
+    parameters:
+      - $ref: "#/components/parameters/SourceId"
+    put:
+      operationId: setSourceHealthCheck
+      tags: [sources]
+      summary: Turn a source's scheduled health checks on or off
+      description: "For plugins with the `health_checks` capability (else `422`, code `unsupported`). Shown as `health.checks_disabled`. Run a check now through the plugin's jobs."
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetHealthCheckRequest"
+      responses:
+        "200":
+          description: The source.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceInfo"
         default:
           $ref: "#/components/responses/Problem"
 
@@ -4196,6 +4833,9 @@ components:
         interval_seconds:
           type: integer
           description: Absent for jobs run by hand only.
+        cron:
+          type: string
+          description: A cron schedule (the connected services' jobs); absent otherwise.
         enabled:
           type: boolean
         source:
@@ -4553,6 +5193,9 @@ components:
         checked_at:
           type: string
           format: date-time
+        checks_disabled:
+          type: boolean
+          description: Its scheduled health checks are turned off (plugins with the `health_checks` capability).
     SourceInfo:
       type: object
       required: [id, plugin_id, name, lang, content_rating, capabilities, health, enabled, present]
@@ -4670,6 +5313,8 @@ components:
         error:
           type: string
           description: Why an installed package isn't working.
+        details:
+          $ref: "#/components/schemas/PackageDetails"
         icon_url:
           type: string
           description: The server's URL for the package's icon, when it has one.
@@ -4723,9 +5368,11 @@ components:
             maxLength: 35
     Solver:
       type: object
-      description: A challenge solver (FlareSolverr-compatible).
+      description: A challenge solver (FlareSolverr-compatible), shared or custom to one owner.
       required: [id, name, type, url, as_response_fallback, created_at, updated_at]
       properties:
+        owner:
+          $ref: "#/components/schemas/ProfileOwner"
         id:
           type: string
         name:
@@ -4765,6 +5412,9 @@ components:
       type: object
       required: [id, name, type, url]
       properties:
+        owner:
+          $ref: "#/components/schemas/ProfileOwner"
+          description: Makes it custom to one plugin, extension, source or provider (only usable by profiles of that owner, removed with its plugin).
         id:
           type: string
           pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
@@ -4811,9 +5461,11 @@ components:
           type: boolean
     Proxy:
       type: object
-      description: An HTTP, HTTPS or SOCKS5 proxy. The password is never returned.
+      description: An HTTP, HTTPS or SOCKS5 proxy, shared or custom to one owner. The password is never returned.
       required: [id, name, url, has_password, created_at, updated_at]
       properties:
+        owner:
+          $ref: "#/components/schemas/ProfileOwner"
         id:
           type: string
         name:
@@ -4843,6 +5495,9 @@ components:
       type: object
       required: [id, name, url]
       properties:
+        owner:
+          $ref: "#/components/schemas/ProfileOwner"
+          description: Makes it custom to one plugin, extension, source or provider (only usable by profiles of that owner, removed with its plugin).
         id:
           type: string
           pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
@@ -5334,6 +5989,519 @@ components:
         values:
           type: object
           additionalProperties: true
+    MetaProviderList:
+      type: object
+      required: [providers]
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetaProviderDetail"
+    MetaProviderDetail:
+      type: object
+      required: [id, mode, health, schedules, record_count, last_runs]
+      properties:
+        id:
+          type: string
+        mode:
+          type: string
+          description: How meta runs its plugin (e.g. in process or as a service).
+        plugin_id:
+          type: string
+        plugin_name:
+          type: string
+        plugin_version:
+          type: string
+        health:
+          type: string
+          enum: [ok, degraded, down, unknown]
+        health_message:
+          type: string
+        schedules:
+          type: object
+          additionalProperties:
+            type: string
+          description: Sync schedules per ingestion kind, from meta's configuration (read-only).
+        record_count:
+          type: integer
+          format: int64
+        last_runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetaSyncRun"
+    MetaSyncRunList:
+      type: object
+      required: [runs, next_page_token]
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetaSyncRun"
+        next_page_token:
+          type: string
+    MetaSyncRun:
+      type: object
+      required: [id, provider, kind, status, trigger, upserts, changed, removals, merges, skipped, marked_removed, notices]
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+        kind:
+          type: string
+          description: The ingestion kind, e.g. dump or delta.
+        status:
+          type: string
+          enum: [running, succeeded, failed, cancelled, unknown]
+        trigger:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        snapshot_id:
+          type: string
+        cursor_start:
+          type: string
+        cursor_end:
+          type: string
+        upserts:
+          type: integer
+          format: int64
+          description: Records received.
+        changed:
+          type: integer
+          format: int64
+          description: Records that changed what meta had stored.
+        removals:
+          type: integer
+          format: int64
+        merges:
+          type: integer
+          format: int64
+        skipped:
+          type: integer
+          format: int64
+        marked_removed:
+          type: integer
+          format: int64
+          description: Records marked removed because a full snapshot no longer had them.
+        error:
+          type: string
+        notices:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetaNotice"
+        progress:
+          type: object
+          additionalProperties: true
+          description: The plugin's last progress report (its own fields, e.g. bytes downloaded).
+    MetaNotice:
+      type: object
+      required: [level, message]
+      properties:
+        level:
+          type: string
+        message:
+          type: string
+        ref:
+          type: string
+        at:
+          type: string
+          format: date-time
+    MetaServiceHealth:
+      type: object
+      required: [status, components]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down, unknown]
+        version:
+          type: string
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetaComponentHealth"
+    MetaComponentHealth:
+      type: object
+      required: [name, kind, status, details]
+      properties:
+        name:
+          type: string
+          description: '"database", "search" or "provider:<id>".'
+        kind:
+          type: string
+        status:
+          type: string
+          enum: [ok, degraded, down, unknown]
+        message:
+          type: string
+        latency_ms:
+          type: integer
+        checked_at:
+          type: string
+          format: date-time
+        details:
+          type: object
+          additionalProperties:
+            type: string
+    MetaEntryRefresh:
+      type: object
+      required: [refreshed, failed]
+      properties:
+        refreshed:
+          type: array
+          items:
+            type: string
+          description: Providers that returned fresh data.
+        failed:
+          type: object
+          additionalProperties:
+            type: string
+          description: Providers that failed, with the reason.
+    DuplicatePage:
+      type: object
+      required: [pairs, next_page_token, total_size]
+      properties:
+        pairs:
+          type: array
+          items:
+            $ref: "#/components/schemas/DuplicatePair"
+        next_page_token:
+          type: string
+        total_size:
+          type: integer
+          format: int64
+    DuplicatePair:
+      type: object
+      required: [id, entry_a, entry_b, status, score, signals, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        entry_a:
+          $ref: "#/components/schemas/CatalogEntrySummary"
+        entry_b:
+          $ref: "#/components/schemas/CatalogEntrySummary"
+        status:
+          type: string
+          enum: [open, confirmed, dismissed, unknown]
+        score:
+          type: number
+          description: 0..1, how likely meta's own comparison thinks the two are one work.
+        signals:
+          $ref: "#/components/schemas/DuplicateSignals"
+        verdict:
+          $ref: "#/components/schemas/DuplicateVerdict"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        decided_at:
+          type: string
+          format: date-time
+        decided_by:
+          type: string
+        note:
+          type: string
+    DuplicateSignals:
+      type: object
+      required: [title, people, shared_people, shared_ids, same_provider]
+      properties:
+        title:
+          type: number
+          description: Best title similarity (1 is the same normalized title).
+        title_a:
+          type: string
+        title_b:
+          type: string
+        people:
+          type: number
+          description: Share of credited people in common (0..1); -1 when a side has none.
+        shared_people:
+          type: array
+          items:
+            type: string
+        year_a:
+          type: integer
+        year_b:
+          type: integer
+        type_a:
+          type: string
+        type_b:
+          type: string
+        language_a:
+          type: string
+        language_b:
+          type: string
+        shared_ids:
+          type: array
+          description: IDs at another site both report.
+          items:
+            type: string
+        same_provider:
+          type: boolean
+    DuplicateVerdict:
+      type: object
+      required: [judge, same, choice, probabilities]
+      properties:
+        judge:
+          type: string
+        model:
+          type: string
+        same:
+          type: number
+          description: Probability that the two are one work.
+        choice:
+          type: string
+          description: same_work, related_work or different.
+        probabilities:
+          type: object
+          additionalProperties:
+            type: number
+        confidence:
+          type: number
+        tokens:
+          type: integer
+          format: int64
+        at:
+          type: string
+          format: date-time
+    ConfirmDuplicateRequest:
+      type: object
+      properties:
+        keep:
+          type: string
+          enum: [a, b]
+          description: The entry that stays; absent keeps the more popular one.
+        note:
+          type: string
+          maxLength: 2000
+    DuplicateNote:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 2000
+    ConfirmedDuplicate:
+      type: object
+      required: [pair, entry_id]
+      properties:
+        pair:
+          $ref: "#/components/schemas/DuplicatePair"
+        entry_id:
+          type: string
+          description: The entry the two are now.
+    DuplicateJudge:
+      type: object
+      required: [enabled, kind, has_api_key, covers, origin]
+      properties:
+        enabled:
+          type: boolean
+        kind:
+          type: string
+          description: The kind of model service, as meta names it.
+        url:
+          type: string
+        model:
+          type: string
+        has_api_key:
+          type: boolean
+        covers:
+          type: boolean
+          description: Send cover images to models that take them.
+        origin:
+          type: string
+          description: Where the settings come from, "config" or "admin".
+    DuplicateJudgeSettings:
+      type: object
+      required: [enabled, kind]
+      properties:
+        enabled:
+          type: boolean
+        kind:
+          type: string
+          maxLength: 100
+        url:
+          type: string
+          maxLength: 2000
+        model:
+          type: string
+          maxLength: 200
+        api_key:
+          type: string
+          maxLength: 2000
+          description: Never returned; empty keeps the stored one.
+        covers:
+          type: boolean
+    DuplicateJudgeTest:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        error:
+          type: string
+        verdict:
+          $ref: "#/components/schemas/DuplicateVerdict"
+    SearchEngineSettings:
+      type: object
+      required: [backend]
+      properties:
+        backend:
+          type: string
+          enum: [postgres, typesense, meilisearch]
+        url:
+          type: string
+          maxLength: 2000
+          description: The engine's URL; meta talks to it, browsers never do.
+        api_key:
+          type: string
+          maxLength: 2000
+          description: Never returned; empty keeps the stored one.
+        index_prefix:
+          type: string
+          maxLength: 100
+        browse:
+          type: string
+          enum: [facets, engine, postgres]
+          description: Who serves browsing without search text.
+    MetaSearchEngine:
+      type: object
+      required: [settings, status]
+      properties:
+        settings:
+          type: object
+          required: [backend, has_api_key, origin]
+          properties:
+            backend:
+              type: string
+            url:
+              type: string
+            has_api_key:
+              type: boolean
+            index_prefix:
+              type: string
+            browse:
+              type: string
+            origin:
+              type: string
+              description: Where the settings come from, "config" or "admin".
+        status:
+          $ref: "#/components/schemas/SearchEngineStatus"
+    SearchEngineStatus:
+      type: object
+      required: [backend, typo_tolerance, substring, facets, ready, reachable, degraded, documents, pending, applied]
+      properties:
+        backend:
+          type: string
+          description: The backend answering searches now.
+        typo_tolerance:
+          type: boolean
+        substring:
+          type: boolean
+        facets:
+          type: boolean
+        ready:
+          type: boolean
+          description: The index is built and searches use it.
+        reachable:
+          type: boolean
+        error:
+          type: string
+        error_at:
+          type: string
+          format: date-time
+        degraded:
+          type: boolean
+          description: Recent queries failed and the database answered them.
+        index:
+          type: string
+        documents:
+          type: integer
+          format: int64
+        built_at:
+          type: string
+          format: date-time
+        pending:
+          type: integer
+          format: int64
+          description: Entry changes waiting for the engine.
+        lag_seconds:
+          type: number
+          description: The age of the oldest pending change.
+        applied:
+          type: integer
+          format: int64
+        indexer_error:
+          type: string
+        indexer_error_at:
+          type: string
+          format: date-time
+    SearchEngineTest:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        error:
+          type: string
+    PackageDetails:
+      type: object
+      description: Set on installed packages.
+      properties:
+        signing_fingerprint:
+          type: string
+        api_version:
+          type: string
+          description: The version of the API the package was built for.
+        installed_at:
+          type: string
+          format: date-time
+        sha256:
+          type: string
+        origin_id:
+          type: string
+          description: The origin it was installed from.
+    PackageOrigin:
+      type: object
+      required: [id, name, package_count]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        refreshed_at:
+          type: string
+          format: date-time
+        error:
+          type: string
+          description: Why the last refresh failed.
+        package_count:
+          type: integer
+        signing_key_fingerprint:
+          type: string
+          description: The pinned signing key of its packages.
+    PackageOriginList:
+      type: object
+      required: [origins]
+      properties:
+        origins:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackageOrigin"
+    SetHealthCheckRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
     SeriesMatchRef:
       type: object
       description: How a work already knows a series.

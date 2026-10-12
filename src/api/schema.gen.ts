@@ -798,7 +798,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The solvers */
+        /**
+         * The solvers
+         * @description Shared ones; with `include_custom` also custom ones; with `owner_kind` and `owner_id` only that owner's custom ones.
+         */
         get: operations["listSolvers"];
         put?: never;
         /**
@@ -879,7 +882,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The proxys */
+        /**
+         * The proxys
+         * @description Shared ones; with `include_custom` also custom ones; with `owner_kind` and `owner_id` only that owner's custom ones.
+         */
         get: operations["listProxies"];
         put?: never;
         /**
@@ -1080,6 +1086,418 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/meta/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The metadata service's providers
+         * @description Each with its plugin, health, sync schedules (set in meta's configuration, read-only here), record count and last sync runs. Start a sync with `POST /system/meta/providers/{provider}/sync` or through the jobs.
+         */
+        get: operations["listMetaProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/sync-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Provider sync runs, newest first */
+        get: operations["listMetaSyncRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/sync-runs/{sync_run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One sync run in full */
+        get: operations["getMetaSyncRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The metadata service's health, per component
+         * @description Its database, its search backend and each provider's plugin.
+         */
+        get: operations["getMetaHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/entries/{entry_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fetch fresh data for one catalogue entry from its providers now */
+        post: operations["refreshMetaEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pairs of catalogue entries the metadata service suspects are one work
+         * @description Open pairs by default. Confirming merges a pair for good; dismissing marks them different works (reopen takes that back).
+         */
+        get: operations["listMetaDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/duplicates/{pair_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One pair, both entries side by side */
+        get: operations["getMetaDuplicate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/duplicates/{pair_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge a pair into one entry
+         * @description Can't be undone: the other entry's records move over and its ID points to the one that stays. Ask the admin to confirm first.
+         */
+        post: operations["confirmMetaDuplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/duplicates/{pair_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a pair as different works */
+        post: operations["dismissMetaDuplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/duplicates/{pair_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take back a dismissal
+         * @description Only dismissed pairs (`409`, code `pair_decided`, for others).
+         */
+        post: operations["reopenMetaDuplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/duplicate-judge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The decision model that rates duplicate pairs
+         * @description Its API key is never returned (`has_api_key`).
+         */
+        get: operations["getMetaDuplicateJudge"];
+        /**
+         * Save the decision model settings
+         * @description They win over meta's configuration until reset. An empty API key keeps the stored one. Off by default; nothing is sent to a model until it's on.
+         */
+        put: operations["putMetaDuplicateJudge"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/duplicate-judge/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the model about a made-up pair, without saving */
+        post: operations["testMetaDuplicateJudge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/duplicate-judge/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forget the saved settings; meta's configuration applies again */
+        post: operations["resetMetaDuplicateJudge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/search-engine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The metadata service's search engine and the state of its index
+         * @description The engine's API key is never returned (`has_api_key`). Rebuild the index with the `search-rebuild` job.
+         */
+        get: operations["getMetaSearchEngine"];
+        /**
+         * Save the search engine settings
+         * @description They win over meta's configuration until reset. An empty API key keeps the stored one.
+         */
+        put: operations["putMetaSearchEngine"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/search-engine/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check search engine settings without saving them */
+        post: operations["testMetaSearchEngine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/search-engine/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forget the saved settings; meta's configuration applies again */
+        post: operations["resetMetaSearchEngine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The metadata service's background jobs
+         * @description meta's jobs, in the same shape as the server's own (`/jobs`). Calls meta: `503` when it isn't connected or can't be reached. Schedules are set in meta's configuration and shown read-only (`schedule.source`).
+         */
+        get: operations["listMetaJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One of the metadata service's jobs */
+        get: operations["getMetaJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/jobs/{job_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A metadata service job's runs, newest first */
+        get: operations["listMetaJobRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/jobs/{job_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run one of the metadata service's jobs now
+         * @description `409`, code `already_running`, with `current_run_id`, when it runs already; e.g. `search-rebuild` rebuilds the search index.
+         */
+        post: operations["runMetaJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/job-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One run of a metadata service job, in full
+         * @description No events come for meta's runs; poll while it runs.
+         */
+        get: operations["getMetaJobRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/meta/job-runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a running run of a metadata service job */
+        post: operations["cancelMetaJobRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sources/{source_id}/settings": {
         parameters: {
             query?: never;
@@ -1126,6 +1544,98 @@ export interface paths {
          */
         get: operations["getSourceNetwork"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/origins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Where a plugin's packages come from (e.g. its stores)
+         * @description With each origin's state: last refresh, its error, how many packages it offers, the pinned signing key. Origins are added and removed in the plugin's settings. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        get: operations["listPackageOrigins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/origins/{origin_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                origin_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch an origin's package list again now
+         * @description A store that can't be reached answers `502`, code `store_fetch_failed`; a broken one `store_invalid`. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        post: operations["refreshPackageOrigin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/packages/{package_id}/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Load an installed package again
+         * @description Without downloading it: retries a failed load or applies settings that need a reload. `409`, code `not_installed`, for a package that isn't installed. The plugin is synced after. Needs a plugin with the `packages` capability (else `422`, code `no_packages`) that is turned on (else `409`, code `plugin_disabled`).
+         */
+        post: operations["reloadPackage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/{source_id}/health-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Turn a source's scheduled health checks on or off
+         * @description For plugins with the `health_checks` capability (else `422`, code `unsupported`). Shown as `health.checks_disabled`. Run a check now through the plugin's jobs.
+         */
+        put: operations["setSourceHealthCheck"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2709,6 +3219,8 @@ export interface components {
         JobSchedule: {
             /** @description Absent for jobs run by hand only. */
             interval_seconds?: number;
+            /** @description A cron schedule (the connected services' jobs); absent otherwise. */
+            cron?: string;
             enabled: boolean;
             /** @description Where the schedule is configured (read-only here). */
             source?: string;
@@ -2906,6 +3418,8 @@ export interface components {
             message?: string;
             /** Format: date-time */
             checked_at?: string;
+            /** @description Its scheduled health checks are turned off (plugins with the `health_checks` capability). */
+            checks_disabled?: boolean;
         };
         SourceInfo: {
             /** @description "plugin:source". */
@@ -2970,6 +3484,7 @@ export interface components {
             enabled_langs: string[];
             /** @description Why an installed package isn't working. */
             error?: string;
+            details?: components["schemas"]["PackageDetails"];
             /** @description The server's URL for the package's icon, when it has one. */
             icon_url?: string;
             /**
@@ -2999,8 +3514,9 @@ export interface components {
         PackageLanguages: {
             enabled_langs: string[];
         };
-        /** @description A challenge solver (FlareSolverr-compatible). */
+        /** @description A challenge solver (FlareSolverr-compatible), shared or custom to one owner. */
         Solver: {
+            owner?: components["schemas"]["ProfileOwner"];
             id: string;
             name: string;
             type: components["schemas"]["SolverType"];
@@ -3023,6 +3539,8 @@ export interface components {
             solvers: components["schemas"]["Solver"][];
         };
         NewSolver: {
+            /** @description Makes it custom to one plugin, extension, source or provider (only usable by profiles of that owner, removed with its plugin). */
+            owner?: components["schemas"]["ProfileOwner"];
             id: string;
             name: string;
             type: components["schemas"]["SolverType"];
@@ -3039,8 +3557,9 @@ export interface components {
             max_timeout_seconds?: number;
             as_response_fallback?: boolean;
         };
-        /** @description An HTTP, HTTPS or SOCKS5 proxy. The password is never returned. */
+        /** @description An HTTP, HTTPS or SOCKS5 proxy, shared or custom to one owner. The password is never returned. */
         Proxy: {
+            owner?: components["schemas"]["ProfileOwner"];
             id: string;
             name: string;
             /** @description http://, https:// or socks5://host:port, without credentials. */
@@ -3056,6 +3575,8 @@ export interface components {
             proxies: components["schemas"]["Proxy"][];
         };
         NewProxy: {
+            /** @description Makes it custom to one plugin, extension, source or provider (only usable by profiles of that owner, removed with its plugin). */
+            owner?: components["schemas"]["ProfileOwner"];
             id: string;
             name: string;
             url: string;
@@ -3315,6 +3836,302 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        MetaProviderList: {
+            providers: components["schemas"]["MetaProviderDetail"][];
+        };
+        MetaProviderDetail: {
+            id: string;
+            /** @description How meta runs its plugin (e.g. in process or as a service). */
+            mode: string;
+            plugin_id?: string;
+            plugin_name?: string;
+            plugin_version?: string;
+            /** @enum {string} */
+            health: "ok" | "degraded" | "down" | "unknown";
+            health_message?: string;
+            /** @description Sync schedules per ingestion kind, from meta's configuration (read-only). */
+            schedules: {
+                [key: string]: string;
+            };
+            /** Format: int64 */
+            record_count: number;
+            last_runs: components["schemas"]["MetaSyncRun"][];
+        };
+        MetaSyncRunList: {
+            runs: components["schemas"]["MetaSyncRun"][];
+            next_page_token: string;
+        };
+        MetaSyncRun: {
+            id: string;
+            provider: string;
+            /** @description The ingestion kind, e.g. dump or delta. */
+            kind: string;
+            /** @enum {string} */
+            status: "running" | "succeeded" | "failed" | "cancelled" | "unknown";
+            trigger: string;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            finished_at?: string;
+            snapshot_id?: string;
+            cursor_start?: string;
+            cursor_end?: string;
+            /**
+             * Format: int64
+             * @description Records received.
+             */
+            upserts: number;
+            /**
+             * Format: int64
+             * @description Records that changed what meta had stored.
+             */
+            changed: number;
+            /** Format: int64 */
+            removals: number;
+            /** Format: int64 */
+            merges: number;
+            /** Format: int64 */
+            skipped: number;
+            /**
+             * Format: int64
+             * @description Records marked removed because a full snapshot no longer had them.
+             */
+            marked_removed: number;
+            error?: string;
+            notices: components["schemas"]["MetaNotice"][];
+            /** @description The plugin's last progress report (its own fields, e.g. bytes downloaded). */
+            progress?: {
+                [key: string]: unknown;
+            };
+        };
+        MetaNotice: {
+            level: string;
+            message: string;
+            ref?: string;
+            /** Format: date-time */
+            at?: string;
+        };
+        MetaServiceHealth: {
+            /** @enum {string} */
+            status: "ok" | "degraded" | "down" | "unknown";
+            version?: string;
+            components: components["schemas"]["MetaComponentHealth"][];
+        };
+        MetaComponentHealth: {
+            /** @description "database", "search" or "provider:<id>". */
+            name: string;
+            kind: string;
+            /** @enum {string} */
+            status: "ok" | "degraded" | "down" | "unknown";
+            message?: string;
+            latency_ms?: number;
+            /** Format: date-time */
+            checked_at?: string;
+            details: {
+                [key: string]: string;
+            };
+        };
+        MetaEntryRefresh: {
+            /** @description Providers that returned fresh data. */
+            refreshed: string[];
+            /** @description Providers that failed, with the reason. */
+            failed: {
+                [key: string]: string;
+            };
+        };
+        DuplicatePage: {
+            pairs: components["schemas"]["DuplicatePair"][];
+            next_page_token: string;
+            /** Format: int64 */
+            total_size: number;
+        };
+        DuplicatePair: {
+            /** Format: int64 */
+            id: number;
+            entry_a: components["schemas"]["CatalogEntrySummary"];
+            entry_b: components["schemas"]["CatalogEntrySummary"];
+            /** @enum {string} */
+            status: "open" | "confirmed" | "dismissed" | "unknown";
+            /** @description 0..1, how likely meta's own comparison thinks the two are one work. */
+            score: number;
+            signals: components["schemas"]["DuplicateSignals"];
+            verdict?: components["schemas"]["DuplicateVerdict"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: date-time */
+            decided_at?: string;
+            decided_by?: string;
+            note?: string;
+        };
+        DuplicateSignals: {
+            /** @description Best title similarity (1 is the same normalized title). */
+            title: number;
+            title_a?: string;
+            title_b?: string;
+            /** @description Share of credited people in common (0..1); -1 when a side has none. */
+            people: number;
+            shared_people: string[];
+            year_a?: number;
+            year_b?: number;
+            type_a?: string;
+            type_b?: string;
+            language_a?: string;
+            language_b?: string;
+            /** @description IDs at another site both report. */
+            shared_ids: string[];
+            same_provider: boolean;
+        };
+        DuplicateVerdict: {
+            judge: string;
+            model?: string;
+            /** @description Probability that the two are one work. */
+            same: number;
+            /** @description same_work, related_work or different. */
+            choice: string;
+            probabilities: {
+                [key: string]: number;
+            };
+            confidence?: number;
+            /** Format: int64 */
+            tokens?: number;
+            /** Format: date-time */
+            at?: string;
+        };
+        ConfirmDuplicateRequest: {
+            /**
+             * @description The entry that stays; absent keeps the more popular one.
+             * @enum {string}
+             */
+            keep?: "a" | "b";
+            note?: string;
+        };
+        DuplicateNote: {
+            note?: string;
+        };
+        ConfirmedDuplicate: {
+            pair: components["schemas"]["DuplicatePair"];
+            /** @description The entry the two are now. */
+            entry_id: string;
+        };
+        DuplicateJudge: {
+            enabled: boolean;
+            /** @description The kind of model service, as meta names it. */
+            kind: string;
+            url?: string;
+            model?: string;
+            has_api_key: boolean;
+            /** @description Send cover images to models that take them. */
+            covers: boolean;
+            /** @description Where the settings come from, "config" or "admin". */
+            origin: string;
+        };
+        DuplicateJudgeSettings: {
+            enabled: boolean;
+            kind: string;
+            url?: string;
+            model?: string;
+            /** @description Never returned; empty keeps the stored one. */
+            api_key?: string;
+            covers?: boolean;
+        };
+        DuplicateJudgeTest: {
+            ok: boolean;
+            error?: string;
+            verdict?: components["schemas"]["DuplicateVerdict"];
+        };
+        SearchEngineSettings: {
+            /** @enum {string} */
+            backend: "postgres" | "typesense" | "meilisearch";
+            /** @description The engine's URL; meta talks to it, browsers never do. */
+            url?: string;
+            /** @description Never returned; empty keeps the stored one. */
+            api_key?: string;
+            index_prefix?: string;
+            /**
+             * @description Who serves browsing without search text.
+             * @enum {string}
+             */
+            browse?: "facets" | "engine" | "postgres";
+        };
+        MetaSearchEngine: {
+            settings: {
+                backend: string;
+                url?: string;
+                has_api_key: boolean;
+                index_prefix?: string;
+                browse?: string;
+                /** @description Where the settings come from, "config" or "admin". */
+                origin: string;
+            };
+            status: components["schemas"]["SearchEngineStatus"];
+        };
+        SearchEngineStatus: {
+            /** @description The backend answering searches now. */
+            backend: string;
+            typo_tolerance: boolean;
+            substring: boolean;
+            facets: boolean;
+            /** @description The index is built and searches use it. */
+            ready: boolean;
+            reachable: boolean;
+            error?: string;
+            /** Format: date-time */
+            error_at?: string;
+            /** @description Recent queries failed and the database answered them. */
+            degraded: boolean;
+            index?: string;
+            /** Format: int64 */
+            documents: number;
+            /** Format: date-time */
+            built_at?: string;
+            /**
+             * Format: int64
+             * @description Entry changes waiting for the engine.
+             */
+            pending: number;
+            /** @description The age of the oldest pending change. */
+            lag_seconds?: number;
+            /** Format: int64 */
+            applied: number;
+            indexer_error?: string;
+            /** Format: date-time */
+            indexer_error_at?: string;
+        };
+        SearchEngineTest: {
+            ok: boolean;
+            error?: string;
+        };
+        /** @description Set on installed packages. */
+        PackageDetails: {
+            signing_fingerprint?: string;
+            /** @description The version of the API the package was built for. */
+            api_version?: string;
+            /** Format: date-time */
+            installed_at?: string;
+            sha256?: string;
+            /** @description The origin it was installed from. */
+            origin_id?: string;
+        };
+        PackageOrigin: {
+            id: string;
+            name: string;
+            url?: string;
+            /** Format: date-time */
+            refreshed_at?: string;
+            /** @description Why the last refresh failed. */
+            error?: string;
+            package_count: number;
+            /** @description The pinned signing key of its packages. */
+            signing_key_fingerprint?: string;
+        };
+        PackageOriginList: {
+            origins: components["schemas"]["PackageOrigin"][];
+        };
+        SetHealthCheckRequest: {
+            enabled: boolean;
         };
         /** @description How a work already knows a series. */
         SeriesMatchRef: {
@@ -5065,7 +5882,11 @@ export interface operations {
     };
     listSolvers: {
         parameters: {
-            query?: never;
+            query?: {
+                include_custom?: boolean;
+                owner_kind?: components["schemas"]["ProfileOwnerKind"];
+                owner_id?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5230,7 +6051,11 @@ export interface operations {
     };
     listProxies: {
         parameters: {
-            query?: never;
+            query?: {
+                include_custom?: boolean;
+                owner_kind?: components["schemas"]["ProfileOwnerKind"];
+                owner_id?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5630,6 +6455,583 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    listMetaProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The providers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaProviderList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMetaSyncRuns: {
+        parameters: {
+            query?: {
+                /** @description Only this provider's runs. */
+                provider?: string;
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaSyncRunList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetaSyncRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sync_run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaSyncRun"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetaHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The health. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaServiceHealth"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    refreshMetaEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The metadata service's entry ID. */
+                entry_id: components["parameters"]["EntryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Which providers answered and which failed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaEntryRefresh"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMetaDuplicates: {
+        parameters: {
+            query?: {
+                status?: "open" | "confirmed" | "dismissed";
+                min_score?: number;
+                /** @description Only pairs the decision model rated. */
+                judged_only?: boolean;
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of pairs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicatePage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetaDuplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pair_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pair. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicatePair"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    confirmMetaDuplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pair_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ConfirmDuplicateRequest"];
+            };
+        };
+        responses: {
+            /** @description Merged. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmedDuplicate"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    dismissMetaDuplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pair_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DuplicateNote"];
+            };
+        };
+        responses: {
+            /** @description Dismissed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicatePair"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    reopenMetaDuplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pair_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicatePair"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetaDuplicateJudge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings in force. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateJudge"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    putMetaDuplicateJudge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateJudgeSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateJudge"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testMetaDuplicateJudge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateJudgeSettings"];
+            };
+        };
+        responses: {
+            /** @description How it went. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateJudgeTest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    resetMetaDuplicateJudge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings in force now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateJudge"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetaSearchEngine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings in force and the engine's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaSearchEngine"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    putMetaSearchEngine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchEngineSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaSearchEngine"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testMetaSearchEngine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchEngineSettings"];
+            };
+        };
+        responses: {
+            /** @description How it went. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchEngineTest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    resetMetaSearchEngine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings in force now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaSearchEngine"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMetaJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The jobs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetaJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMetaJobRuns: {
+        parameters: {
+            query?: {
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+                status?: components["schemas"]["JobRunStatus"];
+            };
+            header?: never;
+            path: {
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    runMetaJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RunJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunSummary"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetaJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRun"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    cancelMetaJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelling. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunSummary"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     getSourceSettings: {
         parameters: {
             query?: never;
@@ -5701,6 +7103,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SourceNetwork"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPackageOrigins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The origins. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackageOriginList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    refreshPackageOrigin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                origin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The origin after the refresh. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackageOrigin"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    reloadPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The package after the reload. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Package"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setSourceHealthCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetHealthCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description The source. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceInfo"];
                 };
             };
             default: components["responses"]["Problem"];

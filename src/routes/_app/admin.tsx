@@ -8,6 +8,7 @@ export const ADMIN_PAGES = [
   { to: "/admin/plugins", label: "Plugins" },
   { to: "/admin/sources", label: "Sources" },
   { to: "/admin/storage", label: "Storage" },
+  { to: "/admin/network", label: "Network" },
   { to: "/admin/jobs", label: "Jobs" },
   { to: "/admin/queue", label: "Queue" },
   { to: "/admin/system", label: "System" },

@@ -27,6 +27,7 @@ import {
 } from "./data";
 import { initialStorages } from "./downloads";
 import { initialJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
+import { initialNetwork, type NetworkState } from "./network";
 import { initialPackageSources, initialPackages, type MockPackage } from "./packages";
 
 type S = components["schemas"];
@@ -44,7 +45,7 @@ export interface MockLibraryEntry {
   auto_download: boolean;
 }
 
-export interface MockDb extends JobsState {
+export interface MockDb extends JobsState, NetworkState {
   users: S["User"][];
   passwords: Record<string, string>;
   /** The signed-in user's ID; undefined when signed out. */
@@ -125,6 +126,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     readerSettings: {},
     preferences: {},
     storages: initialStorages(),
+    ...initialNetwork(),
     jobs: initialJobs(),
     runs: initialRuns(),
     tasks: initialTasks(),

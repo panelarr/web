@@ -33,6 +33,16 @@ Sources become an admin concern; plugins that host many sites get an Extensions 
 - [x] **R3. Reader chrome:** a thin top bar (series and chapter, bookmark, a menu with fullscreen, keep the screen on and the series page) and a bottom bar (the page slider between the chapter buttons, then icons for the chapters, the layout and the settings), hiding while reading; the chapters in a sheet to jump to; the layout switched in one tap for the series; one settings sheet with Layout and General tabs under the scope switch (this series, the source, everywhere), each setting set at that scope marked and reset on its own.
 - [ ] **R4. Library:** unread badges, a continue button, one filter / sort / display sheet.
 
+## Network admin and plugin settings (GOAL-0017)
+
+Panelarr's own proxies, solvers and network profiles, offered to every plugin; chosen per plugin, extension, source or provider.
+
+- [x] **Per-source settings** (pulled forward): a source's own settings from its plugin's schema, on its row, its page and its extension.
+- [x] **N1. Admin → Network:** profiles (shared, or custom ones on request, each saying where it's used), proxies (password write-only, test by connecting or fetching a page), solvers (tested before saving), and the profile for everything; nothing used until chosen.
+- [ ] **N2. Pickers:** a plugin's Network tab, an extension's details, a source's settings and the metadata service's page: what's in effect and from where, inherit, the plugin's own settings, a shared profile, or a custom one made in place; push state.
+- [ ] **N3. Custom solvers and proxies** for one plugin, on its Network tab.
+- [ ] **N4. Finish:** a journey, docs.
+
 ## Working assumptions
 
 Settled for now, cheap to change:
