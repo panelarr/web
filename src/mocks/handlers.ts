@@ -8,6 +8,7 @@ import { continueChapter, seriesChapters, unifiedChapters } from "./chapters";
 import { health, sources as sourceFixtures, systemInfo } from "./data";
 import { commit, currentUser, db, type MockInvite, newId, syncSessionCookie } from "./db";
 import { downloadItem, queueDownload } from "./downloads";
+import { initialDuplicates, judgeTest } from "./duplicates";
 import { emit, onMockEvent } from "./events";
 import { finishRun, type JobStore, queueState, startRun, taskEvent } from "./jobs";
 import { metaHealth, providerDetails, startMetaSync } from "./meta";
@@ -678,6 +679,129 @@ export const operations: MockOperation[] = [
     if (user instanceof Response) return user;
     const run = db().metaSyncRuns.find((r) => r.id === params.sync_run_id);
     return run ? json(run) : problem(404, "not_found", "Not found", "No such sync run.");
+  }),
+
+  // meta's duplicates and their judge
+
+  op("get", "/system/meta/duplicates", ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const url = new URL(request.url);
+    const status = url.searchParams.get("status") ?? "open";
+    const min = Number(url.searchParams.get("min_score") ?? 0);
+    const judged = url.searchParams.get("judged_only") === "true";
+    const pairs = db()
+      .duplicates.filter((p) => p.status === status && p.score >= min && (!judged || p.verdict))
+      .sort((a, b) => b.score - a.score);
+    const { items, next } = paginate(pairs, url);
+    return json<S["DuplicatePage"]>({ pairs: items, next_page_token: next, total_size: pairs.length });
+  }),
+
+  op("get", "/system/meta/duplicates/{pair_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = db().duplicates.find((p) => p.id === Number(params.pair_id));
+    return found ? json(found) : problem(404, "not_found", "Not found", "No such pair.");
+  }),
+
+  op("post", "/system/meta/duplicates/{pair_id}/confirm", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = db().duplicates.find((p) => p.id === Number(params.pair_id));
+    if (!found) return problem(404, "not_found", "Not found", "No such pair.");
+    if (found.status !== "open") return problem(409, "pair_decided", "Already decided", "This pair was decided.");
+    const text = await request.text();
+    const body = (text ? JSON.parse(text) : {}) as S["ConfirmDuplicateRequest"];
+    // Without a choice, the more popular one (here: the better rated) stays.
+    const keep = body.keep ?? ((found.entry_a.rating ?? 0) >= (found.entry_b.rating ?? 0) ? "a" : "b");
+    Object.assign(found, {
+      status: "confirmed",
+      decided_at: now(),
+      decided_by: user.username,
+      updated_at: now(),
+      ...(body.note ? { note: body.note } : {}),
+    });
+    commit();
+    return json<S["ConfirmedDuplicate"]>({
+      pair: found,
+      entry_id: keep === "a" ? found.entry_a.id : found.entry_b.id,
+    });
+  }),
+
+  op("post", "/system/meta/duplicates/{pair_id}/dismiss", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = db().duplicates.find((p) => p.id === Number(params.pair_id));
+    if (!found) return problem(404, "not_found", "Not found", "No such pair.");
+    if (found.status !== "open") return problem(409, "pair_decided", "Already decided", "This pair was decided.");
+    const text = await request.text();
+    const body = (text ? JSON.parse(text) : {}) as S["DuplicateNote"];
+    Object.assign(found, {
+      status: "dismissed",
+      decided_at: now(),
+      decided_by: user.username,
+      updated_at: now(),
+      ...(body.note ? { note: body.note } : {}),
+    });
+    commit();
+    return json(found);
+  }),
+
+  op("post", "/system/meta/duplicates/{pair_id}/reopen", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = db().duplicates.find((p) => p.id === Number(params.pair_id));
+    if (!found) return problem(404, "not_found", "Not found", "No such pair.");
+    if (found.status !== "dismissed")
+      return problem(409, "pair_decided", "Not dismissed", "Only dismissals can be taken back.");
+    found.status = "open";
+    found.updated_at = now();
+    delete found.decided_at;
+    delete found.decided_by;
+    delete found.note;
+    commit();
+    return json(found);
+  }),
+
+  op("get", "/system/meta/duplicate-judge", () => {
+    const user = requireAdmin();
+    return user instanceof Response ? user : json(db().judge);
+  }),
+
+  op("put", "/system/meta/duplicate-judge", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const body = (await request.json()) as S["DuplicateJudgeSettings"];
+    if (!body.kind) return problem(400, "invalid_request", "Invalid settings", "kind: required");
+    const d = db();
+    if (body.api_key) d.judgeKey = body.api_key;
+    d.judge = {
+      enabled: body.enabled,
+      kind: body.kind,
+      ...(body.url ? { url: body.url } : {}),
+      ...(body.model ? { model: body.model } : {}),
+      has_api_key: d.judgeKey !== undefined || d.judge.has_api_key,
+      covers: body.covers ?? false,
+      origin: "admin",
+    };
+    commit();
+    return json(d.judge);
+  }),
+
+  op("post", "/system/meta/duplicate-judge/test", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    return json(judgeTest((await request.json()) as S["DuplicateJudgeSettings"]));
+  }),
+
+  op("post", "/system/meta/duplicate-judge/reset", () => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    d.judge = initialDuplicates().judge;
+    d.judgeKey = undefined;
+    commit();
+    return json(d.judge);
   }),
 
   op("get", "/system/meta/health", () => {

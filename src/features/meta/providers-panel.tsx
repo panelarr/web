@@ -49,13 +49,15 @@ const syncLink = (provider: string, sync: string): LinkOptions => ({
 });
 
 /**
- * A schedule from meta's configuration: cron in words (meta runs cron in UTC unless the
- * expression names a zone), anything else as written.
+ * A schedule from meta's configuration: cron or an @ shorthand in words (meta runs cron in UTC
+ * unless the value names a zone), anything else as written.
  */
 function scheduleText(schedule: string): string {
-  const named = /^(CRON_TZ|TZ)=/.test(schedule.trim());
-  const fields = schedule.trim().split(/\s+/).length - (named ? 1 : 0);
-  return fields === 5 ? cronText(schedule, named ? undefined : "UTC") : schedule;
+  const value = schedule.trim();
+  const named = /^(CRON_TZ|TZ)=/.test(value);
+  const expression = named ? value.replace(/^\S+\s+/, "") : value;
+  const cron = expression.startsWith("@") || expression.split(/\s+/).length === 5;
+  return cron ? cronText(value, named ? undefined : "UTC") : value;
 }
 
 /** "312 received · 41 changed · 4 merged": what a run did, leaving out the zeros. */

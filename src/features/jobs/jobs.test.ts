@@ -39,6 +39,16 @@ describe("schedules", () => {
     expect(cronText("10 */6 * * *")).toBe("every 6 hours at :10");
   });
 
+  it("with @ shorthands read like words; @every is an interval, without a zone", () => {
+    expect(cronText("@every 1h")).toBe("every hour");
+    expect(cronText("@every 30m", "UTC")).toBe("every 30 minutes");
+    expect(cronText("@every 1h30m")).toBe("every 90 minutes");
+    expect(cronText("@hourly", "UTC")).toBe("every hour");
+    expect(cronText("@daily", "UTC")).toBe("daily at 00:00 UTC");
+    expect(cronText("@weekly", "UTC")).toBe("every Sunday at 00:00 UTC");
+    expect(cronText("CRON_TZ=Asia/Tokyo @daily")).toBe("daily at 00:00 (Asia/Tokyo)");
+  });
+
   it("from cron name the zone they run in, or say it's the service's own", () => {
     expect(cronText("0 3 * * *", "Europe/Vilnius")).toBe("daily at 03:00 (Europe/Vilnius)");
     expect(cronText("CRON_TZ=Asia/Tokyo 0 3 * * *")).toBe("daily at 03:00 (Asia/Tokyo)");
@@ -50,7 +60,8 @@ describe("schedules", () => {
   it("from cron fall back to the expression, with its zone", () => {
     expect(cronText("0 3 * 1 *", "UTC")).toBe("on schedule 0 3 * 1 * (UTC)");
     expect(cronText("0 3,15 * * *", "UTC")).toBe("on schedule 0 3,15 * * * (UTC)");
-    expect(cronText("@daily", "UTC")).toBe("on schedule @daily (UTC)");
+    expect(cronText("@reboot", "UTC")).toBe("on schedule @reboot (UTC)");
+    expect(cronText("@every soon")).toBe("on schedule @every soon (the service's time zone)");
     expect(cronText("0 25 * * *")).toBe("on schedule 0 25 * * * (the service's time zone)");
   });
 

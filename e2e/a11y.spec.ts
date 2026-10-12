@@ -23,6 +23,8 @@ const PAGES = [
   "/admin/metadata",
   "/admin/metadata?tab=providers",
   "/admin/metadata?tab=providers&provider=example-provider&sync=sr-102",
+  "/admin/metadata?tab=duplicates",
+  "/admin/metadata?tab=duplicates&pair=1",
   "/admin/metadata?tab=jobs",
   "/admin/metadata?tab=jobs&job=duplicates-scan",
   "/admin/plugins/stores?tab=jobs",

@@ -148,10 +148,20 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
     "/admin/plugins/stores?tab=jobs",
     "/admin/plugins/stores?tab=sources",
     "/admin/plugins/stores?tab=jobs&job=source-health",
+    "/admin/metadata?tab=duplicates",
+    "/admin/metadata?tab=duplicates&pair=1",
   ]) {
     await open(path);
     await check(page, path, found);
   }
+  await open("/admin/metadata?tab=duplicates");
+  await page.getByRole("button", { name: "Settings" }).click();
+  await check(page, "decision model", found);
+  await page.keyboard.press("Escape");
+  await open("/admin/metadata?tab=duplicates&pair=1");
+  await page.getByRole("button", { name: "Merge" }).click();
+  await check(page, "merge a pair", found);
+  await page.keyboard.press("Escape");
   await open("/admin/jobs");
   await page
     .locator("[data-slot=card]", { has: page.getByRole("heading", { name: "Clean up" }) })

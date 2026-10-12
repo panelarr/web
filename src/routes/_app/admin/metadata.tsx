@@ -8,16 +8,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type JobsSearch, JobsSection, jobsSearch } from "@/features/jobs/jobs-views";
 import { metaJobs } from "@/features/jobs/service";
 import { JobsContext, type JobsHost } from "@/features/jobs/use-jobs";
+import { DuplicatesPanel, type DuplicatesSearch, duplicatesSearch } from "@/features/meta/duplicates-panel";
 import { MetaHealthCard } from "@/features/meta/meta-health";
 import { ProvidersPanel, type ProvidersSearch, providersSearch } from "@/features/meta/providers-panel";
 import { MetaNetwork } from "@/features/network/meta-network";
 import { MetaConnectionPanel } from "@/features/setup/meta-connection";
 
 /** The metadata service's sections beyond its overview. */
-const TABS = ["providers", "jobs", "network"] as const;
+const TABS = ["providers", "duplicates", "jobs", "network"] as const;
 type MetaTab = (typeof TABS)[number];
 
-interface MetadataSearch extends JobsSearch, ProvidersSearch {
+interface MetadataSearch extends JobsSearch, ProvidersSearch, DuplicatesSearch {
   tab?: MetaTab;
 }
 
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/_app/admin/metadata")({
     if (!tab) return {};
     if (tab === "jobs") return { tab, ...jobsSearch(search) };
     if (tab === "providers") return { tab, ...providersSearch(search) };
+    if (tab === "duplicates") return { tab, ...duplicatesSearch(search) };
     return { tab };
   },
   component: MetadataPage,
@@ -65,6 +67,7 @@ function MetadataPage() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
+            <TabsTrigger value="duplicates">Duplicates</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
             <TabsTrigger value="network">Network</TabsTrigger>
           </TabsList>
@@ -83,6 +86,12 @@ function MetadataPage() {
         </TabsContent>
         <TabsContent value="providers" className="mt-4">
           <ProvidersPanel search={search} />
+        </TabsContent>
+        <TabsContent value="duplicates" className="mt-4">
+          <DuplicatesPanel
+            search={search}
+            onSearch={(change) => void navigate({ search: (prev) => ({ ...prev, ...change }), replace: true })}
+          />
         </TabsContent>
         <TabsContent value="jobs" className="mt-4">
           <JobsContext value={META_JOBS}>

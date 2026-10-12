@@ -26,6 +26,7 @@ import {
   storePlugin,
 } from "./data";
 import { initialStorages } from "./downloads";
+import { initialDuplicates } from "./duplicates";
 import { initialJobs, initialMetaJobs, initialPluginJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
 import { initialMetaSyncRuns } from "./meta";
 import { initialNetwork, type NetworkState } from "./network";
@@ -59,6 +60,10 @@ export interface MockDb extends JobsState, NetworkState {
   syncing: string[];
   /** meta's provider sync runs, newest first. */
   metaSyncRuns: S["MetaSyncRun"][];
+  duplicates: S["DuplicatePair"][];
+  judge: S["DuplicateJudge"];
+  /** The key the admin saved for the duplicate judge (never returned). */
+  judgeKey: string | undefined;
   plugins: S["Plugin"][];
   pluginConfigs: Record<string, S["PluginConfig"]>;
   sources: S["SourceInfo"][];
@@ -114,6 +119,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     meta: clone(metaConnection),
     syncing: [],
     metaSyncRuns: initialMetaSyncRuns(),
+    ...initialDuplicates(),
     plugins: [clone(plugin), clone(storePlugin)],
     pluginConfigs: { [plugin.id]: clone(pluginConfig) },
     sourceSettings: { "example:1001": clone(sourceSettings), "stores:3101": clone(sourceSettings) },

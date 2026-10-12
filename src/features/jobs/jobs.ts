@@ -66,6 +66,36 @@ function zoneText(timeZone: string | undefined): string {
   return timeZone ? ` (${timeZone})` : " (the service's time zone)";
 }
 
+/** "1h30m" (a Go duration, as in "@every 1h30m") in seconds; undefined when it isn't one. */
+function goDuration(text: string): number | undefined {
+  if (!/^(\d+(\.\d+)?(h|m|s|ms))+$/.test(text)) return undefined;
+  const scale: Record<string, number> = { h: 3_600, m: 60, s: 1, ms: 0.001 };
+  let seconds = 0;
+  for (const [, n, , unit] of text.matchAll(/(\d+(\.\d+)?)(ms|h|m|s)/g))
+    seconds += Number(n) * (scale[unit ?? "s"] ?? 0);
+  return Math.round(seconds);
+}
+
+/** The @ shorthands: "@every 1h" is an interval (no zone); "@daily" and the like are cron. */
+function macroText(expression: string, zone: string | undefined): string | undefined {
+  const interval = /^@every\s+(\S+)$/.exec(expression);
+  if (interval) {
+    const seconds = goDuration(interval[1] ?? "");
+    return seconds ? every(seconds) : undefined;
+  }
+  const midnight = `at 00:00${zoneText(zone)}`;
+  const named: Record<string, string> = {
+    "@hourly": "every hour",
+    "@daily": `daily ${midnight}`,
+    "@midnight": `daily ${midnight}`,
+    "@weekly": `every Sunday ${midnight}`,
+    "@monthly": `monthly on day 1 ${midnight}`,
+    "@yearly": `every 1 January ${midnight}`,
+    "@annually": `every 1 January ${midnight}`,
+  };
+  return named[expression.toLowerCase()];
+}
+
 /**
  * A cron schedule in words where it's a common one ("daily at 03:00 UTC", "every Monday at
  * 04:30 UTC", "every 15 minutes"), else as written, with the time zone it runs in: the
@@ -75,6 +105,8 @@ export function cronText(cron: string, timeZone?: string): string {
   const named = /^(?:CRON_TZ|TZ)=(\S+)\s+(.*)$/.exec(cron.trim());
   const expression = named ? (named[2] ?? "") : cron.trim();
   const zone = timeZone ?? named?.[1];
+  const macro = macroText(expression, zone);
+  if (macro) return macro;
   const fields = expression.split(/\s+/);
   const fallback = `on schedule ${expression}${zone ? ` (${zone})` : " (the service's time zone)"}`;
   if (fields.length !== 5) return fallback;

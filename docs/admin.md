@@ -10,7 +10,7 @@ admin key, and reaches plugins through the source contract.
 | Page | What | Shown when |
 |---|---|---|
 | Admin → Jobs | The server's own jobs | always |
-| Admin → Metadata | The metadata service: connection and health, providers and their sync runs, jobs, network | always |
+| Admin → Metadata | The metadata service: connection and health, providers and their sync runs, duplicates and the decision model, jobs, network | always |
 | A catalogue entry | Refresh from providers (admins) | always |
 | Admin → Plugins → a plugin → Extensions | Its stores (refresh) and packages (install, update, reload) | the plugin has `packages` |
 | Admin → Plugins → a plugin → Sources | Its sources' health checks: results, scheduled checks on or off, Check now | the plugin has `health_checks` (Check now also needs `jobs`) |
@@ -77,3 +77,17 @@ that source's ID. Nothing depends on a plugin's job IDs:
 Sources that aren't there now (a language turned off, gone from the plugin) are hidden, as on
 Admin → Sources, behind "Show hidden". The row then follows the run (by polling, as above) and shows the source's new health when it
 ends, with a link to watch the run on the Jobs tab.
+
+## Duplicates
+
+The metadata service pairs up catalogue entries it suspects are one work. The Duplicates tab
+lists the pairs to review, most alike first (filters in the URL: `show`, `min` in percent,
+`judged`), and a pair side by side with why they look alike and, when the decision model is on,
+its verdict. **Merge** can't be undone (the other entry's records move over and its ID points to
+the one that stays), so it asks first and lets the admin pick which stays; **Different works**
+keeps them apart, with a note, and can be taken back.
+
+The decision model's settings (on or off, the kind of service, URL, model, API key, covers) are
+saved in the metadata service and win over its configuration until reset. The key is write-only:
+the form says a key is saved and an empty field keeps it. "Test" asks the model about a made-up
+pair with the settings in the form, without saving them.
