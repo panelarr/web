@@ -190,3 +190,70 @@ export function metaHealth(state: MetaState): S["MetaServiceHealth"] {
     ],
   };
 }
+
+/** meta's search engine as configured: an external engine, a little behind. */
+export function initialSearchEngine(): S["MetaSearchEngine"] {
+  return {
+    settings: {
+      backend: "meilisearch",
+      url: "http://search:7700",
+      has_api_key: true,
+      index_prefix: "meta_",
+      browse: "facets",
+      origin: "config",
+    },
+    status: {
+      backend: "meilisearch",
+      typo_tolerance: true,
+      substring: false,
+      facets: true,
+      ready: true,
+      reachable: true,
+      degraded: false,
+      index: "meta_entries",
+      documents: 47_188,
+      built_at: hoursAgo(50),
+      pending: 1_022,
+      lag_seconds: 340,
+      applied: 120_400,
+    },
+  };
+}
+
+/** Whether meta could use these settings: an engine needs a URL; "wrong" is a rejected key. */
+export function searchEngineTest(settings: S["SearchEngineSettings"]): S["SearchEngineTest"] {
+  if (settings.backend !== "postgres" && !settings.url) return { ok: false, error: "An engine needs its URL." };
+  if (settings.api_key === "wrong") return { ok: false, error: "The engine answered 401: the key was rejected." };
+  return { ok: true };
+}
+
+/** Saves settings over the configuration; the engine answering changes with them. */
+export function saveSearchEngine(engine: S["MetaSearchEngine"], settings: S["SearchEngineSettings"]): void {
+  const postgres = settings.backend === "postgres";
+  engine.settings = {
+    backend: settings.backend,
+    ...(!postgres && settings.url ? { url: settings.url } : {}),
+    has_api_key: !postgres && (Boolean(settings.api_key) || engine.settings.has_api_key),
+    ...(settings.index_prefix ? { index_prefix: settings.index_prefix } : {}),
+    ...(settings.browse ? { browse: settings.browse } : {}),
+    origin: "admin",
+  };
+  engine.status = {
+    ...engine.status,
+    backend: settings.backend,
+    typo_tolerance: !postgres,
+    substring: postgres,
+    ...(postgres ? { index: undefined } : { index: `${settings.index_prefix ?? ""}entries` }),
+  };
+}
+
+/** A rebuild of the index has finished: everything is in it. */
+export function searchRebuilt(engine: S["MetaSearchEngine"]): void {
+  engine.status = {
+    ...engine.status,
+    documents: 48_210,
+    built_at: new Date().toISOString(),
+    pending: 0,
+    lag_seconds: 0,
+  };
+}

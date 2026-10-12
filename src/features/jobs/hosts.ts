@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { pluginJobs, serverJobs } from "./service";
+import { metaJobs, pluginJobs, serverJobs } from "./service";
 import type { JobsHost } from "./use-jobs";
 
 /** The server's own jobs, on their own pages under Admin → Jobs. */
@@ -28,3 +28,14 @@ export function pluginJobsHost(pluginId: string, name: string): JobsHost {
     },
   };
 }
+
+/** The metadata service's jobs, through the server, inside its page's Jobs tab (?tab=jobs&job=…&run=…). */
+export const META_JOBS: JobsHost = {
+  service: metaJobs,
+  nested: true,
+  links: {
+    list: { to: "/admin/metadata", search: { tab: "jobs" } },
+    job: (job) => ({ to: "/admin/metadata", search: { tab: "jobs", job } }),
+    run: (job, run) => ({ to: "/admin/metadata", search: { tab: "jobs", job, run } }),
+  },
+};

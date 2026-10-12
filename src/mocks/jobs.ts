@@ -5,6 +5,7 @@
 import type { components } from "@/api/schema.gen";
 import { adminUser } from "./data";
 import { emit } from "./events";
+import { searchRebuilt } from "./meta";
 
 type S = components["schemas"];
 
@@ -195,6 +196,8 @@ export interface JobsState extends JobStore {
   tasks: S["Task"][];
   /** For plugins' per-source jobs (health checks), which update their sources when done. */
   sources: S["SourceInfo"][];
+  /** For meta's search-rebuild, which brings the index up to date. */
+  searchEngine: S["MetaSearchEngine"];
   pausedKinds: string[];
   metaJobs: JobStore;
   /** By plugin ID, for plugins with the `jobs` capability. */
@@ -269,6 +272,10 @@ export function tickJobs(state: JobsState): boolean {
             "succeeded",
             `${checked.length} checked, ${checked.filter(failing).length} failing`,
           );
+        } else if (store === state.metaJobs && current.summary.job_id === "search-rebuild") {
+          searchRebuilt(state.searchEngine);
+          current.summary.counts = { entries: 48_210 };
+          finishRun(store, current, "succeeded", "Indexed 48210 entries");
         } else {
           current.summary.counts = { works: 12, new_chapters: 3 };
           finishRun(store, current, "succeeded", "Done: 12 works, 3 new chapters");

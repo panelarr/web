@@ -11,7 +11,14 @@ import { downloadItem, queueDownload } from "./downloads";
 import { initialDuplicates, judgeTest } from "./duplicates";
 import { emit, onMockEvent } from "./events";
 import { finishRun, type JobStore, queueState, startRun, taskEvent } from "./jobs";
-import { metaHealth, providerDetails, startMetaSync } from "./meta";
+import {
+  initialSearchEngine,
+  metaHealth,
+  providerDetails,
+  saveSearchEngine,
+  searchEngineTest,
+  startMetaSync,
+} from "./meta";
 import { applied, filterOwned, metaNetwork, networkTest, pluginNetwork, profileView, sourceNetwork } from "./network";
 import { type MockOperation, mockUrl, op, problem } from "./op";
 import { type MockPackage, packageIconSvg, packageView, queuePackageTask, syncPackageSources } from "./packages";
@@ -802,6 +809,42 @@ export const operations: MockOperation[] = [
     d.judgeKey = undefined;
     commit();
     return json(d.judge);
+  }),
+
+  // meta's search engine
+
+  op("get", "/system/meta/search-engine", () => {
+    const user = requireAdmin();
+    return user instanceof Response ? user : json(db().searchEngine);
+  }),
+
+  op("put", "/system/meta/search-engine", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const body = (await request.json()) as S["SearchEngineSettings"];
+    const tested = searchEngineTest(body);
+    if (!tested.ok) return problem(422, "search_engine_check_failed", "The search engine check failed", tested.error);
+    const d = db();
+    if (body.api_key) d.searchEngineKey = body.api_key;
+    saveSearchEngine(d.searchEngine, body);
+    commit();
+    return json(d.searchEngine);
+  }),
+
+  op("post", "/system/meta/search-engine/test", async ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    return json(searchEngineTest((await request.json()) as S["SearchEngineSettings"]));
+  }),
+
+  op("post", "/system/meta/search-engine/reset", () => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    d.searchEngine = initialSearchEngine();
+    d.searchEngineKey = undefined;
+    commit();
+    return json(d.searchEngine);
   }),
 
   op("get", "/system/meta/health", () => {

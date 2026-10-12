@@ -37,3 +37,11 @@ test("a suspected duplicate reviewed and merged; the decision model tested", asy
   await judge.getByRole("button", { name: "Test" }).click();
   await expect(judge.getByRole("status")).toContainText("It answered: same work");
 });
+
+test("the search index rebuilt through the service's job, up to date after", async ({ page }) => {
+  await page.goto("/admin/metadata?tab=search&mock=ready");
+  await expect(page.getByText(/1,022 changes/)).toBeVisible();
+  await page.getByRole("button", { name: "Rebuild the index" }).click();
+  await expect(page.getByText("Rebuilding the index…")).toBeVisible();
+  await expect(page.getByText("Nothing: up to date")).toBeVisible({ timeout: 20_000 });
+});

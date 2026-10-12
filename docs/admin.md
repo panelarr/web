@@ -10,7 +10,7 @@ admin key, and reaches plugins through the source contract.
 | Page | What | Shown when |
 |---|---|---|
 | Admin → Jobs | The server's own jobs | always |
-| Admin → Metadata | The metadata service: connection and health, providers and their sync runs, duplicates and the decision model, jobs, network | always |
+| Admin → Metadata | The metadata service: connection and health, providers and their sync runs, duplicates and the decision model, search engine, jobs, network | always |
 | A catalogue entry | Refresh from providers (admins) | always |
 | Admin → Plugins → a plugin → Extensions | Its stores (refresh) and packages (install, update, reload) | the plugin has `packages` |
 | Admin → Plugins → a plugin → Sources | Its sources' health checks: results, scheduled checks on or off, Check now | the plugin has `health_checks` (Check now also needs `jobs`) |
@@ -91,3 +91,16 @@ The decision model's settings (on or off, the kind of service, URL, model, API k
 saved in the metadata service and win over its configuration until reset. The key is write-only:
 the form says a key is saved and an empty field keeps it. "Test" asks the model about a made-up
 pair with the settings in the form, without saving them.
+
+## Search engine
+
+The Search tab says which engine answers searches now, what it can do (typos, parts of words,
+filter counts), and how the index is doing: entries in it, when it was built, changes waiting
+and how old the oldest is, errors. A backlog is polled while it drains. **Rebuild the index**
+runs the service's own `search-rebuild` job (and links to it on the Jobs tab); it's offered only
+when the service has that job.
+
+Its settings (the engine, its URL, a write-only API key, an index prefix, who serves browsing)
+work like the decision model's: they win over the service's configuration until reset, "Test"
+checks them without saving, and the service talks to the engine, never the browser. Changing
+the engine wants a rebuild.

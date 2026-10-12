@@ -28,7 +28,7 @@ import {
 import { initialStorages } from "./downloads";
 import { initialDuplicates } from "./duplicates";
 import { initialJobs, initialMetaJobs, initialPluginJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
-import { initialMetaSyncRuns } from "./meta";
+import { initialMetaSyncRuns, initialSearchEngine } from "./meta";
 import { initialNetwork, type NetworkState } from "./network";
 import { initialOrigins, initialPackageSources, initialPackages, type MockPackage } from "./packages";
 
@@ -61,6 +61,9 @@ export interface MockDb extends JobsState, NetworkState {
   /** meta's provider sync runs, newest first. */
   metaSyncRuns: S["MetaSyncRun"][];
   duplicates: S["DuplicatePair"][];
+  searchEngine: S["MetaSearchEngine"];
+  /** The key the admin saved for the search engine (never returned). */
+  searchEngineKey: string | undefined;
   judge: S["DuplicateJudge"];
   /** The key the admin saved for the duplicate judge (never returned). */
   judgeKey: string | undefined;
@@ -120,6 +123,8 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     syncing: [],
     metaSyncRuns: initialMetaSyncRuns(),
     ...initialDuplicates(),
+    searchEngine: initialSearchEngine(),
+    searchEngineKey: undefined,
     plugins: [clone(plugin), clone(storePlugin)],
     pluginConfigs: { [plugin.id]: clone(pluginConfig) },
     sourceSettings: { "example:1001": clone(sourceSettings), "stores:3101": clone(sourceSettings) },

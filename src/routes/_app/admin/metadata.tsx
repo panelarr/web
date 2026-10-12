@@ -5,17 +5,18 @@ import { ScrollStrip } from "@/components/scroll-strip";
 import { PageHeader } from "@/components/states";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { META_JOBS } from "@/features/jobs/hosts";
 import { type JobsSearch, JobsSection, jobsSearch } from "@/features/jobs/jobs-views";
-import { metaJobs } from "@/features/jobs/service";
-import { JobsContext, type JobsHost } from "@/features/jobs/use-jobs";
+import { JobsContext } from "@/features/jobs/use-jobs";
 import { DuplicatesPanel, type DuplicatesSearch, duplicatesSearch } from "@/features/meta/duplicates-panel";
 import { MetaHealthCard } from "@/features/meta/meta-health";
 import { ProvidersPanel, type ProvidersSearch, providersSearch } from "@/features/meta/providers-panel";
+import { SearchEnginePanel } from "@/features/meta/search-engine";
 import { MetaNetwork } from "@/features/network/meta-network";
 import { MetaConnectionPanel } from "@/features/setup/meta-connection";
 
 /** The metadata service's sections beyond its overview. */
-const TABS = ["providers", "duplicates", "jobs", "network"] as const;
+const TABS = ["providers", "duplicates", "search", "jobs", "network"] as const;
 type MetaTab = (typeof TABS)[number];
 
 interface MetadataSearch extends JobsSearch, ProvidersSearch, DuplicatesSearch {
@@ -33,19 +34,6 @@ export const Route = createFileRoute("/_app/admin/metadata")({
   },
   component: MetadataPage,
 });
-
-const to = "/admin/metadata";
-
-/** meta's jobs, through the server, inside this page's Jobs tab (?tab=jobs&job=…&run=…). */
-const META_JOBS: JobsHost = {
-  service: metaJobs,
-  nested: true,
-  links: {
-    list: { to, search: { tab: "jobs" } },
-    job: (job) => ({ to, search: { tab: "jobs", job } }),
-    run: (job, run) => ({ to, search: { tab: "jobs", job, run } }),
-  },
-};
 
 /**
  * The metadata service, administered from Panelarr: the server holds its admin key and passes
@@ -68,6 +56,7 @@ function MetadataPage() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="duplicates">Duplicates</TabsTrigger>
+            <TabsTrigger value="search">Search</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
             <TabsTrigger value="network">Network</TabsTrigger>
           </TabsList>
@@ -92,6 +81,9 @@ function MetadataPage() {
             search={search}
             onSearch={(change) => void navigate({ search: (prev) => ({ ...prev, ...change }), replace: true })}
           />
+        </TabsContent>
+        <TabsContent value="search" className="mt-4">
+          <SearchEnginePanel />
         </TabsContent>
         <TabsContent value="jobs" className="mt-4">
           <JobsContext value={META_JOBS}>
