@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Package as PackageIcon } from "lucide-react";
+import { Package as PackageIcon, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
-import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
 import { NativeSelect } from "@/components/native-select";
 import { SourceIcon } from "@/components/source-icon";
 import { EmptyState, ErrorAlert, Loading } from "@/components/states";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VirtualList } from "@/components/virtual-list";
+import { formatRelative } from "@/lib/format";
 import { PackageActions, PackageFacts } from "./package-parts";
 import { PackageSheet } from "./package-sheet";
 import { filterPackages, type Package, type PackageFilter, packageLanguages } from "./packages";
-import { type PackageTasks, usePackageTasks } from "./use-package-tasks";
+import { type PackageTasks, usePackageList, usePackageTasks } from "./use-package-tasks";
 
 export interface ExtensionsSearch extends PackageFilter {
   /** The package whose details are open. */
@@ -33,7 +34,7 @@ export function ExtensionsPanel({
   search: ExtensionsSearch;
   onSearch: (change: Partial<ExtensionsSearch>) => void;
 }) {
-  const list = $api.useQuery("get", "/plugins/{plugin_id}/packages", { params: { path: { plugin_id: pluginId } } });
+  const list = usePackageList(pluginId);
   const tasks = usePackageTasks(pluginId);
   const all = list.data?.packages ?? [];
   const langs = useMemo(() => packageLanguages(all), [all]);
@@ -82,10 +83,21 @@ export function ExtensionsPanel({
         </NativeSelect>
       </div>
       {list.data ? (
-        <p className="text-sm text-muted-foreground">
-          {shown.length === all.length ? `${all.length} extensions` : `${shown.length} of ${all.length} extensions`} ·{" "}
-          {installed} installed{updates ? ` · ${updates} with an update` : ""}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p className="text-sm text-muted-foreground">
+            {shown.length === all.length ? `${all.length} extensions` : `${shown.length} of ${all.length} extensions`} ·{" "}
+            {installed} installed{updates ? ` · ${updates} with an update` : ""}
+          </p>
+          {/* The list is big and changes only with the stores: reloaded when asked, or when a
+              package here changes. */}
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Loaded {formatRelative(new Date(list.dataUpdatedAt))}</span>
+            <Button variant="outline" size="sm" disabled={list.isFetching} onClick={() => void list.refetch()}>
+              <RefreshCw className={list.isFetching ? "animate-spin" : undefined} aria-hidden />
+              Reload
+            </Button>
+          </p>
+        </div>
       ) : null}
       {list.error ? (
         <ErrorAlert

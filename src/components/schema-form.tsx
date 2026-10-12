@@ -310,6 +310,7 @@ function ChoicesField({
     <fieldset className="grid gap-2">
       <legend className="mb-1 text-sm font-medium">{label(name, schema)}</legend>
       {hint ? <p className="-mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      <AllOnOff label={label(name, schema)} onAll={(on) => onChange(on ? [...options] : [])} />
       <div className="flex flex-wrap gap-x-5 gap-y-2">
         {options.map((option) => {
           const optionId = `${id}-${String(option)}`;
@@ -419,5 +420,33 @@ function ObjectListField({
         </Button>
       </div>
     </fieldset>
+  );
+}
+
+/** "All on" and "All off" for a list of checkboxes. */
+export function AllOnOff({ label, onAll }: { label: string; onAll: (on: boolean) => void }) {
+  return (
+    <div className="-ml-2 flex gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2"
+        aria-label={`${label}: all on`}
+        onClick={() => onAll(true)}
+      >
+        All on
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2"
+        aria-label={`${label}: all off`}
+        onClick={() => onAll(false)}
+      >
+        All off
+      </Button>
+    </div>
   );
 }

@@ -46,6 +46,18 @@ describe("SchemaForm", () => {
     });
   });
 
+  it("turns every choice of a list on or off at once", async () => {
+    const onSubmit = vi.fn();
+    render(<SchemaForm schema={schema} values={pluginConfig.values} onSubmit={onSubmit} />);
+    await userEvent.click(screen.getByRole("button", { name: "Languages: all on" }));
+    for (const lang of ["en", "ja", "es", "fr"]) expect(screen.getByRole("checkbox", { name: lang })).toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ languages: ["en", "ja", "es", "fr"] }));
+    await userEvent.click(screen.getByRole("button", { name: "Languages: all off" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ languages: [] }));
+  });
+
   it("edits a list of objects: add, fill in, remove", async () => {
     const onSubmit = vi.fn();
     render(<SchemaForm schema={schema} values={pluginConfig.values} onSubmit={onSubmit} />);

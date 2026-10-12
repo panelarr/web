@@ -7,6 +7,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { $api } from "@/api/client";
 import { NativeSelect } from "@/components/native-select";
+import { AllOnOff } from "@/components/schema-form";
 import { ErrorAlert } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { formatVersion } from "@/lib/version";
 import { PackageActions, PackageFacts } from "./package-parts";
 import type { Package } from "./packages";
-import type { PackageTasks } from "./use-package-tasks";
+import { type PackageTasks, patchPackage } from "./use-package-tasks";
 
 /** A package's details: where it comes from, its languages and the sources it provides. */
 export function PackageSheet({
@@ -129,11 +130,11 @@ function LanguagesForm({ pluginId, pkg }: { pluginId: string; pkg: Package }) {
   const saved = pkg.enabled_langs.length === 0 ? pkg.langs : pkg.enabled_langs;
   const [chosen, setChosen] = useState<string[]>(saved);
   const save = $api.useMutation("put", "/plugins/{plugin_id}/packages/{package_id}/languages", {
-    onSuccess: () => {
+    onSuccess: (saved) => {
       toast.success("Languages saved.");
-      void queryClient.invalidateQueries({
-        predicate: (q) => q.queryKey[1] === "/plugins/{plugin_id}/packages" || q.queryKey[1] === "/sources",
-      });
+      // The answer is the package as it now is: no need to reload the whole list.
+      patchPackage(queryClient, pluginId, saved);
+      void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[1] === "/sources" });
     },
   });
   const all = pkg.langs.every((lang) => chosen.includes(lang));
@@ -154,6 +155,8 @@ function LanguagesForm({ pluginId, pkg }: { pluginId: string; pkg: Package }) {
       <p className="-mt-1 text-xs text-muted-foreground">
         Only sources in these languages are offered. The plugin's own languages apply too.
       </p>
+      {/* All on is saved as "all", so languages the store adds later are on too. */}
+      <AllOnOff label="Languages" onAll={(on) => setChosen(on ? [...pkg.langs] : [])} />
       <div className="flex flex-wrap gap-x-5 gap-y-2">
         {pkg.langs.map((lang) => (
           <div key={lang} className="flex items-center gap-2">

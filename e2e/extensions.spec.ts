@@ -34,3 +34,13 @@ test("regular users don't browse sources", async ({ page }) => {
   await page.goto("/admin/sources");
   await expect(page).toHaveURL(/\/$/);
 });
+
+test("a big store renders only the rows near the screen", async ({ page }) => {
+  await page.goto("/admin/plugins/stores?tab=extensions&mock=big-store");
+  await expect(page.getByText(/^1504 extensions/)).toBeVisible();
+  const rows = page.getByRole("list", { name: "Extensions" }).locator(":scope > li");
+  expect(await rows.count()).toBeLessThan(100);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(page.getByText("Example Site 1500")).toBeVisible();
+  expect(await rows.count()).toBeLessThan(100);
+});

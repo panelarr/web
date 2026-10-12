@@ -1,15 +1,39 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { type Query, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { $api } from "@/api/client";
+import { $api, api } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import type { TaskEvent } from "@/api/event-types";
+import { MANUAL } from "@/api/events";
 import { useEvent } from "@/api/events-context";
 import { ACTION_LABELS, type Package, type PackageAction } from "./packages";
 
 const KIND = "plugin.package";
+
+const packageListOptions = (pluginId: string) =>
+  $api.queryOptions(
+    "get",
+    "/plugins/{plugin_id}/packages",
+    { params: { path: { plugin_id: pluginId } } },
+    // Kept until a package changes or the admin reloads: events and reconnects leave it alone.
+    { staleTime: Number.POSITIVE_INFINITY, gcTime: 30 * 60_000, meta: MANUAL },
+  );
+
+const packageListKey = (pluginId: string) => packageListOptions(pluginId).queryKey;
+
+/** A plugin's packages from all its stores: one big list, loaded once and kept. */
+export function usePackageList(pluginId: string) {
+  return useQuery(packageListOptions(pluginId));
+}
+
+/** Puts a changed package into the cached list. */
+export function patchPackage(queryClient: QueryClient, pluginId: string, pkg: Package): void {
+  queryClient.setQueryData<{ packages: Package[] }>(packageListKey(pluginId), (old) =>
+    old ? { ...old, packages: old.packages.map((p) => (p.id === pkg.id ? pkg : p)) } : old,
+  );
+}
 const DONE = new Set(["succeeded", "failed", "cancelled"]);
 
 /** A package's install, update or uninstall that is queued or running. */
@@ -25,7 +49,7 @@ export interface OpenTask {
  * Starts installs, updates and uninstalls (each a task on the server) and follows them over
  * the event stream. Events carry no payload, so they're matched by task ID: the one the server
  * answered with, or the one a package row carries while its task is open (after a reload, or
- * from another tab). When one ends, the packages, the plugin and the sources are refetched.
+ * from another tab). When one ends, that package, the plugin and the sources are refetched.
  */
 export function usePackageTasks(pluginId: string) {
   const queryClient = useQueryClient();
@@ -35,30 +59,48 @@ export function usePackageTasks(pluginId: string) {
   const ours = useRef(new Map<string, { name: string; action: PackageAction }>());
   const names = useRef(new Map<string, string>());
 
-  const refresh = useCallback(() => {
-    const plugin = (query: Query) => {
-      const init = query.queryKey[2] as { params?: { path?: { plugin_id?: string } } } | undefined;
-      return init?.params?.path?.plugin_id === pluginId;
-    };
-    void queryClient.invalidateQueries({
-      predicate: (query) => {
-        const path = query.queryKey[1];
-        if (path === "/sources" || path === "/plugins") return true;
-        return (
-          (path === "/plugins/{plugin_id}" ||
-            path === "/plugins/{plugin_id}/packages" ||
-            path === "/plugins/{plugin_id}/packages/{package_id}") &&
-          plugin(query)
-        );
-      },
-    });
-  }, [queryClient, pluginId]);
+  /**
+   * After a package changed: that package alone is fetched and put into the cached list (the
+   * whole list is big), and the plugin and the sources are refetched.
+   */
+  const refresh = useCallback(
+    (packageId: string | undefined) => {
+      void queryClient.invalidateQueries({
+        predicate: (query) => {
+          const path = query.queryKey[1];
+          if (path === "/sources" || path === "/plugins") return true;
+          const init = query.queryKey[2] as { params?: { path?: { plugin_id?: string } } } | undefined;
+          return path === "/plugins/{plugin_id}" && init?.params?.path?.plugin_id === pluginId;
+        },
+      });
+      if (!packageId) {
+        void queryClient.invalidateQueries({ queryKey: packageListKey(pluginId) });
+        return;
+      }
+      void api
+        .GET("/plugins/{plugin_id}/packages/{package_id}", {
+          params: { path: { plugin_id: pluginId, package_id: packageId } },
+        })
+        .then(({ data }) => {
+          if (data) patchPackage(queryClient, pluginId, data);
+        })
+        .catch(() => void queryClient.invalidateQueries({ queryKey: packageListKey(pluginId) }));
+    },
+    [queryClient, pluginId],
+  );
+
+  /** The package a task is about: one started here, or a row that carries the task. */
+  const packageOfTask = (taskId: string): string | undefined =>
+    Object.entries(started).find(([, s]) => s.taskId === taskId)?.[0] ??
+    queryClient
+      .getQueryData<{ packages: Package[] }>(packageListKey(pluginId))
+      ?.packages.find((p) => p.task_id === taskId)?.id;
 
   const onTask = (task: TaskEvent) => {
     if (task.kind !== KIND) return;
     setEvents((prev) => ({ ...prev, [task.id]: task }));
     if (!DONE.has(task.state)) return;
-    refresh();
+    refresh(packageOfTask(task.id));
     const mine = ours.current.get(task.id);
     if (!mine) return;
     ours.current.delete(task.id);
@@ -79,7 +121,6 @@ export function usePackageTasks(pluginId: string) {
       const id = vars.params.path.package_id;
       ours.current.set(ref.task_id, { name: names.current.get(id) ?? id, action });
       setStarted((prev) => ({ ...prev, [id]: { taskId: ref.task_id, action } }));
-      refresh();
     },
     onError: (error: unknown, vars: { params: { path: { package_id: string } } }) => {
       const id = vars.params.path.package_id;

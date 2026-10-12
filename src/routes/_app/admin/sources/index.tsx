@@ -10,6 +10,7 @@ import { NativeSelect } from "@/components/native-select";
 import { SourceIcon } from "@/components/source-icon";
 import { EmptyState, ErrorAlert, Loading, PageHeader } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { HealthBadge } from "@/features/admin/health-badge";
@@ -22,6 +23,8 @@ type StatusFilter = (typeof STATUSES)[number];
 interface SourcesSearch {
   q?: string;
   plugin?: string;
+  /** Also the sources that don't exist for anyone now: Not available and Absent. */
+  hidden?: true;
   /** Only one package's (extension's) sources, e.g. from the plugin's Extensions tab. */
   package?: string;
   lang?: string;
@@ -33,6 +36,7 @@ export const Route = createFileRoute("/_app/admin/sources/")({
     ...(typeof search.q === "string" && search.q ? { q: search.q } : {}),
     ...(typeof search.plugin === "string" && search.plugin ? { plugin: search.plugin } : {}),
     ...(typeof search.package === "string" && search.package ? { package: search.package } : {}),
+    ...(search.hidden === true || search.hidden === "true" ? { hidden: true as const } : {}),
     ...(typeof search.lang === "string" && search.lang ? { lang: search.lang } : {}),
     ...(STATUSES.includes(search.status as StatusFilter) ? { status: search.status as StatusFilter } : {}),
   }),
@@ -67,8 +71,14 @@ function SourcesPage() {
   const plugins = useMemo(() => [...new Set(all.map((s) => s.plugin_id))].sort(), [all]);
   const pluginName = (id: string) => pluginList.data?.plugins.find((p) => p.id === id)?.name ?? id;
   const langs = useMemo(() => [...new Set(all.map((s) => s.lang))].sort(), [all]);
-  const shown = all.filter((source) => matches(source, search));
-  const failing = all.filter((s) => s.health.status === "failing").length;
+  // Sources that don't exist for anyone now (their language is off, or their plugin no longer
+  // lists them) are kept for their works' history but hidden unless asked for, so a language
+  // turned off doesn't look like a setting that didn't work.
+  const showHidden = search.hidden === true || search.status === "unavailable" || search.status === "gone";
+  const existing = all.filter((source) => source.present);
+  const hidden = all.length - existing.length;
+  const shown = (showHidden ? all : existing).filter((source) => matches(source, search));
+  const failing = existing.filter((s) => s.health.status === "failing").length;
 
   const set = (change: Partial<SourcesSearch>) =>
     void navigate({ search: (prev) => ({ ...prev, ...change }), replace: true });
@@ -79,7 +89,7 @@ function SourcesPage() {
         title="Sources"
         description={
           sources.data
-            ? `${all.length} sources${failing ? ` · ${failing} failing` : ""}. Turning one off hides it from everyone.`
+            ? `${existing.length} sources${failing ? ` · ${failing} failing` : ""}${hidden ? ` · ${hidden} hidden` : ""}. Turning one off hides it from everyone.`
             : undefined
         }
       />
@@ -129,6 +139,16 @@ function SourcesPage() {
           <option value="gone">Absent (no longer listed)</option>
         </NativeSelect>
       </div>
+      {hidden > 0 && search.status !== "unavailable" && search.status !== "gone" ? (
+        <div className="mb-4">
+          <Button variant="outline" size="sm" onClick={() => set({ hidden: search.hidden ? undefined : true })}>
+            {search.hidden ? "Hide" : "Show"} hidden ({hidden})
+          </Button>
+          <span className="ml-3 text-xs text-muted-foreground">
+            Not available (language off) or no longer listed by their plugin.
+          </span>
+        </div>
+      ) : null}
       {search.package ? (
         <p className="mb-4 flex flex-wrap items-center gap-2 text-sm">
           Extension:
@@ -149,7 +169,9 @@ function SourcesPage() {
       {sources.isPending ? <Loading /> : null}
       {sources.data && shown.length === 0 ? (
         <EmptyState icon={<Library />} title={all.length === 0 ? "No sources yet" : "No source matches"}>
-          {all.length === 0 ? "Sources come from plugins. Add one under Plugins." : "Try other filters."}
+          {all.length === 0
+            ? "Sources come from plugins. Add one under Plugins."
+            : `Try other filters${hidden && !showHidden ? `, or show the ${hidden} hidden` : ""}.`}
         </EmptyState>
       ) : null}
       {shown.length > 0 ? (

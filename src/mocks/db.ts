@@ -7,6 +7,7 @@
 //   signed-out  set up, nobody signed in
 //   user        set up, signed in as a user without admin rights
 //   degraded    set up and signed in, but the metadata service has no entries yet
+//   big-store   like ready, with a store of 1,500 extensions
 //
 // In the browser, pick one with `?mock=<scenario>`; it lasts for the tab (sessionStorage).
 import type { components } from "@/api/schema.gen";
@@ -28,7 +29,7 @@ import { initialPackageSources, initialPackages, type MockPackage } from "./pack
 
 type S = components["schemas"];
 
-export const SCENARIOS = ["ready", "fresh", "signed-out", "user", "degraded"] as const;
+export const SCENARIOS = ["ready", "fresh", "signed-out", "user", "degraded", "big-store"] as const;
 export type Scenario = (typeof SCENARIOS)[number];
 
 export type MockInvite = S["Invite"] & { token: string };
@@ -153,6 +154,8 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
         packages: {},
         invites: [],
       };
+    case "big-store":
+      return { ...ready, packages: { [storePlugin.id]: initialPackages(1_500) } };
     case "signed-out":
       return { ...ready, currentUserId: undefined };
     case "user":

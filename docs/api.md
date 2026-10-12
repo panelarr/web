@@ -95,7 +95,9 @@ message, the code and a copyable request ID.
 - **Listeners.** `useEvent(type, fn)` hands a component an event's data, e.g. a run's live
   progress (`useRun`).
 - **Reconnects.** The server doesn't replay events, so after a reconnect every active query
-  refetches. A refused stream (signed out) is retried with back-off.
+  refetches, except those marked `meta: MANUAL` (a store's package list, about a megabyte),
+  which reload only when asked or when what they show changed. A refused stream (signed out)
+  is retried with back-off.
 
 The data of each event is typed in `src/api/event-types.ts`, following the server. In tests a
 fake `EventSource` (`src/test/fake-event-source.ts`) receives the mock server's events, and in

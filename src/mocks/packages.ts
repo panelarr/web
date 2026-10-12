@@ -32,7 +32,7 @@ const OFFERS = (version: string, supported = true): S["PackageOffer"][] => [
 
 const LANGS = ["en", "ja", "es", "fr", "de", "pt-BR", "it", "ko"];
 
-export function initialPackages(): MockPackage[] {
+export function initialPackages(count = 60): MockPackage[] {
   const named: MockPackage[] = [
     {
       id: "org.example.polyglot",
@@ -93,9 +93,9 @@ export function initialPackages(): MockPackage[] {
     },
   ];
   // Plenty more, as a real store has hundreds.
-  const more = Array.from({ length: 60 }, (_, i): MockPackage => {
+  const more = Array.from({ length: count }, (_, i): MockPackage => {
     const lang = LANGS[i % LANGS.length] as string;
-    const name = `Example Site ${String(i + 1).padStart(2, "0")}`;
+    const name = `Example Site ${String(i + 1).padStart(count > 99 ? 4 : 2, "0")}`;
     return {
       id: `org.example.site${i + 1}`,
       name,

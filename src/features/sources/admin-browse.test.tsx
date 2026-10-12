@@ -17,9 +17,14 @@ describe("browsing sources", () => {
   it("tells Off from Absent, and names plugins in the filter", async () => {
     const gone = db().sources.find((source) => source.id === "example:1002");
     if (gone) gone.present = false;
-    await renderApp("/admin/sources");
+    const { router } = await renderApp("/admin/sources");
     const off = (await screen.findByText("Demo Comics")).closest("li") as HTMLElement;
     expect(within(off).getByText("Off")).toBeInTheDocument();
+    // Sources that don't exist for anyone now are hidden, and counted, until asked for.
+    expect(screen.queryByText("Sample Scans")).not.toBeInTheDocument();
+    expect(screen.getByText(/· 3 hidden\./)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show hidden (3)" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ hidden: true }));
     const absent = screen.getByText("Sample Scans").closest("li") as HTMLElement;
     expect(within(absent).getByText("Absent")).toBeInTheDocument();
     expect(within(absent).getByText(/No longer listed by its plugin/)).toBeInTheDocument();
@@ -30,6 +35,9 @@ describe("browsing sources", () => {
   it("shows each source's extension, and tells Not available apart", async () => {
     const { router } = await renderApp("/admin/sources?package=org.example.polyglot");
     expect(await screen.findByText("Extension:")).toBeInTheDocument();
+    // Only the one that exists for anyone, until the hidden ones are shown.
+    expect(await screen.findAllByText("via Polyglot Comics")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "Show hidden (2)" }));
     const rows = await screen.findAllByText("via Polyglot Comics");
     expect(rows).toHaveLength(3);
     const row = (lang: string) =>
@@ -45,7 +53,7 @@ describe("browsing sources", () => {
     await userEvent.selectOptions(screen.getByLabelText("Status"), "unavailable");
     await waitFor(() => expect(screen.getAllByText("via Polyglot Comics")).toHaveLength(2));
     await userEvent.click(screen.getByRole("button", { name: "Show every extension's sources" }));
-    await waitFor(() => expect(router.state.location.search).toEqual({ status: "unavailable" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ status: "unavailable", hidden: true }));
   });
 
   it("browses a source that's turned off, to test it, but not one that's absent", async () => {

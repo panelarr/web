@@ -4,8 +4,10 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { db } from "@/mocks/db";
+import { emit } from "@/mocks/events";
 import { queuePackageTask, tickPackages } from "@/mocks/packages";
 import { renderApp } from "@/test/render";
+import { server } from "@/test/server";
 import { filterPackages, type Package, packageLanguages, versionLabel } from "./packages";
 
 const EXTENSIONS = "/admin/plugins/stores?tab=extensions";
@@ -108,10 +110,51 @@ describe("the Extensions tab", () => {
     expect(await screen.findByText("Languages saved.")).toBeInTheDocument();
     await waitFor(() => expect(within(sources).getAllByText("Not available")).toHaveLength(1));
     expect(source("stores:3001")).toMatchObject({ present: true });
+    // All off can't be saved; all on is saved as "all".
+    await userEvent.click(within(sheet).getByRole("button", { name: "Languages: all off" }));
+    expect(within(sheet).getByRole("button", { name: "Save languages" })).toBeDisabled();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Languages: all on" }));
+    await userEvent.click(within(sheet).getByRole("button", { name: "Save languages" }));
+    await waitFor(() =>
+      expect(db().packages.stores?.find((p) => p.id === "org.example.polyglot")?.enabled_langs).toEqual([]),
+    );
     expect(within(sheet).getByRole("link", { name: "Open in Sources" })).toHaveAttribute(
       "href",
       "/admin/sources?plugin=stores&package=org.example.polyglot",
     );
+  });
+});
+
+describe("the store's list", () => {
+  it("loads once: health events and reconnects don't reload it, a finished task patches one package", async () => {
+    const lists: string[] = [];
+    const singles: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      const path = new URL(request.url).pathname;
+      if (request.method !== "GET") return;
+      if (path.endsWith("/plugins/stores/packages")) lists.push(path);
+      else if (/\/plugins\/stores\/packages\/[^/]+$/.test(path)) singles.push(path);
+    });
+    await openOn("Lantern");
+    expect(screen.getByText(/^Loaded /)).toBeInTheDocument();
+    expect(lists).toHaveLength(1);
+
+    // An idle tab: the plugin is checked again and again, the event stream reconnects.
+    for (let i = 0; i < 3; i++) emit("plugin.health", { plugin_id: "stores", health: "ok" });
+    emit("ready" as never, {} as never);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(lists).toHaveLength(1);
+
+    // A package changes: only that one is fetched.
+    await userEvent.click(within(row("Lantern Reader")).getByRole("button", { name: "Install Lantern Reader" }));
+    run();
+    expect(await screen.findByText("Lantern Reader installed.")).toBeInTheDocument();
+    await waitFor(() => expect(singles).toEqual(["/api/v1/plugins/stores/packages/org.example.lantern"]));
+    expect(lists).toHaveLength(1);
+
+    // Reload, when asked.
+    await userEvent.click(screen.getByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(lists).toHaveLength(2));
   });
 });
 

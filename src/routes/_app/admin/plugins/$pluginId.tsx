@@ -217,6 +217,14 @@ function SettingsCard({ plugin }: { plugin: Plugin }) {
   const save = $api.useMutation("put", "/plugins/{plugin_id}/config", {
     onSuccess: (saved) => {
       queryClient.setQueryData(options.queryKey, saved);
+      // The plugin's own languages decide which packages' sources are available: its package
+      // list loads again when next shown.
+      void queryClient.invalidateQueries({
+        queryKey: $api.queryOptions("get", "/plugins/{plugin_id}/packages", {
+          params: { path: { plugin_id: plugin.id } },
+        }).queryKey,
+        refetchType: "none",
+      });
       toast.success("Settings saved.", {
         description: "The plugin applies them in the background; its health here updates when it's done.",
       });
