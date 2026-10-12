@@ -169,6 +169,19 @@ export function db(): MockDb {
 
 export function resetDb(scenario: Scenario = "ready"): void {
   current = createDb(scenario);
+  syncSessionCookie();
+}
+
+/**
+ * Like the real server, a signed-in browser has the readable CSRF cookie next to the session
+ * cookie (the app uses it as a hint that a session exists).
+ */
+export function syncSessionCookie(): void {
+  if (typeof document === "undefined") return;
+  // biome-ignore lint/suspicious/noDocumentCookie: the mock plays the server, which sets this cookie
+  document.cookie = current.currentUserId
+    ? "panelarr_csrf=mock-csrf-token; Path=/; SameSite=Lax"
+    : "panelarr_csrf=; Path=/; Max-Age=0; SameSite=Lax";
 }
 
 /** Saves the state for the next page load (browser only). Call after every change. */
@@ -196,6 +209,8 @@ export function loadBrowserDb(): Scenario {
     }
     const saved = sessionStorage.getItem(STORAGE_KEY);
     if (saved) current = JSON.parse(saved) as MockDb;
+    else resetDb("ready");
+    syncSessionCookie();
     return (sessionStorage.getItem(SCENARIO_KEY) as Scenario | null) ?? "ready";
   } catch {
     return "ready";

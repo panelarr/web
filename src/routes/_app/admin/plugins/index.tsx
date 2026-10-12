@@ -28,6 +28,7 @@ import { Switch } from "@/components/ui/switch";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { RegisterPluginForm } from "@/features/setup/plugins-panel";
 import { formatRelative } from "@/lib/format";
+import { formatVersion } from "@/lib/version";
 
 type Plugin = components["schemas"]["Plugin"];
 
@@ -101,7 +102,7 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 [overflow-wrap:anywhere]">
           {plugin.name}
-          <span className="text-sm font-normal text-muted-foreground">v{plugin.version}</span>
+          <span className="text-sm font-normal text-muted-foreground">{formatVersion(plugin.version)}</span>
         </CardTitle>
         <CardDescription className="[overflow-wrap:anywhere]">
           {plugin.id} · {plugin.url}

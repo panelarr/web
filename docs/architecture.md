@@ -37,9 +37,12 @@ e2e/              Playwright smoke tests
 The server keeps the session in an HTTP-only cookie the app can't read; the app sends the
 CSRF token from the readable `panelarr_csrf` cookie with every change.
 
-- **Route guards.** Every page inside the app shell (`src/routes/_app.tsx`) loads `GET /me`
-  first: signed out → `/login?redirect=…`; a new install (`setup_required`) → `/setup`; an
-  admin on an unfinished setup → `/setup`. `/login`, `/setup` and `/invite` are public.
+- **Route guards** (`src/auth/guard.ts`). Every signed-in page first reads the public
+  `GET /system/info`: a new install goes to `/setup`. Only when the readable CSRF cookie is
+  there (the server sets it with the session cookie, same lifetime) does it ask `GET /me`;
+  otherwise it goes straight to `/login?redirect=…`. So visitors and new installs cause no
+  failed requests. An admin on an unfinished setup goes to `/setup`. `/login`, `/setup` and
+  `/invite` are public.
 - **Mid-session.** When any request answers `unauthenticated`, the app forgets everything
   cached and goes to sign-in with `expired`, then back to where the user was. `redirect` only
   ever leads to a path inside the app.

@@ -2,9 +2,12 @@
 
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { db, resetDb } from "@/mocks/db";
+import { mockUrl } from "@/mocks/op";
 import { renderApp } from "@/test/render";
+import { server } from "@/test/server";
 import { countFilters, validateCatalogSearch } from "./filters";
 
 describe("validateCatalogSearch", () => {
@@ -65,6 +68,17 @@ describe("browsing the catalogue", () => {
     expect(await screen.findByText("Moonlit Bakery")).toBeInTheDocument();
     expect(screen.getByText("“Tsukiyo no Panya”")).toBeInTheDocument();
     expect(screen.getByText("1 work")).toBeInTheDocument();
+  });
+
+  it("says when the catalogue has no entries at all", async () => {
+    server.use(
+      http.get(mockUrl("/catalog/browse"), () =>
+        HttpResponse.json({ entries: [], next_page_token: "", no_providers: false }),
+      ),
+    );
+    await renderApp("/browse");
+    expect(await screen.findByText("The catalogue is empty")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Check the metadata service" })).toHaveAttribute("href", "/admin/system");
   });
 
   it("says when nothing matches", async () => {

@@ -8,6 +8,7 @@ import { formValues, TextField } from "@/components/form";
 import { ErrorAlert, Loading } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatVersion } from "@/lib/version";
 
 /** Registers source plugins running as services, and lists the ones registered. */
 export function PluginsPanel() {
@@ -25,7 +26,7 @@ export function PluginsPanel() {
               <div className="min-w-0 flex-1">
                 <p className="font-medium [overflow-wrap:anywhere]">{plugin.name}</p>
                 <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                  {plugin.id} · {plugin.url} · v{plugin.version}
+                  {plugin.id} · {plugin.url} · {formatVersion(plugin.version)}
                 </p>
               </div>
               <Badge variant={plugin.health === "ok" ? "secondary" : "destructive"}>{plugin.health}</Badge>

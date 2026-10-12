@@ -6,6 +6,33 @@ import { describe, expect, it } from "vitest";
 import { invite } from "@/mocks/data";
 import { db, resetDb } from "@/mocks/db";
 import { renderApp } from "@/test/render";
+import { server } from "@/test/server";
+
+describe("asking who the user is", () => {
+  function countMe() {
+    const seen: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (new URL(request.url).pathname.endsWith("/api/v1/me")) seen.push(request.method);
+    });
+    return seen;
+  }
+
+  it("doesn't, for a visitor without a session (no failed requests)", async () => {
+    resetDb("signed-out");
+    const seen = countMe();
+    await renderApp("/downloads");
+    expect(await screen.findByRole("heading", { name: "Sign in to Panelarr" })).toBeInTheDocument();
+    expect(seen).toEqual([]);
+  });
+
+  it("doesn't, on a new install", async () => {
+    resetDb("fresh");
+    const seen = countMe();
+    await renderApp("/");
+    expect(await screen.findByRole("heading", { name: "Create the admin account" })).toBeInTheDocument();
+    expect(seen).toEqual([]);
+  });
+});
 
 describe("signing in", () => {
   it("sends visitors to sign in and back where they were going", async () => {

@@ -5,7 +5,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
-import { meQuery, safeRedirect, systemInfoQuery } from "@/auth/session";
+import { clearSessionHint, hasSessionHint, meQuery, safeRedirect, systemInfoQuery } from "@/auth/session";
 import { AuthLayout } from "@/components/auth-layout";
 import { formValues, TextField } from "@/components/form";
 import { ErrorAlert } from "@/components/states";
@@ -25,8 +25,12 @@ export const Route = createFileRoute("/login")({
   beforeLoad: async ({ context, search }) => {
     const info = await context.queryClient.ensureQueryData(systemInfoQuery());
     if (info.setup_required) throw redirect({ to: "/setup" });
-    // Already signed in: carry on where they were going.
-    const me = await context.queryClient.fetchQuery(meQuery()).catch(() => undefined);
+    // Already signed in: carry on where they were going (only asked when a session is likely).
+    if (!hasSessionHint()) return;
+    const me = await context.queryClient.fetchQuery(meQuery()).catch(() => {
+      clearSessionHint();
+      return undefined;
+    });
     if (me) throw redirect({ href: safeRedirect(search.redirect) });
   },
   component: LoginPage,

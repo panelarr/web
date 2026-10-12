@@ -6,7 +6,7 @@ import type { components } from "@/api/schema.gen";
 import { CATALOG, coverSvg, summary, withinCeiling } from "./catalog";
 import { continueChapter, seriesChapters, unifiedChapters } from "./chapters";
 import { health, sources as sourceFixtures, systemInfo } from "./data";
-import { commit, currentUser, db, type MockInvite, newId } from "./db";
+import { commit, currentUser, db, type MockInvite, newId, syncSessionCookie } from "./db";
 import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
 import { finishRun, queueState, startRun, taskEvent } from "./jobs";
@@ -387,6 +387,7 @@ export const operations: MockOperation[] = [
     const d = db();
     d.sessions = d.sessions.filter((s) => !s.current);
     d.currentUserId = undefined;
+    syncSessionCookie();
     commit();
     return new HttpResponse(null, { status: 204 });
   }),

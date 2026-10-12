@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { HealthBadge } from "@/features/admin/health-badge";
+import { formatVersion } from "@/lib/version";
 
 type Plugin = components["schemas"]["Plugin"];
 
@@ -43,7 +44,7 @@ function PluginPage() {
             description={
               <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span>
-                  {plugin.data.id} · v{plugin.data.version}
+                  {plugin.data.id} · {formatVersion(plugin.data.version)}
                 </span>
                 <HealthBadge status={plugin.data.health} />
               </span>

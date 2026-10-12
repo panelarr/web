@@ -3,7 +3,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";
 import { isApiError } from "@/api/errors";
-import { isPublicPath } from "./session";
+import { clearSessionHint, isPublicPath } from "./session";
 
 /**
  * What to do when any API call says the session is gone or the server isn't set up:
@@ -19,6 +19,7 @@ export function createAuthErrorHandler(getRouter: () => AnyRouter | undefined, g
     if (isPublicPath(pathname)) return;
     if (isApiError(error, "unauthenticated")) {
       handling = true;
+      clearSessionHint();
       getQueryClient().clear();
       void router.navigate({ to: "/login", search: { redirect: href, expired: true } }).finally(() => {
         handling = false;

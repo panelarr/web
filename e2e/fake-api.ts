@@ -7,7 +7,9 @@ import { apiKey, health, me, metaConnection, session, setupStatus, systemInfo } 
  * Answers the API at the network level, for the production build (which has no mock server):
  * a signed-in admin on a finished install.
  */
-export async function fakeApi(page: Page): Promise<void> {
+export async function fakeApi(page: Page, baseURL: string): Promise<void> {
+  // A signed-in browser has the readable CSRF cookie the server sets with the session.
+  await page.context().addCookies([{ name: "panelarr_csrf", value: "fake-csrf", url: baseURL }]);
   const answers: Record<string, unknown> = {
     "GET /system/info": systemInfo,
     "GET /system/health": health,

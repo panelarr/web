@@ -188,12 +188,35 @@ function BrowseResults({ search }: { search: CatalogSearch }) {
       query={results}
       count={results.data?.pages[0]?.total_size}
       noProviders={results.data?.pages[0]?.no_providers ?? false}
-      empty={<EmptyState icon={<BookOpen />} title="Nothing matches these filters" />}
+      empty={
+        countFilters(search) > 0 ? (
+          <EmptyState icon={<BookOpen />} title="Nothing matches these filters" />
+        ) : (
+          <EmptyCatalogue />
+        )
+      }
     >
       {entries.map((entry) => (
         <CardItem key={entry.id} entry={entry} />
       ))}
     </Results>
+  );
+}
+
+/** No entries at all: the metadata service's providers haven't delivered any yet. */
+function EmptyCatalogue() {
+  const isAdmin = useIsAdmin();
+  return (
+    <EmptyState icon={<BookOpen />} title="The catalogue is empty">
+      The metadata service has no entries yet: its providers haven't been synced.{" "}
+      {isAdmin ? (
+        <Link to="/admin/system" className="underline underline-offset-4">
+          Check the metadata service
+        </Link>
+      ) : (
+        "Ask your admin."
+      )}
+    </EmptyState>
   );
 }
 

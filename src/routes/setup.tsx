@@ -6,7 +6,7 @@ import { Check, Loader2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { $api, api } from "@/api/client";
 import { isApiError } from "@/api/errors";
-import { setupQuery } from "@/auth/session";
+import { hasSessionHint, setupQuery } from "@/auth/session";
 import { AuthLayout } from "@/components/auth-layout";
 import { formValues, PasswordConfirm, TextField } from "@/components/form";
 import { ErrorAlert } from "@/components/states";
@@ -39,6 +39,7 @@ export const Route = createFileRoute("/setup")({
     if (status.completed) throw redirect({ to: "/" });
     if (status.admin_created) {
       // Only the admin, signed in, may carry on.
+      if (!hasSessionHint()) throw redirect({ to: "/login", search: { redirect: "/setup" } });
       const me = await api.GET("/me").catch((error: unknown) => {
         if (isApiError(error, "unauthenticated")) throw redirect({ to: "/login", search: { redirect: "/setup" } });
         throw error;
