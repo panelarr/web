@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import { ApiError } from "@/api/errors";
 import { Field } from "@/components/form";
@@ -173,12 +173,22 @@ function SchemaField(props: FieldProps<unknown>) {
 
   if (type === "boolean") return <BooleanField {...props} value={value === true} hint={hint} error={error} />;
 
+  if (type === "array" && schema.items && typeOf(schema.items) === "object") {
+    return (
+      <ObjectListField {...props} value={Array.isArray(value) ? (value as Values[]) : []} hint={hint} error={error} />
+    );
+  }
+
   if (type === "array" && schema.items?.enum) {
     return <ChoicesField {...props} value={Array.isArray(value) ? value : []} hint={hint} error={error} />;
   }
 
   return (
-    <Field label={label(name, schema)} hint={hint} error={error}>
+    <Field
+      label={label(name, schema)}
+      hint={type === "array" && !schema.enum ? [hint, "One per line."].filter(Boolean).join(" ") : hint}
+      error={error}
+    >
       {(aria) => {
         if (schema.enum) {
           return (
@@ -198,22 +208,7 @@ function SchemaField(props: FieldProps<unknown>) {
           );
         }
         if (type === "array") {
-          // A list of free text: one item per line.
-          return (
-            <Textarea
-              {...aria}
-              rows={4}
-              value={Array.isArray(value) ? value.join("\n") : ""}
-              onChange={(e) =>
-                onChange(
-                  e.target.value
-                    .split("\n")
-                    .map((line) => line.trim())
-                    .filter(Boolean),
-                )
-              }
-            />
-          );
+          return <LinesInput {...aria} value={Array.isArray(value) ? value.map(String) : []} onChange={onChange} />;
         }
         if (type === "integer" || type === "number") {
           return (
@@ -311,6 +306,95 @@ function ChoicesField({
         })}
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </fieldset>
+  );
+}
+
+/**
+ * A list of free text, one item per line. It keeps what is typed (blank lines too, so Enter
+ * starts the next item) and hands on the non-empty lines.
+ */
+function LinesInput({
+  value,
+  onChange,
+  ...aria
+}: { value: string[]; onChange: (value: string[]) => void } & React.ComponentProps<"textarea">) {
+  const [text, setText] = useState(() => value.join("\n"));
+  return (
+    <Textarea
+      {...aria}
+      rows={4}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(
+          e.target.value
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean),
+        );
+      }}
+    />
+  );
+}
+
+/** A list of objects (say, stores with a URL and a key): one card of fields per item. */
+function ObjectListField({
+  name,
+  schema,
+  value,
+  onChange,
+  path,
+  errors,
+  hint,
+  error,
+}: FieldProps<Values[]> & { hint?: string | undefined; error?: string | undefined }) {
+  const items = schema.items ?? {};
+  const noun = items.title ?? "Item";
+  return (
+    <fieldset className="grid gap-3">
+      <legend className="mb-1 text-sm font-medium">{label(name, schema)}</legend>
+      {hint ? <p className="-mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      {value.length === 0 ? <p className="text-sm text-muted-foreground">None yet.</p> : null}
+      {value.map((item, index) => (
+        // Items have no identity of their own; the fields are controlled, so the index is enough.
+        // biome-ignore lint/suspicious/noArrayIndexKey: see above
+        <div key={index} className="grid gap-4 rounded-lg border p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">
+              {noun} {index + 1}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={`Remove ${noun.toLowerCase()} ${index + 1}`}
+              onClick={() => onChange(value.filter((_, i) => i !== index))}
+            >
+              Remove
+            </Button>
+          </div>
+          <ObjectFields
+            schema={items}
+            value={item ?? {}}
+            onChange={(next) => onChange(value.map((old, i) => (i === index ? next : old)))}
+            path={`${path}.${index}`}
+            errors={errors}
+          />
+        </div>
+      ))}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onChange([...value, initialValues(items, undefined)])}
+        >
+          <Plus aria-hidden />
+          Add {noun.toLowerCase()}
+        </Button>
+      </div>
     </fieldset>
   );
 }

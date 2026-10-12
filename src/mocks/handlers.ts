@@ -658,6 +658,16 @@ export const operations: MockOperation[] = [
     const found = db().plugins.find((p) => p.id === params.plugin_id);
     if (!found) return problem(404, "not_found", "Not found");
     found.checked_at = now();
+    // Like a plugin that adds stores in the background: one it can't reach shows in its health.
+    const stores = (db().pluginConfigs[found.id]?.values.stores ?? []) as { url?: string }[];
+    const failing = stores.find((store) => store.url?.includes("unreachable"));
+    if (failing) {
+      found.health = "degraded";
+      found.health_message = `adding store ${failing.url}: can't be reached`;
+    } else if (found.health === "degraded") {
+      found.health = "ok";
+      delete found.health_message;
+    }
     commit();
     return json(found);
   }),
@@ -688,6 +698,12 @@ export const operations: MockOperation[] = [
         },
         { status: 400, headers: { "Content-Type": "application/problem+json" } },
       );
+    }
+    // Like the plugin's schema check: every store is an object with a URL.
+    const stores = Array.isArray(values.stores) ? (values.stores as unknown[]) : [];
+    const bad = stores.findIndex((store) => typeof store !== "object" || !store || !("url" in store));
+    if (bad >= 0) {
+      return problem(400, "invalid_config", "Invalid settings", `stores/${bad}: want an object with a url`);
     }
     // Secret fields come back empty; leaving them empty keeps the stored value.
     config.values = { ...values, api_token: "" };

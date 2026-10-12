@@ -188,6 +188,28 @@ export const pluginConfig = {
       mode: { type: "string", title: "Image quality", enum: ["original", "compressed"], default: "original" },
       max_results: { type: "integer", title: "Results per page", minimum: 1, maximum: 100, default: 20 },
       show_nsfw: { type: "boolean", title: "Show adult sources", default: false },
+      stores: {
+        type: "array",
+        title: "Extension stores",
+        description: "Stores to add to the backend.",
+        items: {
+          type: "object",
+          title: "Store",
+          required: ["url"],
+          properties: {
+            url: { type: "string", format: "uri", title: "Store URL" },
+            fingerprint: { type: "string", title: "Signing key fingerprint", description: "Optional." },
+          },
+        },
+        default: [],
+      },
+      packages: {
+        type: "array",
+        title: "Extensions",
+        description: "Package names to install when missing.",
+        items: { type: "string" },
+        default: [],
+      },
       proxy: {
         type: "object",
         title: "Proxy",
@@ -205,6 +227,8 @@ export const pluginConfig = {
     mode: "original",
     max_results: 20,
     show_nsfw: false,
+    stores: [{ url: "https://store.example.com/index.json" }],
+    packages: [],
     proxy: { url: "", enabled: false },
   },
 } satisfies Schemas["PluginConfig"];

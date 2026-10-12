@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/errors";
@@ -40,8 +40,41 @@ describe("SchemaForm", () => {
       mode: "compressed",
       max_results: 50,
       show_nsfw: true,
+      stores: [{ url: "https://store.example.com/index.json" }],
+      packages: [],
       proxy: { url: "http://proxy:8888", enabled: false },
     });
+  });
+
+  it("edits a list of objects: add, fill in, remove", async () => {
+    const onSubmit = vi.fn();
+    render(<SchemaForm schema={schema} values={pluginConfig.values} onSubmit={onSubmit} />);
+    const stores = screen.getByRole("group", { name: "Extension stores" });
+    expect(within(stores).getByLabelText("Store URL")).toHaveValue("https://store.example.com/index.json");
+
+    await userEvent.click(within(stores).getByRole("button", { name: "Add store" }));
+    const urls = within(stores).getAllByLabelText("Store URL");
+    expect(urls).toHaveLength(2);
+    await userEvent.type(urls[1] as HTMLElement, "https://other.example.org/index.json");
+    await userEvent.type(within(stores).getAllByLabelText("Signing key fingerprint")[1] as HTMLElement, "ab:cd");
+    await userEvent.click(within(stores).getByRole("button", { name: "Remove store 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ stores: [{ url: "https://other.example.org/index.json", fingerprint: "ab:cd" }] }),
+    );
+  });
+
+  it("takes a list of text one item per line, and Enter starts the next", async () => {
+    const onSubmit = vi.fn();
+    render(<SchemaForm schema={schema} values={pluginConfig.values} onSubmit={onSubmit} />);
+    const packages = screen.getByLabelText("Extensions");
+    expect(packages).toHaveAccessibleDescription(/One per line/);
+    await userEvent.type(packages, "org.example.one{Enter}org.example.two{Enter}");
+    expect(packages).toHaveValue("org.example.one\norg.example.two\n");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ packages: ["org.example.one", "org.example.two"] }),
+    );
   });
 
   it("starts from the schema's defaults when nothing is saved", () => {

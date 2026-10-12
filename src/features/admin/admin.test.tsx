@@ -163,6 +163,48 @@ describe("plugins", () => {
     expect(db().pluginConfigs.example?.values.languages).toEqual(["en", "ja"]);
   });
 
+  it("adds an extension store in the plugin's settings", async () => {
+    await renderApp("/admin/plugins/example");
+    const stores = await screen.findByRole("group", { name: "Extension stores" });
+    await userEvent.click(within(stores).getByRole("button", { name: "Add store" }));
+    await userEvent.type(
+      within(stores).getAllByLabelText("Store URL")[1] as HTMLElement,
+      "https://new.example.net/index.json",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save settings" }));
+    await waitFor(() =>
+      expect(db().pluginConfigs.example?.values.stores).toEqual([
+        { url: "https://store.example.com/index.json" },
+        { url: "https://new.example.net/index.json" },
+      ]),
+    );
+  });
+
+  it("shows on the plugin's page how applying its settings went", async () => {
+    await renderApp("/admin/plugins/example");
+    const stores = await screen.findByRole("group", { name: "Extension stores" });
+    await userEvent.click(within(stores).getByRole("button", { name: "Add store" }));
+    await userEvent.type(
+      within(stores).getAllByLabelText("Store URL")[1] as HTMLElement,
+      "https://unreachable.example.net/index.json",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save settings" }));
+    expect(await screen.findByText(/Sync now shows how it went/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    expect(
+      await screen.findByText("adding store https://unreachable.example.net/index.json: can't be reached"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a development build's version as it is, not as vdev", async () => {
+    for (const plugin of db().plugins) plugin.version = "dev";
+    const { router } = await renderApp("/admin/plugins");
+    expect(await screen.findByText("dev")).toBeInTheDocument();
+    await router.navigate({ to: "/admin/plugins/$pluginId", params: { pluginId: "example" } });
+    expect(await screen.findByText(/example · dev/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/vdev/);
+  });
+
   it("removes a plugin and its sources", async () => {
     await renderApp("/admin/plugins");
     await userEvent.click(await screen.findByRole("button", { name: "Remove" }));

@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { $api } from "@/api/client";
@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { HealthBadge } from "@/features/admin/health-badge";
+import { formatRelative } from "@/lib/format";
 import { formatVersion } from "@/lib/version";
 
 type Plugin = components["schemas"]["Plugin"];
@@ -26,7 +27,18 @@ export const Route = createFileRoute("/_app/admin/plugins/$pluginId")({
 
 function PluginPage() {
   const { pluginId } = Route.useParams();
-  const plugin = $api.useQuery("get", "/plugins/{plugin_id}", { params: { path: { plugin_id: pluginId } } });
+  const queryClient = useQueryClient();
+  const path = { params: { path: { plugin_id: pluginId } } };
+  const plugin = $api.useQuery("get", "/plugins/{plugin_id}", path);
+  // Settings are applied in the background (a plugin may add stores, say); syncing asks the
+  // plugin again, so its health shows how that went.
+  const sync = $api.useMutation("post", "/plugins/{plugin_id}/sync", {
+    onSuccess: (synced) => {
+      queryClient.setQueryData($api.queryOptions("get", "/plugins/{plugin_id}", path).queryKey, synced);
+      void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/plugins").queryKey });
+      toast.success(`${synced.name}: ${synced.source_count} sources, ${synced.health}.`);
+    },
+  });
   return (
     <>
       <Button variant="ghost" size="sm" asChild className="-ml-2 mb-2">
@@ -47,9 +59,22 @@ function PluginPage() {
                   {plugin.data.id} · {formatVersion(plugin.data.version)}
                 </span>
                 <HealthBadge status={plugin.data.health} />
+                {plugin.data.checked_at ? (
+                  <span className="text-xs">checked {formatRelative(plugin.data.checked_at)}</span>
+                ) : null}
               </span>
             }
+            actions={
+              <Button variant="outline" disabled={sync.isPending} onClick={() => sync.mutate(path)}>
+                <RefreshCw className={sync.isPending ? "animate-spin" : undefined} aria-hidden />
+                Sync now
+              </Button>
+            }
           />
+          {sync.error ? <ErrorAlert error={sync.error} title="Not synced" /> : null}
+          {plugin.data.health_message ? (
+            <p className="mb-6 text-sm text-muted-foreground [overflow-wrap:anywhere]">{plugin.data.health_message}</p>
+          ) : null}
           <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
             <ConnectionCard plugin={plugin.data} />
             {plugin.data.has_config ? <SettingsCard plugin={plugin.data} /> : null}
@@ -138,7 +163,9 @@ function SettingsCard({ plugin }: { plugin: Plugin }) {
   const save = $api.useMutation("put", "/plugins/{plugin_id}/config", {
     onSuccess: (saved) => {
       queryClient.setQueryData(options.queryKey, saved);
-      toast.success("Settings saved.");
+      toast.success("Settings saved.", {
+        description: "The plugin applies them in the background. Sync now shows how it went.",
+      });
     },
   });
   return (
