@@ -18,6 +18,8 @@ export function PageImage({
   className,
   placeholderHeight,
   placeholderWidth,
+  hold = false,
+  onSettled,
 }: {
   url: string;
   index: number;
@@ -31,6 +33,10 @@ export function PageImage({
   placeholderHeight?: string;
   /** Width kept while loading, for pages side by side. */
   placeholderWidth?: string;
+  /** Not to be fetched yet (pages load in order in a long strip): only its space is kept. */
+  hold?: boolean;
+  /** Called once it has loaded or failed. */
+  onSettled?: () => void;
 }) {
   const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
   const [attempt, setAttempt] = useState(0);
@@ -50,7 +56,7 @@ export function PageImage({
             }
       }
     >
-      {state !== "failed" ? (
+      {hold ? null : state !== "failed" ? (
         <img
           key={attempt}
           src={serverUrl(url)}
@@ -61,8 +67,12 @@ export function PageImage({
           onLoad={(event) => {
             setState("loaded");
             onSize?.({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
+            onSettled?.();
           }}
-          onError={() => setState("failed")}
+          onError={() => {
+            setState("failed");
+            onSettled?.();
+          }}
           className={cn(
             "block select-none",
             fit === "screen" && (stretch ? "h-full w-full object-contain" : "max-h-full max-w-full object-contain"),

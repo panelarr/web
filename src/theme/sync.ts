@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useAsyncDebouncedCallback } from "@tanstack/react-pacer";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { $api, api } from "@/api/client";
 import { findPreset } from "./presets";
@@ -34,8 +34,9 @@ export function themeFromStored(stored: StoredPreferences | undefined): Partial<
  */
 export function usePreferencesSync(): void {
   const queryClient = useQueryClient();
-  const options = $api.queryOptions("get", "/me/preferences");
-  const stored = $api.useQuery("get", "/me/preferences", {}, { staleTime: Number.POSITIVE_INFINITY });
+  // One cache entry for the preferences, read and written: they hold more than one feature's.
+  const options = $api.queryOptions("get", "/me/preferences", {}, { staleTime: Number.POSITIVE_INFINITY });
+  const stored = useQuery(options);
   const applying = useRef(false);
   const loaded = useRef(false);
 

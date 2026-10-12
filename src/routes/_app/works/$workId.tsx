@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cover } from "@/features/catalog/cover";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
 import { LIBRARY_INDEX_KEY } from "@/features/catalog/library-index";
+import { type ChapterOrder, useChapterOrder } from "@/features/works/chapter-order";
 import { ChaptersPanel } from "@/features/works/chapters-panel";
 import { SeriesChaptersPanel } from "@/features/works/series-chapters";
 import { SourcesPanel } from "@/features/works/sources-panel";
@@ -37,7 +38,8 @@ type Tab = string;
 
 interface WorkSearch {
   tab?: Tab;
-  order?: "desc";
+  /** Chosen here; without it, the user's remembered order (newest first by default). */
+  order?: ChapterOrder;
   unread?: true;
 }
 
@@ -46,7 +48,7 @@ export const Route = createFileRoute("/_app/works/$workId")({
     ...(typeof search.tab === "string" && /^(chapters|sources|series:[0-9a-f-]{36})$/.test(search.tab)
       ? { tab: search.tab }
       : {}),
-    ...(search.order === "desc" ? { order: "desc" as const } : {}),
+    ...(search.order === "desc" || search.order === "asc" ? { order: search.order } : {}),
     ...(search.unread === true || search.unread === "true" ? { unread: true as const } : {}),
   }),
   component: WorkPage,
@@ -83,6 +85,7 @@ function WorkDetails({ work }: { work: Work }) {
       ? "chapters"
       : requested;
   const navigate = useNavigate({ from: Route.fullPath });
+  const chapterOrder = useChapterOrder();
   return (
     <>
       <header className="mb-6 flex gap-4 sm:gap-6">
@@ -127,17 +130,14 @@ function WorkDetails({ work }: { work: Work }) {
         <TabsContent value="chapters" className="mt-4">
           <ChaptersPanel
             work={work}
-            view={{ order: search.order ?? "asc", unread: search.unread ?? false }}
-            onViewChange={(view) =>
+            view={{ order: search.order ?? chapterOrder.order, unread: search.unread ?? false }}
+            onViewChange={(view) => {
+              chapterOrder.remember(view.order);
               void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  order: view.order === "desc" ? "desc" : undefined,
-                  unread: view.unread ? true : undefined,
-                }),
+                search: (prev) => ({ ...prev, order: view.order, unread: view.unread ? true : undefined }),
                 replace: true,
-              })
-            }
+              });
+            }}
           />
         </TabsContent>
         {attached.map((state) =>

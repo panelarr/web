@@ -34,6 +34,28 @@ beforeEach(() => {
 });
 
 describe("a work's chapters", () => {
+  it("lists the newest first by default, and remembers the order chosen", async () => {
+    const { router } = await renderApp(`/works/${workId}`);
+    await screen.findByText(/^15 chapters/);
+    const labels = () =>
+      within(screen.getByRole("list", { name: "Chapters" }))
+        .getAllByRole("link", { name: /Chapter/ })
+        .map((link) => link.getAttribute("aria-label") ?? link.textContent);
+    await waitFor(() => expect(labels()[0]).toMatch(/Chapter 1[0-9]/));
+    await userEvent.click(screen.getByRole("button", { name: "Newest first" }));
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ order: "asc" }));
+    await waitFor(() => expect(labels()[0]).toMatch(/Chapter 1\b/), { timeout: 3000 });
+    await waitFor(() =>
+      expect((db().preferences[db().currentUserId ?? ""] as { chapters?: unknown }).chapters).toEqual({
+        order: "asc",
+      }),
+    );
+    // Another work (or a later visit) opens in the order remembered.
+    await router.navigate({ to: "/works/$workId", params: { workId } });
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    await waitFor(() => expect(labels()[0]).toMatch(/Chapter 1\b/));
+  });
+
   it("unifies the sources' chapters, one row each, with the chosen copy and why", async () => {
     await renderApp(`/works/${workId}`);
     expect(await screen.findByText(/^15 chapters · 0 read$/)).toBeInTheDocument();

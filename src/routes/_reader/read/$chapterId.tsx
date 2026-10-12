@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
+import { useRef } from "react";
 import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
 import { ErrorAlert, Loading } from "@/components/states";
@@ -32,6 +33,12 @@ export const Route = createFileRoute("/_reader/read/$chapterId")({
 function ReadPage() {
   const { chapterId } = Route.useParams();
   const { page, variant } = Route.useSearch();
+  // Scrolling on into another chapter (long strips) keeps the same reader: only the URL follows.
+  const continuing = useRouterState({
+    select: (state) => (state.location.state as { continuing?: boolean }).continuing === true,
+  });
+  const session = useRef(chapterId);
+  if (!continuing) session.current = chapterId;
   const pages = $api.useQuery(
     "get",
     "/chapters/{chapter_id}/pages",
@@ -63,5 +70,5 @@ function ReadPage() {
     );
   }
   if (!pages.data) return <Loading label="Opening the chapter…" />;
-  return <ReaderScreen key={pages.data.chapter.id} data={pages.data} work={work.data} asked={page} />;
+  return <ReaderScreen key={session.current} data={pages.data} work={work.data} asked={page} />;
 }

@@ -16,7 +16,7 @@ import { edgeColor, TapZonePreview, useFullscreen, useWakeLock } from "./screen-
 import { isContinuous, type Mode, type ReaderSettings } from "./settings";
 import { ReaderSettingsSheet } from "./settings-sheet";
 import { isSpread, pairPages, viewOf } from "./spreads";
-import { StripViewer } from "./strip-viewer";
+import { type EdgeKind, StripViewer } from "./strip-viewer";
 import { useProgressSaver } from "./use-progress";
 import { type SaveLevel, useReaderSettings } from "./use-reader-settings";
 
@@ -131,6 +131,30 @@ export function ReaderScreen({
     [save, total],
   );
 
+  // In a long strip the reader can scroll into another chapter: it becomes the current one (the
+  // URL and progress follow it), and the one left behind going forward is read.
+  const arriving = useRef<number | undefined>(undefined);
+  const onStripPosition = useCallback(
+    (chapterId: string, page: number) => {
+      if (chapterId === data.chapter.id) return onIndexChange(page);
+      if (chapterId === data.next_chapter_id) save(total - 1, true);
+      arriving.current = page;
+      void navigate({
+        to: "/read/$chapterId",
+        params: { chapterId },
+        search: {},
+        replace: true,
+        state: { continuing: true } as never,
+      });
+    },
+    [data.chapter.id, data.next_chapter_id, onIndexChange, save, total, navigate],
+  );
+  useEffect(() => {
+    if (arriving.current === undefined || data.chapter.id === "") return;
+    setIndex(arriving.current);
+    arriving.current = undefined;
+  }, [data.chapter.id]);
+
   // Another device read further: offer to catch up.
   useEvent("progress.synced", (event) => {
     if (event.chapter_id !== data.chapter.id || event.page === undefined || event.page <= index + 1) return;
@@ -143,8 +167,10 @@ export function ReaderScreen({
     });
   });
 
-  // Load the pages ahead (and the one behind) so turning is instant.
+  // Load the pages ahead (and the one behind) so turning is instant. A long strip loads its own,
+  // in order.
   useEffect(() => {
+    if (continuous) return;
     for (let i = Math.max(0, index - 1); i <= Math.min(total - 1, index + settings.preload); i++) {
       const image = new Image();
       const page = i;
@@ -152,7 +178,7 @@ export function ReaderScreen({
       image.onload = () => recordSize(page, { width: image.naturalWidth, height: image.naturalHeight });
       image.src = serverUrl(urls[i]) ?? "";
     }
-  }, [index, settings.preload, total, urls, recordSize]);
+  }, [continuous, index, settings.preload, total, urls, recordSize]);
 
   // Near the end, fetch the next chapter's page list so it opens at once.
   useEffect(() => {
@@ -252,6 +278,24 @@ export function ReaderScreen({
     />
   );
 
+  // A band in a long strip: the start of the first chapter, between two, the end of the last.
+  const chapterById = (id: string | undefined) => chapters.data?.chapters.find((c) => c.id === id);
+  const stripEdge = (kind: EdgeKind, chapter: ChapterPages, following: ChapterPages | undefined) =>
+    kind === "between" ? (
+      <ChapterEdge compact kind="end" current={chapter.chapter} other={following?.chapter} workId={data.work_id} />
+    ) : (
+      <ChapterEdge
+        compact
+        kind={kind === "start" ? "start" : "end"}
+        current={chapter.chapter}
+        other={chapterById(kind === "start" ? chapter.prev_chapter_id : chapter.next_chapter_id)}
+        workId={data.work_id}
+        onGo={() =>
+          kind === "start" ? goToChapter(chapter.prev_chapter_id, "last") : goToChapter(chapter.next_chapter_id, 0)
+        }
+      />
+    );
+
   // Page by page in double mode turns a view (one or two pages) at a time.
   const viewIndex = views ? viewOf(views, index) : index;
   const onViewChange = (view: number) => {
@@ -291,15 +335,18 @@ export function ReaderScreen({
           scroll={scroll}
         />
       ) : continuous ? (
+        // One strip for the whole session: chapters follow one another in it.
         <StripViewer
-          key={`${data.chapter.id}-${settings.mode}`}
-          urls={urls}
+          key={`strip-${settings.mode}`}
+          first={data}
           startIndex={index}
-          onIndexChange={onIndexChange}
+          onPosition={onStripPosition}
           settings={settings}
           onMenu={() => setOverlay((v) => !v)}
-          renderStart={edge("start")}
-          renderEnd={edge("end")}
+          renderEdge={stripEdge}
+          onPageSize={(chapterId, page, size) => {
+            if (chapterId === data.chapter.id) recordSize(page, size);
+          }}
           scroll={scroll}
         />
       ) : (

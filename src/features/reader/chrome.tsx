@@ -16,17 +16,71 @@ export function ChapterEdge({
   other,
   workId,
   onGo,
+  compact = false,
 }: {
   kind: "start" | "end";
   current: Chapter;
   other: Chapter | undefined;
   workId: string;
-  onGo: () => void;
+  /** Opens the other chapter; without it (a band between chapters already shown) no button. */
+  onGo?: () => void;
+  /** A small band between pages (long strips), instead of a screen of its own. */
+  compact?: boolean;
 }) {
   const gap =
     other && current.number !== undefined && other.number !== undefined
       ? Math.abs(other.number - current.number) > 1.01 && Math.floor(Math.abs(other.number - current.number)) - 1
       : 0;
+  if (compact) {
+    const notes = [
+      gap ? (gap === 1 ? "1 chapter seems to be missing." : `${gap} chapters seem to be missing.`) : "",
+      current.chosen?.scanlator && other?.chosen?.scanlator && current.chosen.scanlator !== other.chosen.scanlator
+        ? `Translated by ${other.chosen.scanlator} from here.`
+        : "",
+    ].filter(Boolean);
+    return (
+      <div className="mx-auto grid max-w-md gap-1 px-4 py-4 text-center text-sm" data-reader-edge={kind}>
+        <p className="[overflow-wrap:anywhere]">
+          <span className="text-muted-foreground">{kind === "end" ? "End of " : "Start of "}</span>
+          <span className="font-medium">{chapterLabel(current)}</span>
+        </p>
+        {other ? (
+          <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+            {kind === "end" ? "Next: " : "Previous: "}
+            {chapterLabel(other)}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {kind === "end" ? "That's the last chapter for now." : "This is the first chapter."}
+          </p>
+        )}
+        {notes.map((note) => (
+          <p key={note} className="text-xs text-warning">
+            {note}
+          </p>
+        ))}
+        <div className="flex flex-wrap justify-center gap-1">
+          {other && onGo ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                onGo();
+              }}
+            >
+              {kind === "end" ? "Next chapter" : "Previous chapter"}
+            </Button>
+          ) : null}
+          <Button variant="ghost" size="sm" asChild onClick={(event) => event.stopPropagation()}>
+            <Link to="/works/$workId" params={{ workId }}>
+              Chapters
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center gap-4 p-6 text-center" data-reader-edge={kind}>
       <div>
@@ -61,7 +115,7 @@ export function ChapterEdge({
           <Button
             onClick={(event) => {
               event.stopPropagation();
-              onGo();
+              onGo?.();
             }}
           >
             {kind === "end" ? "Read the next chapter" : "Read the previous chapter"}
