@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { db, resetDb } from "@/mocks/db";
-import { mockUrl } from "@/mocks/op";
+import { mockUrl, problem } from "@/mocks/op";
 import { renderApp } from "@/test/render";
 import { server } from "@/test/server";
 import { countFilters, validateCatalogSearch } from "./filters";
@@ -79,6 +79,17 @@ describe("browsing the catalogue", () => {
     await renderApp("/browse");
     expect(await screen.findByText("The catalogue is empty")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Check the metadata service" })).toHaveAttribute("href", "/admin/system");
+  });
+
+  it("shows the server's message when the metadata service refuses", async () => {
+    server.use(
+      http.get(mockUrl("/catalog/browse"), () =>
+        problem(502, "meta_key_rejected", "Metadata key rejected", "The metadata service refused Panelarr's API key."),
+      ),
+    );
+    await renderApp("/browse");
+    expect(await screen.findByText("Metadata key rejected", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText("The metadata service refused Panelarr's API key.")).toBeInTheDocument();
   });
 
   it("says when nothing matches", async () => {

@@ -2,9 +2,12 @@
 
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http } from "msw";
 import { describe, expect, it } from "vitest";
 import { db, resetDb } from "@/mocks/db";
+import { mockUrl, problem } from "@/mocks/op";
 import { renderApp } from "@/test/render";
+import { server } from "@/test/server";
 
 const reader = () => db().users.find((u) => u.username === "reader");
 
@@ -194,5 +197,22 @@ describe("system", () => {
     await renderApp("/admin/system");
     expect(await screen.findByText("database")).toBeInTheDocument();
     expect(screen.getByText("A metadata provider has entries")).toBeInTheDocument();
+  });
+  it("says why a provider's sync didn't start, in the server's words", async () => {
+    resetDb("degraded");
+    server.use(
+      http.post(mockUrl("/system/meta/providers/{provider}/sync"), () =>
+        problem(
+          502,
+          "meta_provider_unavailable",
+          "Metadata provider unavailable",
+          "The metadata service can't reach the example-provider plugin. Start it and try again.",
+        ),
+      ),
+    );
+    await renderApp("/admin/system");
+    await userEvent.click(await screen.findByRole("button", { name: "Start sync" }));
+    expect(await screen.findByText("The sync didn't start")).toBeInTheDocument();
+    expect(screen.getByText(/can't reach the example-provider plugin/)).toBeInTheDocument();
   });
 });
