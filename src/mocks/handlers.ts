@@ -1041,6 +1041,38 @@ export const operations: MockOperation[] = [
     });
   }),
 
+  op("get", "/plugins/{plugin_id}/origins", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const plugin = packagesPlugin(String(params.plugin_id));
+    if (plugin instanceof Response) return plugin;
+    return json<S["PackageOriginList"]>({ origins: db().origins[plugin.id] ?? [] });
+  }),
+
+  op("post", "/plugins/{plugin_id}/origins/{origin_id}/refresh", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const plugin = packagesPlugin(String(params.plugin_id));
+    if (plugin instanceof Response) return plugin;
+    const origin = db().origins[plugin.id]?.find((o) => o.id === params.origin_id);
+    if (!origin) return problem(404, "not_found", "Not found", "No such store.");
+    delete origin.error;
+    origin.refreshed_at = now();
+    commit();
+    return json(origin);
+  }),
+
+  op("post", "/plugins/{plugin_id}/packages/{package_id}/reload", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = pluginPackage(String(params.plugin_id), String(params.package_id));
+    if (found instanceof Response) return found;
+    if (!found.pkg.installed) return problem(409, "not_installed", "Not installed", "Install it first.");
+    delete found.pkg.error;
+    commit();
+    return json(packageView(db(), found.plugin.id, found.pkg));
+  }),
+
   op("post", "/plugins/{plugin_id}/packages/{package_id}/install", async ({ params, request }) => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
@@ -1162,13 +1194,34 @@ export const operations: MockOperation[] = [
     const url = new URL(request.url);
     const all = url.searchParams.get("all") === "true" && user.role === "admin";
     const lang = url.searchParams.get("lang");
+    const pluginId = url.searchParams.get("plugin_id");
+    const packageId = url.searchParams.get("package_id");
     const list = db().sources.filter((source) => {
       if (lang && source.lang !== lang) return false;
+      if (pluginId && source.plugin_id !== pluginId) return false;
+      if (packageId && source.package_id !== packageId) return false;
       if (all) return true;
       if (!source.enabled || !source.present) return false;
       return user.role === "admin" || user.grants.all_sources || user.grants.allowed_sources.includes(source.id);
     });
     return json<S["SourceList"]>({ sources: list });
+  }),
+
+  op("put", "/sources/{source_id}/health-check", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const source = d.sources.find((s) => s.id === params.source_id);
+    if (!source) return problem(404, "not_found", "Not found");
+    const plugin = d.plugins.find((p) => p.id === source.plugin_id);
+    if (!plugin?.capabilities.includes("health_checks")) {
+      return problem(422, "unsupported", "Not supported", "This source's plugin has no health checks to turn off.");
+    }
+    const { enabled } = (await request.json()) as S["SetHealthCheckRequest"];
+    const { checks_disabled: _, ...health } = source.health;
+    source.health = enabled ? health : { ...health, checks_disabled: true };
+    commit();
+    return json(source);
   }),
 
   op("patch", "/sources/{source_id}", async ({ params, request }) => {

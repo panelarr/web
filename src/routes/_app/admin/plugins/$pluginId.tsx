@@ -19,20 +19,21 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { ExtensionsPanel, type ExtensionsSearch } from "@/features/extensions/extensions-panel";
+import { pluginJobsHost } from "@/features/jobs/hosts";
 import { type JobsSearch, JobsSection, jobsSearch } from "@/features/jobs/jobs-views";
-import { pluginJobs } from "@/features/jobs/service";
-import { JobsContext, type JobsHost } from "@/features/jobs/use-jobs";
+import { JobsContext } from "@/features/jobs/use-jobs";
 import { PluginNetwork } from "@/features/network/plugin-network";
+import { SourcesHealthPanel, type SourcesHealthSearch, sourcesHealthSearch } from "@/features/sources/source-health";
 import { formatRelative } from "@/lib/format";
 import { formatVersion } from "@/lib/version";
 
 type Plugin = components["schemas"]["Plugin"];
 
 /** The plugin page's sections beyond its overview; each shows when the plugin supports it. */
-const TABS = ["extensions", "jobs", "network"] as const;
+const TABS = ["extensions", "sources", "jobs", "network"] as const;
 type PluginTab = (typeof TABS)[number];
 
-interface PluginSearch extends ExtensionsSearch, JobsSearch {
+interface PluginSearch extends ExtensionsSearch, JobsSearch, SourcesHealthSearch {
   tab?: PluginTab;
 }
 
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/_app/admin/plugins/$pluginId")({
     }
     if (search.show === "installed" || search.show === "updates") out.show = search.show;
     if (out.tab === "jobs") Object.assign(out, jobsSearch(search));
+    if (out.tab === "sources") Object.assign(out, sourcesHealthSearch(search));
     return out;
   },
   component: PluginPage,
@@ -118,6 +120,9 @@ function PluginPage() {
                 {plugin.data.capabilities.includes("packages") ? (
                   <TabsTrigger value="extensions">Extensions</TabsTrigger>
                 ) : null}
+                {plugin.data.capabilities.includes("health_checks") ? (
+                  <TabsTrigger value="sources">Sources</TabsTrigger>
+                ) : null}
                 {plugin.data.capabilities.includes("jobs") ? <TabsTrigger value="jobs">Jobs</TabsTrigger> : null}
                 <TabsTrigger value="network">Network</TabsTrigger>
               </TabsList>
@@ -134,9 +139,23 @@ function PluginPage() {
                 />
               </TabsContent>
             ) : null}
+            {plugin.data.capabilities.includes("health_checks") ? (
+              <TabsContent value="sources" className="mt-4">
+                <SourcesHealthPanel
+                  pluginId={plugin.data.id}
+                  jobs={
+                    plugin.data.capabilities.includes("jobs")
+                      ? pluginJobsHost(plugin.data.id, plugin.data.name)
+                      : undefined
+                  }
+                  search={search}
+                  onSearch={(change) => void navigate({ search: (prev) => ({ ...prev, ...change }), replace: true })}
+                />
+              </TabsContent>
+            ) : null}
             {plugin.data.capabilities.includes("jobs") ? (
               <TabsContent value="jobs" className="mt-4">
-                <JobsContext value={pluginJobsHost(plugin.data)}>
+                <JobsContext value={pluginJobsHost(plugin.data.id, plugin.data.name)}>
                   <JobsSection
                     search={search}
                     onStatus={(status) => void navigate({ search: (prev) => ({ ...prev, status }), replace: true })}
@@ -152,21 +171,6 @@ function PluginPage() {
       ) : null}
     </>
   );
-}
-
-/** A plugin's jobs, inside its page's Jobs tab (?tab=jobs&job=…&run=…). */
-function pluginJobsHost(plugin: Plugin): JobsHost {
-  const to = "/admin/plugins/$pluginId";
-  const params = { pluginId: plugin.id };
-  return {
-    service: pluginJobs(plugin.id, plugin.name),
-    nested: true,
-    links: {
-      list: { to, params, search: { tab: "jobs" } },
-      job: (job) => ({ to, params, search: { tab: "jobs", job } }),
-      run: (job, run) => ({ to, params, search: { tab: "jobs", job, run } }),
-    },
-  };
 }
 
 function Overview({ plugin }: { plugin: Plugin }) {

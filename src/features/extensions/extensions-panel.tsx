@@ -13,6 +13,7 @@ import { formatRelative } from "@/lib/format";
 import { PackageActions, PackageFacts } from "./package-parts";
 import { PackageSheet } from "./package-sheet";
 import { filterPackages, type Package, type PackageFilter, packageLanguages } from "./packages";
+import { StoresPanel } from "./stores-panel";
 import { type PackageTasks, usePackageList, usePackageTasks } from "./use-package-tasks";
 
 export interface ExtensionsSearch extends PackageFilter {
@@ -52,6 +53,7 @@ export function ExtensionsPanel({
   }
   return (
     <div className="grid gap-4">
+      <StoresPanel pluginId={pluginId} />
       <div className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]">
         <Input
           type="search"

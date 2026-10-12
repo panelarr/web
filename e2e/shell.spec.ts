@@ -48,6 +48,7 @@ test("never scrolls sideways", async ({ page }) => {
     "/admin/queue",
     "/admin/metadata?tab=jobs",
     "/admin/plugins/stores?tab=jobs&job=source-health",
+    "/admin/plugins/stores?tab=sources",
   ];
   for (const path of [...paths, ...admin]) {
     await page.goto(path);

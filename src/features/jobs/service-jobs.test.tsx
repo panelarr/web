@@ -85,6 +85,9 @@ describe("the metadata service's jobs", () => {
     expect(await screen.findByRole("heading", { name: "Providers" })).toBeInTheDocument();
     expect(within(card("Rebuild the search index")).getByText(/by the metadata service/)).toBeInTheDocument();
     expect(within(card("Look for duplicates")).getByText("Failed")).toBeInTheDocument();
+    // Its schedules are cron, in words.
+    expect(within(card("Example Provider: full sync")).getByText(/Runs daily at 03:00 UTC/)).toBeInTheDocument();
+    expect(within(card("Look for duplicates")).getByText(/Runs every Monday at 04:30 UTC/)).toBeInTheDocument();
   });
 
   it("run with parameters and filter runs by status from the URL", async () => {

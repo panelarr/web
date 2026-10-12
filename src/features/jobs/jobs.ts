@@ -44,10 +44,62 @@ export function every(seconds: number): string {
   return `every ${seconds} seconds`;
 }
 
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+const number = (field: string, max: number): number | undefined =>
+  /^\d+$/.test(field) && Number(field) <= max ? Number(field) : undefined;
+
+/** A day of the week from cron (0–7, Sunday twice, or a name). */
+function weekday(field: string): string | undefined {
+  const n = number(field, 7);
+  if (n !== undefined) return DAYS[n % 7];
+  const i = DAY_NAMES.indexOf(field.toUpperCase());
+  return i >= 0 ? DAYS[i] : undefined;
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * A cron schedule in words where it's a common one ("daily at 03:00 UTC", "every Monday at
+ * 04:30 UTC", "every 15 minutes"), else as written. The services read cron in UTC.
+ */
+export function cronText(cron: string): string {
+  const fields = cron.trim().split(/\s+/);
+  const fallback = `on schedule ${cron.trim()} (UTC)`;
+  if (fields.length !== 5) return fallback;
+  const [minute = "", hour = "", dom = "", month = "", dow = ""] = fields;
+  const m = number(minute, 59);
+  const h = number(hour, 23);
+  const step = (field: string, max: number) => {
+    const match = /^\*\/(\d+)$/.exec(field);
+    return match && Number(match[1]) > 0 && Number(match[1]) <= max ? Number(match[1]) : undefined;
+  };
+  const anyDay = dom === "*" && month === "*" && dow === "*";
+  if (anyDay && hour === "*" && step(minute, 59)) return every(60 * (step(minute, 59) ?? 1));
+  if (anyDay && hour === "*" && m !== undefined) return m === 0 ? "every hour" : `every hour at :${pad(m)}`;
+  if (anyDay && m !== undefined && step(hour, 23)) {
+    const text = every(3_600 * (step(hour, 23) ?? 1));
+    return m === 0 ? text : `${text} at :${pad(m)}`;
+  }
+  if (m === undefined || h === undefined || month !== "*") return fallback;
+  const at = `at ${pad(h)}:${pad(m)} UTC`;
+  if (dom === "*" && dow === "*") return `daily ${at}`;
+  if (dom === "*" && weekday(dow)) return `every ${weekday(dow)} ${at}`;
+  if (dom === "*" && (dow === "1-5" || dow.toUpperCase() === "MON-FRI")) return `on weekdays ${at}`;
+  const day = number(dom, 31);
+  if (dow === "*" && day !== undefined && day >= 1) return `monthly on day ${day} ${at}`;
+  return fallback;
+}
+
 /** How a job runs on its own, in a few words. */
 export function scheduleText(schedule: Job["schedule"]): string {
-  if (!schedule.interval_seconds) return "Runs by hand only";
-  const text = every(schedule.interval_seconds);
+  const text = schedule.cron
+    ? cronText(schedule.cron)
+    : schedule.interval_seconds
+      ? every(schedule.interval_seconds)
+      : undefined;
+  if (!text) return "Runs by hand only";
   return schedule.enabled ? `Runs ${text}` : `Schedule off (${text})`;
 }
 
@@ -87,4 +139,19 @@ export function defaultsText(params: JobParam[]): string | undefined {
 export function paramLabel(name: string): string {
   const words = name.replaceAll(/[_.-]+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The parameter that makes a job a per-source one (contracts/jobs.md). */
+export const SOURCE_IDS_PARAM = "source_ids";
+
+/**
+ * A plugin's jobs that can run for one source: they take a `source_ids` list. When several do,
+ * health checks come first (by group or name); one left means a plain "Check now", more a menu.
+ */
+export function perSourceJobs(jobs: readonly Job[]): Job[] {
+  const candidates = jobs.filter((job) =>
+    job.params.some((param) => param.name === SOURCE_IDS_PARAM && param.type === "string_list"),
+  );
+  const health = candidates.filter((job) => /health/i.test(job.group) || /health/i.test(job.name));
+  return health.length > 0 ? health : candidates;
 }

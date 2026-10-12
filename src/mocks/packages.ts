@@ -45,6 +45,7 @@ export function initialPackages(count = 60): MockPackage[] {
       content_rating: "safe",
       supported: true,
       offers: OFFERS("2.1.0"),
+      details: { ...installedDetails("main"), installed_at: "2026-10-01T12:40:00Z" },
       enabled_langs: ["ja"],
       sources: [
         { key: "3001", name: "Polyglot Comics", lang: "en" },
@@ -113,6 +114,53 @@ export function initialPackages(count = 60): MockPackage[] {
   return [...named, ...more];
 }
 
+/** What the plugin records about a package it installed. */
+function installedDetails(originId: string): NonNullable<S["Package"]["details"]> {
+  return {
+    signing_fingerprint: "7c:1e:9a:44:0b:d2:5f:83:e6:20:91:ab:3c:58:f0:12",
+    api_version: "1.5",
+    installed_at: new Date().toISOString(),
+    sha256: "5d41402abc4b2a76b9719d911017c592ae2fbb6d5a2c5a7c3f1b0e9d8c7b6a59",
+    origin_id: originId,
+  };
+}
+
+/** The stores the store plugin reads packages from. */
+export function initialOrigins(): Record<string, S["PackageOrigin"][]> {
+  return {
+    [STORE_PLUGIN]: [
+      {
+        id: "main",
+        name: "Main store",
+        url: "https://store.example.com/index.json",
+        refreshed_at: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+        package_count: 204,
+        signing_key_fingerprint: "7c:1e:9a:44:0b:d2:5f:83:e6:20:91:ab:3c:58:f0:12",
+      },
+      {
+        id: "mirror",
+        name: "Mirror store",
+        url: "https://mirror.example.org/index.json",
+        refreshed_at: new Date(Date.now() - 27 * 3_600_000).toISOString(),
+        error: "The store answered 503 Service Unavailable",
+        package_count: 203,
+      },
+    ],
+  };
+}
+
+/** How the store plugin's sources fared in their last health check. */
+const INITIAL_HEALTH: Record<string, S["SourceHealth"]> = {
+  "3001": { status: "ok", checked_at: "2026-10-10T05:00:00Z" },
+  "3002": {
+    status: "failing",
+    reason: "SOURCE_DOWN",
+    message: "The site answered 503",
+    checked_at: "2026-10-12T05:00:00Z",
+  },
+  "3003": { status: "unknown", checks_disabled: true },
+};
+
 /** The sources of the installed packages, as the server lists them. */
 export function initialPackageSources(packages: MockPackage[]): S["SourceInfo"][] {
   return packages.filter((p) => p.installed).flatMap((p) => packageSources(p, undefined));
@@ -137,7 +185,7 @@ function packageSources(pkg: MockPackage, known: S["SourceInfo"][] | undefined):
       content_rating: pkg.content_rating,
       // Lantern Reader's source has settings of its own.
       capabilities: s.key === "3101" ? ["latest", "search", "settings"] : ["latest", "search"],
-      health: before?.health ?? { status: "unknown" },
+      health: before?.health ?? INITIAL_HEALTH[s.key] ?? { status: "unknown" },
       // Polyglot's Japanese source starts turned off by the admin.
       enabled: before?.enabled ?? s.key !== "3002",
       present: pkg.installed && on,
@@ -276,11 +324,13 @@ function finish(state: PackagesState, task: S["Task"]): void {
     if (task.payload.action === "uninstall") {
       pkg.installed = false;
       delete pkg.installed_version;
+      delete pkg.details;
       pkg.update_available = false;
     } else {
       pkg.installed = true;
       pkg.installed_version = pkg.version;
       pkg.update_available = false;
+      pkg.details = installedDetails(String(task.payload.origin_id ?? pkg.offers[0]?.origin_id ?? "main"));
     }
     syncPackageSources(state, pluginId);
   }

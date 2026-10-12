@@ -193,6 +193,8 @@ export interface JobStore {
 
 export interface JobsState extends JobStore {
   tasks: S["Task"][];
+  /** For plugins' per-source jobs (health checks), which update their sources when done. */
+  sources: S["SourceInfo"][];
   pausedKinds: string[];
   metaJobs: JobStore;
   /** By plugin ID, for plugins with the `jobs` capability. */
@@ -258,8 +260,19 @@ export function tickJobs(state: JobsState): boolean {
       const done = progress.done + 1;
       changed = true;
       if (done >= (progress.total ?? RUN_STEPS)) {
-        current.summary.counts = { works: 12, new_chapters: 3 };
-        finishRun(store, current, "succeeded", "Done: 12 works, 3 new chapters");
+        if (current.summary.job_id === "source-health") {
+          const checked = checkSources(state, current.params.source_ids);
+          current.summary.counts = { checked: checked.length, failing: checked.filter(failing).length };
+          finishRun(
+            store,
+            current,
+            "succeeded",
+            `${checked.length} checked, ${checked.filter(failing).length} failing`,
+          );
+        } else {
+          current.summary.counts = { works: 12, new_chapters: 3 };
+          finishRun(store, current, "succeeded", "Done: 12 works, 3 new chapters");
+        }
       } else {
         current.progress = { ...progress, done };
         if (!store.quiet)
@@ -272,6 +285,24 @@ export function tickJobs(state: JobsState): boolean {
     }
   }
   return changed;
+}
+
+const failing = (source: S["SourceInfo"]) => source.health.status === "failing";
+
+/** A health check of some of the store plugin's sources (all when none are named): they all answer. */
+function checkSources(state: JobsState, ids: string | undefined): S["SourceInfo"][] {
+  const wanted = ids ? ids.split(",") : undefined;
+  const checked = state.sources.filter(
+    (s) => s.plugin_id === "stores" && s.present && (wanted ? wanted.includes(s.id) : !s.health.checks_disabled),
+  );
+  for (const source of checked) {
+    source.health = {
+      status: "ok",
+      checked_at: new Date().toISOString(),
+      ...(source.health.checks_disabled ? { checks_disabled: true } : {}),
+    };
+  }
+  return checked;
 }
 
 /** Each job's last run, from the newest run of it. */
@@ -300,7 +331,7 @@ export function initialMetaJobs(): JobStore {
         name: "Example Provider: full sync",
         description: "Downloads the provider's whole catalogue and merges it in.",
         group: "Providers",
-        schedule: { interval_seconds: 604_800, enabled: true, source: "META_SYNC_DUMP_INTERVAL" },
+        schedule: { cron: "0 3 * * *", enabled: true, source: "META_SYNC_DUMP_SCHEDULE" },
         running: false,
         next_run_at: minutesFromNow(3 * 1440),
         cancellable: true,
@@ -332,7 +363,7 @@ export function initialMetaJobs(): JobStore {
         name: "Look for duplicates",
         description: "Pairs up entries that look like the same work, for review.",
         group: "Maintenance",
-        schedule: { interval_seconds: 86_400, enabled: true, source: "META_DUPLICATES_INTERVAL" },
+        schedule: { cron: "30 4 * * 1", enabled: true, source: "META_DUPLICATES_SCHEDULE" },
         running: false,
         next_run_at: minutesFromNow(600),
         cancellable: false,

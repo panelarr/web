@@ -21,7 +21,7 @@ const packageListOptions = (pluginId: string) =>
     { staleTime: Number.POSITIVE_INFINITY, gcTime: 30 * 60_000, meta: MANUAL },
   );
 
-const packageListKey = (pluginId: string) => packageListOptions(pluginId).queryKey;
+export const packageListKey = (pluginId: string) => packageListOptions(pluginId).queryKey;
 
 /** A plugin's packages from all its stores: one big list, loaded once and kept. */
 export function usePackageList(pluginId: string) {

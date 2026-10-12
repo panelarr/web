@@ -143,6 +143,7 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
     "/admin/metadata?tab=jobs&job=sync.example-provider.dump",
     "/admin/metadata?tab=network",
     "/admin/plugins/stores?tab=jobs",
+    "/admin/plugins/stores?tab=sources",
     "/admin/plugins/stores?tab=jobs&job=source-health",
   ]) {
     await open(path);

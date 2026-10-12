@@ -48,7 +48,7 @@ Panelarr's own proxies, solvers and network profiles, offered to every plugin; c
 Everything in the metadata service's and source plugins' own admin pages, inside Panelarr's, through the server (`docs/admin.md`).
 
 - [x] **S1. One Jobs view** for the server, the metadata service and plugins: the list by group, a job's runs (by status), a run in full, run with parameters, cancel, the run already going on a 409; live by events (server) or polling (the others). A plugin's Jobs tab (with `jobs`); Admin → Metadata with its connection, jobs and network (moved from System, which keeps a line and a link).
-- [ ] **S2. Plugin admin:** stores (refresh), package reload and details, a Sources tab with health checks (switch, check now through a per-source job).
+- [x] **S2. Plugin admin:** its stores (last refresh, error, signing key, refresh now) above its extensions; an installed extension's details (installed when, from which store, API, signature, checksum) and Reload; a Sources tab (with `health_checks`): each source's health and last check, filters in the URL, scheduled checks on or off, Check now through the plugin's per-source job (one taking `source_ids`), followed to the end. Cron schedules in words (UTC).
 - [ ] **S3. Metadata service:** health per component, providers and their sync runs, start a sync; refresh a work from its providers.
 - [ ] **S4. Duplicates** with the judge: review pairs, merge, dismiss, reopen; the judge's settings, test and reset.
 - [ ] **S5. Search engine** settings, test and reset; docs, journeys and checks over every page; done.

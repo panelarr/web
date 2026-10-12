@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { Loader2, RotateCw } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { $api } from "@/api/client";
@@ -17,6 +17,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ProfilePicker } from "@/features/network/profile-picker";
 import { hasSettings, SourceSettingsButton } from "@/features/sources/source-settings";
 import { useIsDesktop } from "@/hooks/use-media-query";
+import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { formatVersion } from "@/lib/version";
 import { PackageActions, PackageFacts } from "./package-parts";
@@ -98,6 +99,7 @@ function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tas
           ) : null}
           <PackageActions pkg={pkg} tasks={tasks} {...(origin ? { originId: origin } : {})} />
         </section>
+        {pkg.installed ? <Installed pluginId={pluginId} pkg={pkg} /> : null}
         {pkg.langs.length > 1 ? (
           // Keyed by what's saved, so the form starts over once a save comes back.
           <LanguagesForm key={pkg.enabled_langs.join()} pluginId={pluginId} pkg={pkg} />
@@ -146,6 +148,58 @@ function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tas
         </section>
       </div>
     </>
+  );
+}
+
+/** What the plugin recorded when it installed the package, and Reload. */
+function Installed({ pluginId, pkg }: { pluginId: string; pkg: Package }) {
+  const queryClient = useQueryClient();
+  // Without downloading it again: retries a failed load or applies settings that need one.
+  const reload = $api.useMutation("post", "/plugins/{plugin_id}/packages/{package_id}/reload", {
+    onSuccess: (reloaded) => {
+      patchPackage(queryClient, pluginId, reloaded);
+      toast.success(reloaded.error ? `${reloaded.name} still fails to load.` : `${reloaded.name} reloaded.`);
+    },
+  });
+  const details = pkg.details;
+  const origin = pkg.offers.find((offer) => offer.origin_id === details?.origin_id)?.origin_name ?? details?.origin_id;
+  const facts: Array<[string, string | undefined, boolean?]> = [
+    ["Installed", details?.installed_at ? formatDateTime(details.installed_at) : undefined],
+    ["From", origin],
+    ["For API", details?.api_version],
+    ["Signed by", details?.signing_fingerprint, true],
+    ["SHA-256", details?.sha256, true],
+  ];
+  return (
+    <section className="grid gap-2" aria-labelledby={`installed-${pkg.id}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id={`installed-${pkg.id}`} className="text-sm font-medium">
+          Installed
+        </h3>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={reload.isPending}
+          onClick={() => reload.mutate({ params: { path: { plugin_id: pluginId, package_id: pkg.id } } })}
+        >
+          <RotateCw className={reload.isPending ? "animate-spin" : undefined} aria-hidden />
+          Reload
+        </Button>
+      </div>
+      {reload.error ? <ErrorAlert error={reload.error} title="Not reloaded" /> : null}
+      {facts.some(([, value]) => value) ? (
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+          {facts.map(([label, value, code]) =>
+            value ? (
+              <div key={label} className="contents">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className={cn("[overflow-wrap:anywhere]", code && "font-mono text-xs leading-5")}>{value}</dd>
+              </div>
+            ) : null,
+          )}
+        </dl>
+      ) : null}
+    </section>
   );
 }
 

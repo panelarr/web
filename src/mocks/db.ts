@@ -28,7 +28,7 @@ import {
 import { initialStorages } from "./downloads";
 import { initialJobs, initialMetaJobs, initialPluginJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
 import { initialNetwork, type NetworkState } from "./network";
-import { initialPackageSources, initialPackages, type MockPackage } from "./packages";
+import { initialOrigins, initialPackageSources, initialPackages, type MockPackage } from "./packages";
 
 type S = components["schemas"];
 
@@ -83,6 +83,8 @@ export interface MockDb extends JobsState, NetworkState {
   sourceSettings: Record<string, S["SourceSettings"]>;
   /** Per plugin with the packages capability: its packages. */
   packages: Record<string, MockPackage[]>;
+  /** By plugin: where its packages come from. */
+  origins: Record<string, S["PackageOrigin"][]>;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -113,6 +115,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     sourceSettings: { "example:1001": clone(sourceSettings), "stores:3101": clone(sourceSettings) },
     sources: [...clone(sources), ...initialPackageSources(packages)],
     packages: { [storePlugin.id]: packages },
+    origins: initialOrigins(),
     invites: [{ ...clone(invite), token: "open-invite-token" }],
     failedLogins: 0,
     works: [],
@@ -165,6 +168,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
         pluginConfigs: {},
         sources: [],
         packages: {},
+        origins: {},
         invites: [],
       };
     case "slow-pages":
