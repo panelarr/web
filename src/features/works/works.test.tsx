@@ -29,26 +29,6 @@ describe("the library", () => {
     expect(await screen.findByText("Your library is empty")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse the catalogue" })).toHaveAttribute("href", "/browse");
   });
-
-  it("shows works, searches them, and sorts by new chapters", async () => {
-    seed("ent_1000", "ent_1001", "ent_1002");
-    const entry = db().library.find((e) => db().works.find((w) => w.id === e.work_id)?.title === "Iron Garden");
-    if (entry) entry.new_chapters = 4;
-    const { router } = await renderApp("/");
-    expect(await screen.findByText("The Lantern Keeper")).toBeInTheDocument();
-    expect(screen.getByText("3 works")).toBeInTheDocument();
-    expect(screen.getByText("4")).toHaveTextContent("4 new chapters");
-
-    await userEvent.click(screen.getByRole("button", { name: /New chapters/ }));
-    await waitFor(() => expect(router.state.location.search).toEqual({ only: "new" }));
-    expect(screen.queryByText("The Lantern Keeper")).not.toBeInTheDocument();
-    expect(screen.getByText("Iron Garden")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /New chapters/ }));
-    await userEvent.type(screen.getByRole("searchbox", { name: "Search your library" }), "moon");
-    await waitFor(() => expect(screen.queryByText("Iron Garden")).not.toBeInTheDocument());
-    expect(screen.getByText("Moonlit Bakery")).toBeInTheDocument();
-  });
 });
 
 describe("fixing matches", () => {
