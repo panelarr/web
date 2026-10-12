@@ -12,6 +12,7 @@ const PAGES = [
   "/browse",
   "/catalog/ent_1001",
   "/admin/sources/example:1001",
+  "/admin/plugins/stores?tab=extensions",
   "/downloads",
   "/settings?tab=appearance",
   "/settings?tab=api-keys",

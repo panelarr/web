@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -10,23 +10,44 @@ import { isApiError } from "@/api/errors";
 import type { components } from "@/api/schema.gen";
 import { formValues, TextField } from "@/components/form";
 import { type JsonSchema, SchemaForm } from "@/components/schema-form";
+import { ScrollStrip } from "@/components/scroll-strip";
 import { ErrorAlert, Loading, PageHeader } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HealthBadge } from "@/features/admin/health-badge";
+import { ExtensionsPanel, type ExtensionsSearch } from "@/features/extensions/extensions-panel";
 import { formatRelative } from "@/lib/format";
 import { formatVersion } from "@/lib/version";
 
 type Plugin = components["schemas"]["Plugin"];
 
+interface PluginSearch extends ExtensionsSearch {
+  tab?: "extensions";
+}
+
+const str = (value: unknown) => (typeof value === "string" && value ? value : undefined);
+
 export const Route = createFileRoute("/_app/admin/plugins/$pluginId")({
+  validateSearch: (search: Record<string, unknown>): PluginSearch => {
+    const out: PluginSearch = {};
+    if (search.tab === "extensions") out.tab = "extensions";
+    for (const key of ["q", "lang", "pkg"] as const) {
+      const value = str(search[key]);
+      if (value) out[key] = value;
+    }
+    if (search.show === "installed" || search.show === "updates") out.show = search.show;
+    return out;
+  },
   component: PluginPage,
 });
 
 function PluginPage() {
   const { pluginId } = Route.useParams();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const queryClient = useQueryClient();
   const path = { params: { path: { plugin_id: pluginId } } };
   const plugin = $api.useQuery("get", "/plugins/{plugin_id}", path);
@@ -75,13 +96,46 @@ function PluginPage() {
           {plugin.data.health_message ? (
             <p className="mb-6 text-sm text-muted-foreground [overflow-wrap:anywhere]">{plugin.data.health_message}</p>
           ) : null}
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-            <ConnectionCard plugin={plugin.data} />
-            {plugin.data.has_config ? <SettingsCard plugin={plugin.data} /> : null}
-          </div>
+          {plugin.data.capabilities.includes("packages") ? (
+            // A plugin that hosts many sites (e.g. via extensions) manages them here.
+            <Tabs
+              value={search.tab ?? "overview"}
+              onValueChange={(value) =>
+                void navigate({ search: value === "extensions" ? { tab: "extensions" } : {}, replace: true })
+              }
+            >
+              <ScrollStrip>
+                <TabsList>
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="extensions">Extensions</TabsTrigger>
+                </TabsList>
+              </ScrollStrip>
+              <TabsContent value="overview" className="mt-4">
+                <Overview plugin={plugin.data} />
+              </TabsContent>
+              <TabsContent value="extensions" className="mt-4">
+                <ExtensionsPanel
+                  pluginId={plugin.data.id}
+                  search={search}
+                  onSearch={(change) => void navigate({ search: (prev) => ({ ...prev, ...change }), replace: true })}
+                />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <Overview plugin={plugin.data} />
+          )}
         </>
       ) : null}
     </>
+  );
+}
+
+function Overview({ plugin }: { plugin: Plugin }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <ConnectionCard plugin={plugin} />
+      {plugin.has_config ? <SettingsCard plugin={plugin} /> : null}
+    </div>
   );
 }
 

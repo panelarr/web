@@ -174,6 +174,8 @@ export function packageView(state: PackagesState, pluginId: string, pkg: MockPac
   );
   return {
     ...pkg,
+    // Two of them have an icon, served (signed) by the server.
+    ...(ICONS.has(pkg.id) ? { icon_url: `/api/v1/plugins/${pluginId}/packages/${pkg.id}/icon?ref=mock&sig=mock` } : {}),
     sources: pkg.sources.map((s) => ({
       id: sourceId(s.key),
       name: s.name,
@@ -182,6 +184,14 @@ export function packageView(state: PackagesState, pluginId: string, pkg: MockPac
     })),
     ...(open ? { task_id: open.id } : {}),
   };
+}
+
+const ICONS = new Set(["org.example.polyglot", "org.example.lantern"]);
+
+/** A package's icon: a coloured square with its first letter. */
+export function packageIconSvg(name: string): string {
+  const letter = name.slice(0, 1).toUpperCase();
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#3b6ea5"/><text x="32" y="42" font-family="sans-serif" font-size="30" fill="#fff" text-anchor="middle">${letter}</text></svg>`;
 }
 
 export type PackageAction = "install" | "update" | "uninstall";

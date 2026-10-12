@@ -685,6 +685,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plugins/{plugin_id}/packages/{package_id}/icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A package's icon
+         * @description Use the package's `icon_url`; only links the server handed out
+         *     work (they are signed). The server fetches the icon from the plugin
+         *     (with the plugin's key, only to the plugin's own address), keeps
+         *     raster images up to 2 MiB and refreshes them weekly, so the browser
+         *     never contacts a site.
+         */
+        get: operations["getPackageIcon"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plugins/{plugin_id}/packages/{package_id}/install": {
         parameters: {
             query?: never;
@@ -2572,6 +2600,8 @@ export interface components {
             enabled_langs: string[];
             /** @description Why an installed package isn't working. */
             error?: string;
+            /** @description The server's URL for the package's icon, when it has one. */
+            icon_url?: string;
             /**
              * Format: uuid
              * @description An install, update or uninstall of it that is queued or running.
@@ -4226,6 +4256,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskRef"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPackageIcon: {
+        parameters: {
+            query: {
+                ref: string;
+                sig: string;
+            };
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The icon. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
                 };
             };
             default: components["responses"]["Problem"];

@@ -84,11 +84,14 @@ message, the code and a copyable request ID.
 - **Invalidations.** Each event marks the cached queries it affects as stale (the
   `INVALIDATIONS` table). They are batched for half a second, so a burst refetches once.
 - **Targeted invalidations.** Some events concern one thing (the `TARGETED` table):
-  `plugin.health` refreshes that plugin, the plugins list and the sources lists, but not the
+  `plugin.health` refreshes that plugin, its packages, the plugins list and the sources lists, but not the
   plugin's settings, which would reset a form being edited. Repeats within a batch refetch once.
 - **Patches.** Progress events change cached data in place instead (the `PATCHES` table):
   refetching task lists several times a second would swamp the server. A plugin's new health
   is patched in too, so it shows before the refetch.
+- **Tasks.** Task events carry no payload, so a page that starts tasks (installing a package,
+  say) follows them by the task ID the server answered with, or the one a row carries while its
+  task is open (after a reload, or from another tab), and refetches when one ends.
 - **Listeners.** `useEvent(type, fn)` hands a component an event's data, e.g. a run's live
   progress (`useRun`).
 - **Reconnects.** The server doesn't replay events, so after a reconnect every active query

@@ -11,7 +11,7 @@ import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
 import { finishRun, queueState, startRun, taskEvent } from "./jobs";
 import { type MockOperation, mockUrl, op, problem } from "./op";
-import { type MockPackage, packageView, queuePackageTask, syncPackageSources } from "./packages";
+import { type MockPackage, packageIconSvg, packageView, queuePackageTask, syncPackageSources } from "./packages";
 import { pageCount, pageSvg } from "./reader";
 import { FILTERS, listSeries, seriesIndex, sourceChapters, sourceSeries } from "./sources";
 import { entryCandidates, matchSeries, resolveUrl, startMatching } from "./works";
@@ -700,6 +700,16 @@ export const operations: MockOperation[] = [
     const found = pluginPackage(String(params.plugin_id), String(params.package_id));
     if (found instanceof Response) return found;
     return json(packageView(db(), found.plugin.id, found.pkg));
+  }),
+
+  op("get", "/plugins/{plugin_id}/packages/{package_id}/icon", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const found = pluginPackage(String(params.plugin_id), String(params.package_id));
+    if (found instanceof Response) return found;
+    return new HttpResponse(packageIconSvg(found.pkg.name), {
+      headers: { "Content-Type": "image/svg+xml", "Cache-Control": "private, max-age=86400" },
+    });
   }),
 
   op("post", "/plugins/{plugin_id}/packages/{package_id}/install", async ({ params, request }) => {

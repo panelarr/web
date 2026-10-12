@@ -28,14 +28,18 @@ export const INVALIDATIONS: Partial<Record<EventType, readonly string[]>> = {
 export const TARGETED: Partial<
   Record<EventType, (data: never) => { key: string; matches: (query: Query) => boolean }>
 > = {
-  // After every check of a plugin (several follow a settings save): the plugin, the plugins
-  // list and the sources lists. Not its settings, which would reset a form being edited.
+  // After every check of a plugin (several follow a settings save): the plugin, its packages,
+  // the plugins list and the sources lists. Not its settings, which would reset a form being
+  // edited.
   "plugin.health": (event: PluginEvent) => ({
     key: `plugin:${event.plugin_id}`,
     matches: (query) => {
       const path = keyPath(query);
       if (path === "/plugins" || path === "/sources") return true;
-      return path === "/plugins/{plugin_id}" && pathParam(query, "plugin_id") === event.plugin_id;
+      return (
+        (path === "/plugins/{plugin_id}" || path === "/plugins/{plugin_id}/packages") &&
+        pathParam(query, "plugin_id") === event.plugin_id
+      );
     },
   }),
 };
