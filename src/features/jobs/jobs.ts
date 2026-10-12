@@ -22,6 +22,11 @@ export const TRIGGERS: Record<string, string> = {
   system: "by the server",
 };
 
+/** How a run started, in words; "system" runs are started by the service that owns the job. */
+export function triggerText(trigger: string, owner = "the server"): string {
+  return trigger === "system" ? `by ${owner}` : (TRIGGERS[trigger] ?? trigger);
+}
+
 /** "every 6 hours" from seconds. */
 export function every(seconds: number): string {
   const units: Array<[number, string]> = [

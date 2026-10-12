@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2, Play, Square } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { $api, api } from "@/api/client";
 import { errorMessage, isApiError } from "@/api/errors";
 import { Field } from "@/components/form";
 import { ErrorAlert } from "@/components/states";
@@ -24,24 +23,18 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { initialParamValue, type Job, type JobParam, type ParamValue, paramLabel, paramsToSend } from "./jobs";
-
-function useInvalidateJobs() {
-  const queryClient = useQueryClient();
-  return () =>
-    void queryClient.invalidateQueries({
-      predicate: (q) => typeof q.queryKey[1] === "string" && /^\/(jobs|job-runs)/.test(q.queryKey[1]),
-    });
-}
+import { useInvalidateJobs, useJobsHost } from "./use-jobs";
 
 /** Runs a job now; a job with parameters asks for them first. */
 export function RunJobButton({ job, size = "sm" }: { job: Job; size?: "sm" | "default" }) {
+  const { service, links } = useJobsHost();
   const navigate = useNavigate();
   const invalidate = useInvalidateJobs();
   const [open, setOpen] = useState(false);
-  const goToRun = (runId: string) =>
-    void navigate({ to: "/admin/jobs/$jobId/runs/$runId", params: { jobId: job.id, runId } });
+  const goToRun = (runId: string) => void navigate(links.run(job.id, runId));
 
-  const run = $api.useMutation("post", "/jobs/{job_id}/run", {
+  const run = useMutation({
+    mutationFn: (params: Record<string, string>) => service.start(job.id, params),
     onSuccess: (started) => {
       setOpen(false);
       invalidate();
@@ -52,11 +45,13 @@ export function RunJobButton({ job, size = "sm" }: { job: Job; size?: "sm" | "de
       // Someone else started it: offer the run that is going.
       setOpen(false);
       invalidate();
+      // The server and meta name it in current_run_id, plugins (with their own IDs) in current_run.
       const current =
         error.problem?.current_run_id ??
-        (await api
-          .GET("/jobs/{job_id}", { params: { path: { job_id: job.id } } })
-          .then((r) => r.data?.current_run_id)
+        error.problem?.current_run ??
+        (await service
+          .job(job.id)
+          .then((found) => found.current_run_id)
           .catch(() => undefined));
       toast.info(
         `${job.name} is already running.`,
@@ -64,8 +59,7 @@ export function RunJobButton({ job, size = "sm" }: { job: Job; size?: "sm" | "de
       );
     },
   });
-  const start = (params: Record<string, string>) =>
-    run.mutate({ params: { path: { job_id: job.id } }, body: Object.keys(params).length > 0 ? { params } : {} });
+  const start = (params: Record<string, string>) => run.mutate(params);
 
   return (
     <>
@@ -235,8 +229,10 @@ function ParamField({
 
 /** Stops a running run, for jobs that can stop midway. */
 export function CancelRunButton({ runId, label = "Cancel" }: { runId: string; label?: string }) {
+  const { service } = useJobsHost();
   const invalidate = useInvalidateJobs();
-  const cancel = $api.useMutation("post", "/job-runs/{run_id}/cancel", {
+  const cancel = useMutation({
+    mutationFn: () => service.cancel(runId),
     onSuccess: invalidate,
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -246,7 +242,7 @@ export function CancelRunButton({ runId, label = "Cancel" }: { runId: string; la
       variant="outline"
       className="text-destructive"
       disabled={cancel.isPending}
-      onClick={() => cancel.mutate({ params: { path: { run_id: runId } } })}
+      onClick={() => cancel.mutate()}
     >
       <Square aria-hidden />
       {label}

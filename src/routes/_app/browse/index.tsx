@@ -208,7 +208,7 @@ function EmptyCatalogue() {
     <EmptyState icon={<BookOpen />} title="The catalogue is empty">
       The metadata service has no entries yet: its providers haven't been synced.{" "}
       {isAdmin ? (
-        <Link to="/admin/system" className="underline underline-offset-4">
+        <Link to="/admin/metadata" className="underline underline-offset-4">
           Check the metadata service
         </Link>
       ) : (
@@ -284,7 +284,7 @@ function Results({
       <EmptyState icon={<BookOpen />} title="The catalogue is empty">
         The metadata service has no provider yet.{" "}
         {isAdmin ? (
-          <Link to="/admin/system" className="underline underline-offset-4">
+          <Link to="/admin/metadata" className="underline underline-offset-4">
             Check the connection
           </Link>
         ) : (

@@ -184,18 +184,26 @@ export function initialTasks(): S["Task"][] {
 
 export const QUEUE_CONCURRENCY: Record<string, number> = { "download.chapter": 2, "match.work": 4, "update.work": 4 };
 
-export interface JobsState {
+/** One service's jobs and their runs. Only the server's send events; meta's and plugins' are polled. */
+export interface JobStore {
   jobs: S["Job"][];
   runs: S["JobRun"][];
+  quiet?: boolean;
+}
+
+export interface JobsState extends JobStore {
   tasks: S["Task"][];
   pausedKinds: string[];
+  metaJobs: JobStore;
+  /** By plugin ID, for plugins with the `jobs` capability. */
+  pluginJobs: Record<string, JobStore>;
 }
 
 const RUN_STEPS = 5;
 
-/** Starts a run of `job` and tells admins. */
+/** Starts a run of `job` and tells admins (when its service sends events). */
 export function startRun(
-  state: JobsState,
+  state: JobStore,
   job: S["Job"],
   params: Record<string, string>,
   trigger: S["JobRunSummary"]["trigger"],
@@ -219,12 +227,12 @@ export function startRun(
   state.runs.unshift(started);
   job.running = true;
   job.current_run_id = started.summary.id;
-  emit("job.started", { job_id: job.id, run_id: started.summary.id });
+  if (!state.quiet) emit("job.started", { job_id: job.id, run_id: started.summary.id });
   return started;
 }
 
-/** Ends a run (succeeded, failed or cancelled) and tells admins. */
-export function finishRun(state: JobsState, current: S["JobRun"], status: S["JobRunStatus"], message: string): void {
+/** Ends a run (succeeded, failed or cancelled) and tells admins (when its service sends events). */
+export function finishRun(state: JobStore, current: S["JobRun"], status: S["JobRunStatus"], message: string): void {
   current.summary = { ...current.summary, status, message, finished_at: new Date().toISOString() };
   delete current.progress;
   const job = state.jobs.find((j) => j.id === current.summary.job_id);
@@ -233,6 +241,7 @@ export function finishRun(state: JobsState, current: S["JobRun"], status: S["Job
     delete job.current_run_id;
     job.last_run = current.summary;
   }
+  if (state.quiet) return;
   emit(status === "failed" ? "job.failed" : "job.done", {
     job_id: current.summary.job_id,
     run_id: current.summary.id,
@@ -240,22 +249,163 @@ export function finishRun(state: JobsState, current: S["JobRun"], status: S["Job
   });
 }
 
-/** Moves every running run one step on (the browser calls it on a timer; tests call it by hand). */
+/** Moves every running run of every service one step on (the browser calls it on a timer; tests call it by hand). */
 export function tickJobs(state: JobsState): boolean {
   let changed = false;
-  for (const current of state.runs.filter((r) => r.summary.status === "running" && r.progress)) {
-    const progress = current.progress as S["JobProgress"];
-    const done = progress.done + 1;
-    changed = true;
-    if (done >= (progress.total ?? RUN_STEPS)) {
-      current.summary.counts = { works: 12, new_chapters: 3 };
-      finishRun(state, current, "succeeded", "Done: 12 works, 3 new chapters");
-    } else {
-      current.progress = { ...progress, done };
-      emit("job.progress", { job_id: current.summary.job_id, run_id: current.summary.id, progress: current.progress });
+  for (const store of [state, state.metaJobs, ...Object.values(state.pluginJobs)]) {
+    for (const current of store.runs.filter((r) => r.summary.status === "running" && r.progress)) {
+      const progress = current.progress as S["JobProgress"];
+      const done = progress.done + 1;
+      changed = true;
+      if (done >= (progress.total ?? RUN_STEPS)) {
+        current.summary.counts = { works: 12, new_chapters: 3 };
+        finishRun(store, current, "succeeded", "Done: 12 works, 3 new chapters");
+      } else {
+        current.progress = { ...progress, done };
+        if (!store.quiet)
+          emit("job.progress", {
+            job_id: current.summary.job_id,
+            run_id: current.summary.id,
+            progress: current.progress,
+          });
+      }
     }
   }
   return changed;
+}
+
+/** Each job's last run, from the newest run of it. */
+function withLastRuns(store: JobStore): JobStore {
+  for (const job of store.jobs) {
+    const last = store.runs.find((r) => r.summary.job_id === job.id);
+    if (last) job.last_run = last.summary;
+  }
+  return store;
+}
+
+/** The metadata service's jobs: a sync per provider and kind, the search index, duplicates. */
+export function initialMetaJobs(): JobStore {
+  const force: S["JobParam"] = {
+    name: "force",
+    type: "bool",
+    description: "Ingest everything again, even what hasn't changed.",
+    required: false,
+    default: "false",
+  };
+  return withLastRuns({
+    quiet: true,
+    jobs: [
+      {
+        id: "sync.example-provider.dump",
+        name: "Example Provider: full sync",
+        description: "Downloads the provider's whole catalogue and merges it in.",
+        group: "Providers",
+        schedule: { interval_seconds: 604_800, enabled: true, source: "META_SYNC_DUMP_INTERVAL" },
+        running: false,
+        next_run_at: minutesFromNow(3 * 1440),
+        cancellable: true,
+        params: [force],
+      },
+      {
+        id: "sync.example-provider.delta",
+        name: "Example Provider: changes",
+        description: "Fetches what changed at the provider since the last sync.",
+        group: "Providers",
+        schedule: { interval_seconds: 3_600, enabled: true, source: "META_SYNC_DELTA_INTERVAL" },
+        running: false,
+        next_run_at: minutesFromNow(40),
+        cancellable: true,
+        params: [force],
+      },
+      {
+        id: "search-rebuild",
+        name: "Rebuild the search index",
+        description: "Indexes every catalogue entry again, from scratch.",
+        group: "Search",
+        schedule: { enabled: false },
+        running: false,
+        cancellable: true,
+        params: [],
+      },
+      {
+        id: "duplicates-scan",
+        name: "Look for duplicates",
+        description: "Pairs up entries that look like the same work, for review.",
+        group: "Maintenance",
+        schedule: { interval_seconds: 86_400, enabled: true, source: "META_DUPLICATES_INTERVAL" },
+        running: false,
+        next_run_at: minutesFromNow(600),
+        cancellable: false,
+        params: [
+          {
+            name: "min_score",
+            type: "int",
+            description: "Only pairs scoring at least this (0–100).",
+            required: false,
+            default: "70",
+          },
+        ],
+      },
+    ],
+    runs: [
+      run("sync.example-provider.delta", "succeeded", "schedule", 20, "312 records, 4 merges", {
+        upserts: 312,
+        merges: 4,
+      }),
+      run("sync.example-provider.dump", "succeeded", "schedule", 4 * 1440, "48210 records", {
+        upserts: 48_210,
+        merges: 1_022,
+      }),
+      run("search-rebuild", "succeeded", "system", 2 * 1440, "Indexed 48210 entries", { entries: 48_210 }),
+      run("duplicates-scan", "failed", "schedule", 840, "The judge didn't answer", { pairs: 0 }, [
+        { at: minutesAgo(839), level: "error", message: "Judge timed out after 30 s", ref: "" },
+      ]),
+    ],
+  });
+}
+
+/** A plugin's own jobs (the store plugin's): its stores and its sources' health checks. */
+export function initialPluginJobs(): Record<string, JobStore> {
+  return {
+    stores: withLastRuns({
+      quiet: true,
+      jobs: [
+        {
+          id: "store-refresh",
+          name: "Refresh stores",
+          description: "Fetches every store's package list again.",
+          group: "Stores",
+          schedule: { interval_seconds: 21_600, enabled: true, source: "STORE_REFRESH_INTERVAL" },
+          running: false,
+          next_run_at: minutesFromNow(200),
+          cancellable: false,
+          params: [],
+        },
+        {
+          id: "source-health",
+          name: "Check sources",
+          description: "Asks each source for a page of results to see that it works.",
+          group: "health",
+          schedule: { interval_seconds: 43_200, enabled: true, source: "SOURCE_HEALTH_INTERVAL" },
+          running: false,
+          next_run_at: minutesFromNow(500),
+          cancellable: true,
+          params: [
+            {
+              name: "source_ids",
+              type: "string_list",
+              description: "Only these sources (all when empty).",
+              required: false,
+            },
+          ],
+        },
+      ],
+      runs: [
+        run("store-refresh", "succeeded", "schedule", 160, "2 stores, 5 updates", { stores: 2, updates: 5 }),
+        run("source-health", "succeeded", "startup", 220, "1 source checked, all well", { checked: 1, failing: 0 }),
+      ],
+    }),
+  };
 }
 
 export function queueState(state: JobsState): S["QueueState"] {

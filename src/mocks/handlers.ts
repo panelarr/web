@@ -9,7 +9,7 @@ import { health, sources as sourceFixtures, systemInfo } from "./data";
 import { commit, currentUser, db, type MockInvite, newId, syncSessionCookie } from "./db";
 import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
-import { finishRun, queueState, startRun, taskEvent } from "./jobs";
+import { finishRun, type JobStore, queueState, startRun, taskEvent } from "./jobs";
 import { applied, filterOwned, metaNetwork, networkTest, pluginNetwork, profileView, sourceNetwork } from "./network";
 import { type MockOperation, mockUrl, op, problem } from "./op";
 import { type MockPackage, packageIconSvg, packageView, queuePackageTask, syncPackageSources } from "./packages";
@@ -2083,83 +2083,99 @@ export const operations: MockOperation[] = [
 
   op("get", "/jobs", () => {
     const admin = requireAdmin();
-    return admin instanceof Response ? admin : json<S["JobList"]>({ jobs: db().jobs });
+    return admin instanceof Response ? admin : listJobs(db());
   }),
 
   op("get", "/jobs/{job_id}", ({ params }) => {
     const admin = requireAdmin();
-    if (admin instanceof Response) return admin;
-    const job = db().jobs.find((j) => j.id === params.job_id);
-    return job ? json(job) : problem(404, "not_found", "Not found", `No job "${params.job_id}".`);
+    return admin instanceof Response ? admin : getJob(db(), String(params.job_id));
   }),
 
   op("get", "/jobs/{job_id}/runs", ({ params, request }) => {
     const admin = requireAdmin();
-    if (admin instanceof Response) return admin;
-    const url = new URL(request.url);
-    const status = url.searchParams.get("status");
-    const runs = db()
-      .runs.filter((r) => r.summary.job_id === params.job_id && (!status || r.summary.status === status))
-      .map((r) => r.summary);
-    const { items, next } = paginate(runs, url);
-    return json<S["JobRunList"]>({ runs: items, next_page_token: next });
+    return admin instanceof Response ? admin : listRuns(db(), String(params.job_id), request);
   }),
 
   op("post", "/jobs/{job_id}/run", async ({ params, request }) => {
     const admin = requireAdmin();
     if (admin instanceof Response) return admin;
-    const d = db();
-    const job = d.jobs.find((j) => j.id === params.job_id);
-    if (!job) return problem(404, "not_found", "Not found");
-    if (job.running) {
-      return HttpResponse.json(
-        {
-          type: "about:blank",
-          title: "Already running",
-          status: 409,
-          code: "already_running",
-          detail: `the job is running as ${job.current_run_id}`,
-          ...(job.current_run_id ? { current_run_id: job.current_run_id } : {}),
-        },
-        { status: 409, headers: { "Content-Type": "application/problem+json" } },
-      );
-    }
-    const text = await request.text();
-    const given = (text ? (JSON.parse(text) as S["RunJobRequest"]).params : undefined) ?? {};
-    const unknown = Object.keys(given).filter((name) => !job.params.some((p) => p.name === name));
-    const missing = job.params.filter((p) => p.required && !given[p.name] && !p.default).map((p) => p.name);
-    if (unknown.length || missing.length) {
-      return problem(
-        400,
-        "invalid_request",
-        "Invalid parameters",
-        [...unknown.map((n) => `unknown parameter ${n}`), ...missing.map((n) => `${n} is required`)].join("; "),
-      );
-    }
-    const started = startRun(d, job, given, "manual", admin.username);
-    commit();
-    return json(started.summary, 202);
+    return runJob(db(), String(params.job_id), request, admin.username, "current_run_id");
   }),
 
   op("get", "/job-runs/{run_id}", ({ params }) => {
     const admin = requireAdmin();
-    if (admin instanceof Response) return admin;
-    const found = db().runs.find((r) => r.summary.id === params.run_id);
-    return found ? json(found) : problem(404, "not_found", "Not found");
+    return admin instanceof Response ? admin : getRun(db(), String(params.run_id));
   }),
 
   op("post", "/job-runs/{run_id}/cancel", ({ params }) => {
     const admin = requireAdmin();
-    if (admin instanceof Response) return admin;
-    const d = db();
-    const found = d.runs.find((r) => r.summary.id === params.run_id);
-    if (!found) return problem(404, "not_found", "Not found");
-    if (found.summary.status !== "running") return problem(409, "not_running", "Not running", "The run has finished.");
-    const job = d.jobs.find((j) => j.id === found.summary.job_id);
-    if (!job?.cancellable) return problem(409, "not_cancellable", "Can't cancel", "This job can't stop midway.");
-    finishRun(d, found, "cancelled", `Cancelled by ${admin.username}`);
-    commit();
-    return json(found.summary, 202);
+    return admin instanceof Response ? admin : cancelRun(db(), String(params.run_id), admin.username);
+  }),
+
+  // The metadata service's jobs (no events: the app polls)
+
+  op("get", "/system/meta/jobs", () => {
+    const store = metaJobStore();
+    return store instanceof Response ? store : listJobs(store);
+  }),
+
+  op("get", "/system/meta/jobs/{job_id}", ({ params }) => {
+    const store = metaJobStore();
+    return store instanceof Response ? store : getJob(store, String(params.job_id));
+  }),
+
+  op("get", "/system/meta/jobs/{job_id}/runs", ({ params, request }) => {
+    const store = metaJobStore();
+    return store instanceof Response ? store : listRuns(store, String(params.job_id), request);
+  }),
+
+  op("post", "/system/meta/jobs/{job_id}/run", async ({ params, request }) => {
+    const store = metaJobStore();
+    if (store instanceof Response) return store;
+    return runJob(store, String(params.job_id), request, `panelarr (${currentUser()?.username})`, "current_run_id");
+  }),
+
+  op("get", "/system/meta/job-runs/{run_id}", ({ params }) => {
+    const store = metaJobStore();
+    return store instanceof Response ? store : getRun(store, String(params.run_id));
+  }),
+
+  op("post", "/system/meta/job-runs/{run_id}/cancel", ({ params }) => {
+    const store = metaJobStore();
+    return store instanceof Response ? store : cancelRun(store, String(params.run_id), "panelarr");
+  }),
+
+  // A plugin's jobs (plugins with the jobs capability; no events: the app polls)
+
+  op("get", "/plugins/{plugin_id}/jobs", ({ params }) => {
+    const store = pluginJobStore(String(params.plugin_id));
+    return store instanceof Response ? store : listJobs(store);
+  }),
+
+  op("get", "/plugins/{plugin_id}/jobs/{job_id}", ({ params }) => {
+    const store = pluginJobStore(String(params.plugin_id));
+    return store instanceof Response ? store : getJob(store, String(params.job_id));
+  }),
+
+  op("get", "/plugins/{plugin_id}/jobs/{job_id}/runs", ({ params, request }) => {
+    const store = pluginJobStore(String(params.plugin_id));
+    return store instanceof Response ? store : listRuns(store, String(params.job_id), request);
+  }),
+
+  op("post", "/plugins/{plugin_id}/jobs/{job_id}/run", async ({ params, request }) => {
+    const store = pluginJobStore(String(params.plugin_id));
+    if (store instanceof Response) return store;
+    return runJob(store, String(params.job_id), request, currentUser()?.username, "current_run");
+  }),
+
+  op("get", "/plugins/{plugin_id}/job-runs/{run_id}", ({ params }) => {
+    const store = pluginJobStore(String(params.plugin_id));
+    return store instanceof Response ? store : getRun(store, String(params.run_id));
+  }),
+
+  op("post", "/plugins/{plugin_id}/job-runs/{run_id}/cancel", ({ params }) => {
+    const store = pluginJobStore(String(params.plugin_id));
+    return store instanceof Response ? store : cancelRun(store, String(params.run_id), currentUser()?.username);
   }),
 
   // The task queue
@@ -2231,6 +2247,108 @@ export const operations: MockOperation[] = [
     return json(queueState(d));
   }),
 ];
+
+// Jobs: the same model for the server's, meta's and plugins' (contracts/jobs.md).
+
+function listJobs(store: JobStore): Response {
+  return json<S["JobList"]>({ jobs: store.jobs });
+}
+
+function getJob(store: JobStore, jobId: string): Response {
+  const job = store.jobs.find((j) => j.id === jobId);
+  return job ? json(job) : problem(404, "not_found", "Not found", `No job "${jobId}".`);
+}
+
+function listRuns(store: JobStore, jobId: string, request: Request): Response {
+  const url = new URL(request.url);
+  const status = url.searchParams.get("status");
+  const runs = store.runs
+    .filter((r) => r.summary.job_id === jobId && (!status || r.summary.status === status))
+    .map((r) => r.summary);
+  const { items, next } = paginate(runs, url);
+  return json<S["JobRunList"]>({ runs: items, next_page_token: next });
+}
+
+/** Starts a run; a running job answers 409 naming its run (plugins in `current_run`, with their own IDs). */
+async function runJob(
+  store: JobStore,
+  jobId: string,
+  request: Request,
+  by: string | undefined,
+  runField: "current_run_id" | "current_run",
+): Promise<Response> {
+  const job = store.jobs.find((j) => j.id === jobId);
+  if (!job) return problem(404, "not_found", "Not found");
+  if (job.running) {
+    return HttpResponse.json(
+      {
+        type: "about:blank",
+        title: "Already running",
+        status: 409,
+        code: "already_running",
+        detail: `the job is running as ${job.current_run_id}`,
+        ...(job.current_run_id ? { [runField]: job.current_run_id } : {}),
+      },
+      { status: 409, headers: { "Content-Type": "application/problem+json" } },
+    );
+  }
+  const text = await request.text();
+  const given = (text ? (JSON.parse(text) as S["RunJobRequest"]).params : undefined) ?? {};
+  const unknown = Object.keys(given).filter((name) => !job.params.some((p) => p.name === name));
+  const missing = job.params.filter((p) => p.required && !given[p.name] && !p.default).map((p) => p.name);
+  if (unknown.length || missing.length) {
+    return problem(
+      400,
+      "invalid_request",
+      "Invalid parameters",
+      [...unknown.map((n) => `unknown parameter ${n}`), ...missing.map((n) => `${n} is required`)].join("; "),
+    );
+  }
+  const started = startRun(store, job, given, "manual", by);
+  commit();
+  return json(started.summary, 202);
+}
+
+function getRun(store: JobStore, runId: string): Response {
+  const found = store.runs.find((r) => r.summary.id === runId);
+  return found ? json(found) : problem(404, "not_found", "Not found");
+}
+
+function cancelRun(store: JobStore, runId: string, by: string | undefined): Response {
+  const found = store.runs.find((r) => r.summary.id === runId);
+  if (!found) return problem(404, "not_found", "Not found");
+  if (found.summary.status !== "running") return problem(409, "not_running", "Not running", "The run has finished.");
+  const job = store.jobs.find((j) => j.id === found.summary.job_id);
+  if (!job?.cancellable) return problem(409, "not_cancellable", "Can't cancel", "This job can't stop midway.");
+  finishRun(store, found, "cancelled", `Cancelled by ${by ?? "an admin"}`);
+  commit();
+  return json(found.summary, 202);
+}
+
+/** meta's jobs, through the server: for admins, while meta is connected. */
+function metaJobStore(): JobStore | Response {
+  const admin = requireAdmin();
+  if (admin instanceof Response) return admin;
+  if (!db().meta.check.configured) {
+    return problem(503, "meta_unavailable", "The metadata service isn't connected", "Connect it first.");
+  }
+  return db().metaJobs;
+}
+
+/** A plugin's jobs: for admins, on a plugin with the jobs capability that is turned on. */
+function pluginJobStore(pluginId: string): JobStore | Response {
+  const admin = requireAdmin();
+  if (admin instanceof Response) return admin;
+  const plugin = db().plugins.find((p) => p.id === pluginId);
+  if (!plugin) return problem(404, "not_found", "Not found", "No such plugin.");
+  if (!plugin.capabilities.includes("jobs")) {
+    return problem(422, "no_jobs", "No jobs", "This plugin has no jobs.");
+  }
+  if (!plugin.enabled) return problem(409, "plugin_disabled", "Plugin turned off", "Turn the plugin on first.");
+  const jobs = db().pluginJobs;
+  jobs[pluginId] ??= { jobs: [], runs: [], quiet: true };
+  return jobs[pluginId];
+}
 
 /** A plugin with the packages capability, turned on; or the problem. */
 function packagesPlugin(pluginId: string): S["Plugin"] | Response {

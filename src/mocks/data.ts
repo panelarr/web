@@ -120,7 +120,7 @@ export const storePlugin = {
   plugin_id: "stores",
   version: "dev",
   contracts: ["panelarr.source.v1"],
-  capabilities: ["latest", "search", "packages"],
+  capabilities: ["latest", "search", "packages", "jobs"],
   has_config: false,
   health: "ok",
   checked_at: "2026-10-11T08:00:00Z",

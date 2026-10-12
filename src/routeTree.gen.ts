@@ -20,6 +20,7 @@ import { Route as AppDownloadsRouteImport } from './routes/_app/downloads'
 import { Route as AppMoreRouteImport } from './routes/_app/more'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
+import { Route as AppAdminMetadataRouteImport } from './routes/_app/admin/metadata'
 import { Route as AppAdminNetworkRouteImport } from './routes/_app/admin/network'
 import { Route as AppAdminQueueRouteImport } from './routes/_app/admin/queue'
 import { Route as AppAdminStorageRouteImport } from './routes/_app/admin/storage'
@@ -92,6 +93,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
 const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminMetadataRoute = AppAdminMetadataRouteImport.update({
+  id: '/metadata',
+  path: '/metadata',
   getParentRoute: () => AppAdminRoute,
 } as any)
 const AppAdminNetworkRoute = AppAdminNetworkRouteImport.update({
@@ -207,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/downloads': typeof AppDownloadsRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
+  '/admin/metadata': typeof AppAdminMetadataRoute
   '/admin/network': typeof AppAdminNetworkRoute
   '/admin/queue': typeof AppAdminQueueRoute
   '/admin/storage': typeof AppAdminStorageRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByTo {
   '/downloads': typeof AppDownloadsRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
+  '/admin/metadata': typeof AppAdminMetadataRoute
   '/admin/network': typeof AppAdminNetworkRoute
   '/admin/queue': typeof AppAdminQueueRoute
   '/admin/storage': typeof AppAdminStorageRoute
@@ -271,6 +279,7 @@ export interface FileRoutesById {
   '/_app/more': typeof AppMoreRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/admin/metadata': typeof AppAdminMetadataRoute
   '/_app/admin/network': typeof AppAdminNetworkRoute
   '/_app/admin/queue': typeof AppAdminQueueRoute
   '/_app/admin/storage': typeof AppAdminStorageRoute
@@ -304,6 +313,7 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/more'
     | '/settings'
+    | '/admin/metadata'
     | '/admin/network'
     | '/admin/queue'
     | '/admin/storage'
@@ -334,6 +344,7 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/more'
     | '/settings'
+    | '/admin/metadata'
     | '/admin/network'
     | '/admin/queue'
     | '/admin/storage'
@@ -367,6 +378,7 @@ export interface FileRouteTypes {
     | '/_app/more'
     | '/_app/settings'
     | '/_app/'
+    | '/_app/admin/metadata'
     | '/_app/admin/network'
     | '/_app/admin/queue'
     | '/_app/admin/storage'
@@ -475,6 +487,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AppAdminIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/metadata': {
+      id: '/_app/admin/metadata'
+      path: '/metadata'
+      fullPath: '/admin/metadata'
+      preLoaderRoute: typeof AppAdminMetadataRouteImport
       parentRoute: typeof AppAdminRoute
     }
     '/_app/admin/network': {
@@ -621,6 +640,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppAdminRouteChildren {
+  AppAdminMetadataRoute: typeof AppAdminMetadataRoute
   AppAdminNetworkRoute: typeof AppAdminNetworkRoute
   AppAdminQueueRoute: typeof AppAdminQueueRoute
   AppAdminStorageRoute: typeof AppAdminStorageRoute
@@ -639,6 +659,7 @@ interface AppAdminRouteChildren {
 }
 
 const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminMetadataRoute: AppAdminMetadataRoute,
   AppAdminNetworkRoute: AppAdminNetworkRoute,
   AppAdminQueueRoute: AppAdminQueueRoute,
   AppAdminStorageRoute: AppAdminStorageRoute,

@@ -26,7 +26,7 @@ import {
   storePlugin,
 } from "./data";
 import { initialStorages } from "./downloads";
-import { initialJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
+import { initialJobs, initialMetaJobs, initialPluginJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
 import { initialNetwork, type NetworkState } from "./network";
 import { initialPackageSources, initialPackages, type MockPackage } from "./packages";
 
@@ -131,6 +131,8 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     runs: initialRuns(),
     tasks: initialTasks(),
     pausedKinds: [],
+    metaJobs: initialMetaJobs(),
+    pluginJobs: initialPluginJobs(),
   };
   for (const job of ready.jobs) {
     const last = ready.runs.find((r) => r.summary.job_id === job.id);

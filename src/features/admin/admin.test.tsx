@@ -238,10 +238,18 @@ describe("sources", () => {
 });
 
 describe("system", () => {
-  it("shows component health and the metadata connection", async () => {
+  it("shows component health, and the metadata service in a line with a link to its page", async () => {
     await renderApp("/admin/system");
     expect(await screen.findByText("database")).toBeInTheDocument();
-    expect(screen.getByText("A metadata provider has entries")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Providers, jobs and settings" })).toHaveAttribute(
+      "href",
+      "/admin/metadata",
+    );
+  });
+
+  it("shows the metadata connection on the metadata service's page", async () => {
+    await renderApp("/admin/metadata");
+    expect(await screen.findByText("A metadata provider has entries")).toBeInTheDocument();
   });
   it("says why a provider's sync didn't start, in the server's words", async () => {
     resetDb("degraded");
@@ -255,7 +263,7 @@ describe("system", () => {
         ),
       ),
     );
-    await renderApp("/admin/system");
+    await renderApp("/admin/metadata");
     await userEvent.click(await screen.findByRole("button", { name: "Start sync" }));
     expect(await screen.findByText("The sync didn't start")).toBeInTheDocument();
     expect(screen.getByText(/can't reach the example-provider plugin/)).toBeInTheDocument();

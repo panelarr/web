@@ -19,17 +19,20 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { ExtensionsPanel, type ExtensionsSearch } from "@/features/extensions/extensions-panel";
+import { type JobsSearch, JobsSection, jobsSearch } from "@/features/jobs/jobs-views";
+import { pluginJobs } from "@/features/jobs/service";
+import { JobsContext, type JobsHost } from "@/features/jobs/use-jobs";
 import { PluginNetwork } from "@/features/network/plugin-network";
 import { formatRelative } from "@/lib/format";
 import { formatVersion } from "@/lib/version";
 
 type Plugin = components["schemas"]["Plugin"];
 
-/** The plugin page's sections beyond its overview; more come with its admin (jobs, health…). */
-const TABS = ["extensions", "network"] as const;
+/** The plugin page's sections beyond its overview; each shows when the plugin supports it. */
+const TABS = ["extensions", "jobs", "network"] as const;
 type PluginTab = (typeof TABS)[number];
 
-interface PluginSearch extends ExtensionsSearch {
+interface PluginSearch extends ExtensionsSearch, JobsSearch {
   tab?: PluginTab;
 }
 
@@ -44,6 +47,7 @@ export const Route = createFileRoute("/_app/admin/plugins/$pluginId")({
       if (value) out[key] = value;
     }
     if (search.show === "installed" || search.show === "updates") out.show = search.show;
+    if (out.tab === "jobs") Object.assign(out, jobsSearch(search));
     return out;
   },
   component: PluginPage,
@@ -114,6 +118,7 @@ function PluginPage() {
                 {plugin.data.capabilities.includes("packages") ? (
                   <TabsTrigger value="extensions">Extensions</TabsTrigger>
                 ) : null}
+                {plugin.data.capabilities.includes("jobs") ? <TabsTrigger value="jobs">Jobs</TabsTrigger> : null}
                 <TabsTrigger value="network">Network</TabsTrigger>
               </TabsList>
             </ScrollStrip>
@@ -129,6 +134,16 @@ function PluginPage() {
                 />
               </TabsContent>
             ) : null}
+            {plugin.data.capabilities.includes("jobs") ? (
+              <TabsContent value="jobs" className="mt-4">
+                <JobsContext value={pluginJobsHost(plugin.data)}>
+                  <JobsSection
+                    search={search}
+                    onStatus={(status) => void navigate({ search: (prev) => ({ ...prev, status }), replace: true })}
+                  />
+                </JobsContext>
+              </TabsContent>
+            ) : null}
             <TabsContent value="network" className="mt-4">
               <PluginNetwork pluginId={plugin.data.id} pluginName={plugin.data.name} />
             </TabsContent>
@@ -137,6 +152,21 @@ function PluginPage() {
       ) : null}
     </>
   );
+}
+
+/** A plugin's jobs, inside its page's Jobs tab (?tab=jobs&job=…&run=…). */
+function pluginJobsHost(plugin: Plugin): JobsHost {
+  const to = "/admin/plugins/$pluginId";
+  const params = { pluginId: plugin.id };
+  return {
+    service: pluginJobs(plugin.id, plugin.name),
+    nested: true,
+    links: {
+      list: { to, params, search: { tab: "jobs" } },
+      job: (job) => ({ to, params, search: { tab: "jobs", job } }),
+      run: (job, run) => ({ to, params, search: { tab: "jobs", job, run } }),
+    },
+  };
 }
 
 function Overview({ plugin }: { plugin: Plugin }) {

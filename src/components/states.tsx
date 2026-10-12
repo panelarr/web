@@ -12,15 +12,23 @@ export function PageHeader({
   title,
   description,
   actions,
+  level = 1,
 }: {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  /** 2 for a header inside another page (a tab's own page, say). */
+  level?: 1 | 2;
 }) {
+  const Heading = level === 1 ? "h1" : "h2";
   return (
     <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1 basis-60">
-        <h1 className="text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{title}</h1>
+        <Heading
+          className={cn("font-semibold tracking-tight [overflow-wrap:anywhere]", level === 1 ? "text-2xl" : "text-xl")}
+        >
+          {title}
+        </Heading>
         {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}

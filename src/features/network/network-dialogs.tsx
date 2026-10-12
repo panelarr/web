@@ -546,7 +546,6 @@ export function ProfileDialog({
           <fieldset className="grid gap-2">
             <legend className="mb-1 text-sm font-medium">Extra headers</legend>
             {headers.map(([name, value], index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity; the inputs are controlled
               <div key={index} className="flex gap-2">
                 <Input
                   aria-label={`Header ${index + 1} name`}

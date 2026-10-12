@@ -70,7 +70,7 @@ describe("choosing network profiles", () => {
   });
 
   it("for the metadata service and each provider, on its own page", async () => {
-    await renderApp("/admin/system");
+    await renderApp("/admin/metadata?tab=network");
     const all = await screen.findByLabelText("Network profile for every provider");
     await waitFor(() => expect(within(all).getByRole("option", { name: "Through the VPN" })).toBeInTheDocument());
     await userEvent.selectOptions(all, "profile:vpn");

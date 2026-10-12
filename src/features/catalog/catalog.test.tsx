@@ -78,7 +78,7 @@ describe("browsing the catalogue", () => {
     );
     await renderApp("/browse");
     expect(await screen.findByText("The catalogue is empty")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Check the metadata service" })).toHaveAttribute("href", "/admin/system");
+    expect(screen.getByRole("link", { name: "Check the metadata service" })).toHaveAttribute("href", "/admin/metadata");
   });
 
   it("shows the server's message when the metadata service refuses", async () => {

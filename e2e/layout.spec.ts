@@ -135,8 +135,15 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
     "/admin/sources/example:1001?list=search&q=the",
     "/admin/sources/example:1001/series?key=%2Fseries%2F1000",
     "/admin/jobs",
+    "/admin/jobs/update-check",
     "/admin/queue",
     "/admin/system",
+    "/admin/metadata",
+    "/admin/metadata?tab=jobs",
+    "/admin/metadata?tab=jobs&job=sync.example-provider.dump",
+    "/admin/metadata?tab=network",
+    "/admin/plugins/stores?tab=jobs",
+    "/admin/plugins/stores?tab=jobs&job=source-health",
   ]) {
     await open(path);
     await check(page, path, found);

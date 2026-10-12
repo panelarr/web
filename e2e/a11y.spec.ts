@@ -20,6 +20,9 @@ const PAGES = [
   "/admin/plugins/example",
   "/admin/sources",
   "/admin/jobs",
+  "/admin/metadata?tab=jobs",
+  "/admin/metadata?tab=jobs&job=duplicates-scan",
+  "/admin/plugins/stores?tab=jobs",
   "/admin/queue",
   "/admin/storage",
 ];

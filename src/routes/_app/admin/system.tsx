@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronRight } from "lucide-react";
 import { $api } from "@/api/client";
 import { ErrorAlert, Loading, PageHeader } from "@/components/states";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HealthBadge } from "@/features/admin/health-badge";
-import { MetaNetwork } from "@/features/network/meta-network";
-import { MetaConnectionPanel } from "@/features/setup/meta-connection";
 
 export const Route = createFileRoute("/_app/admin/system")({
   component: SystemPage,
@@ -47,28 +47,41 @@ function SystemPage() {
             ) : null}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Metadata service</CardTitle>
-            <CardDescription>Where Panelarr finds works. The library needs it.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MetaConnectionPanel />
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Metadata service: network</CardTitle>
-            <CardDescription>
-              The proxy, solver and limits its providers use, from Panelarr's profiles. Nothing is chosen until you
-              choose it.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MetaNetwork />
-          </CardContent>
-        </Card>
+        <MetaSummary />
       </div>
     </>
+  );
+}
+
+/** The metadata service in a line; everything about it is on its own page. */
+function MetaSummary() {
+  const meta = $api.useQuery("get", "/system/meta");
+  const check = meta.data?.check;
+  return (
+    <Card className="self-start">
+      <CardHeader>
+        <CardTitle>Metadata service</CardTitle>
+        <CardDescription>Where Panelarr finds works. The library needs it.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {meta.error ? <ErrorAlert error={meta.error} onRetry={() => void meta.refetch()} /> : null}
+        {check ? (
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <HealthBadge
+              status={!check.configured ? "unknown" : check.ready ? "ok" : check.reachable ? "degraded" : "failing"}
+            />
+            <span className="[overflow-wrap:anywhere]">
+              {check.ready ? (meta.data?.url ?? "Connected") : (check.problem ?? "Not connected")}
+            </span>
+          </p>
+        ) : null}
+        <Button variant="outline" asChild className="justify-self-start">
+          <Link to="/admin/metadata">
+            Providers, jobs and settings
+            <ChevronRight aria-hidden />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

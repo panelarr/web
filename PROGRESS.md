@@ -43,6 +43,16 @@ Panelarr's own proxies, solvers and network profiles, offered to every plugin; c
 - [x] **N3. Custom solvers and proxies** for one plugin, on its Network tab: its own proxies, solvers (when it can use one) and profiles, offered to it, its extensions and its sources only.
 - [x] **N4. Finish:** a journey on desktop and phone (a proxy, a profile from it, chosen for a plugin, a source opting out, where it's used), the layout and accessibility checks over the new pages, docs (`docs/network.md`).
 
+## Connected services' admin (GOAL-0021)
+
+Everything in the metadata service's and source plugins' own admin pages, inside Panelarr's, through the server (`docs/admin.md`).
+
+- [x] **S1. One Jobs view** for the server, the metadata service and plugins: the list by group, a job's runs (by status), a run in full, run with parameters, cancel, the run already going on a 409; live by events (server) or polling (the others). A plugin's Jobs tab (with `jobs`); Admin → Metadata with its connection, jobs and network (moved from System, which keeps a line and a link).
+- [ ] **S2. Plugin admin:** stores (refresh), package reload and details, a Sources tab with health checks (switch, check now through a per-source job).
+- [ ] **S3. Metadata service:** health per component, providers and their sync runs, start a sync; refresh a work from its providers.
+- [ ] **S4. Duplicates** with the judge: review pairs, merge, dismiss, reopen; the judge's settings, test and reset.
+- [ ] **S5. Search engine** settings, test and reset; docs, journeys and checks over every page; done.
+
 ## Working assumptions
 
 Settled for now, cheap to change:
@@ -51,7 +61,7 @@ Settled for now, cheap to change:
 - The app is served at the root; every asset path is relative to `<base href>` so a URL base can come later (`docs/embedding.md`).
 - Inline styles are allowed by the CSP (UI libraries insert `<style>` at runtime); scripts are strictly same-origin.
 - Reader settings and appearance are per user (per-series overrides too), stored by the server; until the server has them, appearance is kept per device.
-- Library categories and the connected services' admin pages are not part of the first version.
+- Library categories are not part of the first version.
 
 ## Next
 
