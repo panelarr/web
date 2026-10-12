@@ -95,10 +95,14 @@ pair with the settings in the form, without saving them.
 ## Search engine
 
 The Search tab says which engine answers searches now, what it can do (typos, parts of words,
-filter counts), and how the index is doing: entries in it, when it was built, changes waiting
-and how old the oldest is, errors. A backlog is polled while it drains. **Rebuild the index**
-runs the service's own `search-rebuild` job (and links to it on the Jobs tab); it's offered only
-when the service has that job.
+filter counts), and, for an external engine, how its index is doing: entries in it, when it was
+built, changes waiting and how old the oldest is, errors. A backlog is polled while it drains.
+**Rebuild the index** runs the service's own `search-rebuild` job (and links to it on the Jobs
+tab); it's offered only when the service has that job.
+
+The built-in backend is the database itself, with no separate index: the status's `ready` and
+`reachable` describe an engine and don't apply to it, so it is healthy unless searches fell
+back (`degraded`), and shows no index figures or rebuild.
 
 Its settings (the engine, its URL, a write-only API key, an index prefix, who serves browsing)
 work like the decision model's: they win over the service's configuration until reset, "Test"

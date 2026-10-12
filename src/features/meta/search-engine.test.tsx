@@ -7,6 +7,7 @@ import { POLL } from "@/features/jobs/use-jobs";
 import { db } from "@/mocks/db";
 import { tickJobs } from "@/mocks/jobs";
 import { renderApp } from "@/test/render";
+import { searchHealth } from "./search-engine";
 
 const card = (name: string) => screen.getByRole("heading", { name }).closest("[data-slot=card]") as HTMLElement;
 const saved = { ...POLL };
@@ -60,10 +61,55 @@ describe("the metadata service's search engine", () => {
     await userEvent.click(within(settings).getByRole("button", { name: "Save" }));
     expect(await screen.findByText(/Search engine settings saved/)).toBeInTheDocument();
     expect(db().searchEngine.settings).toMatchObject({ backend: "postgres", origin: "admin" });
-    expect(await screen.findByText("The database (built in) answers searches.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("The database (built in) answers searches, with no separate index."),
+    ).toBeInTheDocument();
 
     await userEvent.click(await within(card("Settings")).findByRole("button", { name: "Use the configuration" }));
     expect(await screen.findByText("Back to the service's configuration.")).toBeInTheDocument();
     expect(db().searchEngine.settings).toMatchObject({ backend: "meilisearch", origin: "config" });
+  });
+});
+
+describe("search health", () => {
+  const status = {
+    typo_tolerance: false,
+    substring: true,
+    facets: true,
+    ready: false,
+    reachable: false,
+    degraded: false,
+    documents: 0,
+    pending: 0,
+    applied: 0,
+  };
+
+  it("counts the built-in backend as well unless searches fell back", () => {
+    expect(searchHealth({ ...status, backend: "postgres" })).toEqual({ health: "ok", engine: false });
+    expect(searchHealth({ ...status, backend: "postgres", degraded: true }).health).toBe("degraded");
+  });
+
+  it("counts an engine by whether it answers, its index is ready, and fallbacks", () => {
+    const engine = { ...status, backend: "meilisearch", reachable: true, ready: true };
+    expect(searchHealth(engine)).toEqual({ health: "ok", engine: true });
+    expect(searchHealth({ ...engine, ready: false }).health).toBe("degraded");
+    expect(searchHealth({ ...engine, degraded: true }).health).toBe("degraded");
+    expect(searchHealth({ ...engine, reachable: false }).health).toBe("down");
+  });
+
+  it("shows the built-in backend as healthy, without index figures or a rebuild", async () => {
+    const engine = db().searchEngine;
+    engine.settings = { backend: "postgres", has_api_key: false, origin: "admin" };
+    engine.status = { ...status, backend: "postgres" };
+    await renderApp("/admin/metadata?tab=search");
+    const card = (await screen.findByRole("heading", { name: /Search now/ })).closest(
+      "[data-slot=card]",
+    ) as HTMLElement;
+    expect(within(card).getByRole("heading", { name: "Search now Healthy" })).toBeInTheDocument();
+    expect(
+      within(card).getByText("The database (built in) answers searches, with no separate index."),
+    ).toBeInTheDocument();
+    expect(within(card).queryByText("Entries in it")).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Rebuild the index" })).not.toBeInTheDocument();
   });
 });

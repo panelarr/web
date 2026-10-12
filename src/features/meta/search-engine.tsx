@@ -73,9 +73,21 @@ function Capability({ on, children }: { on: boolean; children: string }) {
   );
 }
 
+/**
+ * Whether search is well. The built-in backend is the database itself: `ready` and `reachable`
+ * describe an engine's index and connection (meta.v1), so they only count for typesense and
+ * meilisearch. `degraded` (searches fell back to the database) counts for all.
+ */
+export function searchHealth(status: Engine["status"]): { health: "ok" | "degraded" | "down"; engine: boolean } {
+  const engine = status.backend !== "postgres";
+  if (engine && !status.reachable) return { health: "down", engine };
+  if (status.degraded || (engine && !status.ready)) return { health: "degraded", engine };
+  return { health: "ok", engine };
+}
+
 function StatusCard({ engine }: { engine: Engine }) {
   const { status } = engine;
-  const health = !status.reachable ? "down" : status.degraded || !status.ready ? "degraded" : "ok";
+  const { health, engine: external } = searchHealth(status);
   const rows: Array<[string, string | undefined]> = [
     ["Index", status.index],
     ["Entries in it", status.documents.toLocaleString()],
@@ -98,7 +110,11 @@ function StatusCard({ engine }: { engine: Engine }) {
         </CardTitle>
         <CardDescription>
           {BACKENDS[status.backend as Backend] ?? status.backend} answers searches
-          {status.ready ? "." : ", but its index isn't ready: the database answers meanwhile."}
+          {!external
+            ? ", with no separate index."
+            : status.ready
+              ? "."
+              : ", but its index isn't ready: the database answers meanwhile."}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
@@ -116,16 +132,19 @@ function StatusCard({ engine }: { engine: Engine }) {
           <Capability on={status.substring}>Finds parts of words</Capability>
           <Capability on={status.facets}>Counts for filters</Capability>
         </ul>
-        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
-          {rows.map(([name, value]) =>
-            value ? (
-              <div key={name} className="contents">
-                <dt className="text-muted-foreground">{name}</dt>
-                <dd className="tabular-nums [overflow-wrap:anywhere]">{value}</dd>
-              </div>
-            ) : null,
-          )}
-        </dl>
+        {/* The index figures are an engine's; the database has none. */}
+        {external ? (
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
+            {rows.map(([name, value]) =>
+              value ? (
+                <div key={name} className="contents">
+                  <dt className="text-muted-foreground">{name}</dt>
+                  <dd className="tabular-nums [overflow-wrap:anywhere]">{value}</dd>
+                </div>
+              ) : null,
+            )}
+          </dl>
+        ) : null}
         {status.indexer_error ? (
           <p className="text-destructive [overflow-wrap:anywhere]">
             Indexing failed: {status.indexer_error}
@@ -133,9 +152,11 @@ function StatusCard({ engine }: { engine: Engine }) {
           </p>
         ) : null}
       </CardContent>
-      <CardFooter>
-        <RebuildButton />
-      </CardFooter>
+      {external ? (
+        <CardFooter>
+          <RebuildButton />
+        </CardFooter>
+      ) : null}
     </Card>
   );
 }
