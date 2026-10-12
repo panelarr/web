@@ -22,10 +22,7 @@ export function useOpenDownloads(enabled = true) {
   return useMemo(() => {
     const byChapter = new Map<string, Task>();
     for (const item of list.data?.items ?? []) {
-      const chapterId = item.task.payload.chapter_id;
-      if (typeof chapterId === "string" && (item.task.state === "queued" || item.task.state === "running")) {
-        byChapter.set(chapterId, item.task);
-      }
+      if (item.task.state === "queued" || item.task.state === "running") byChapter.set(item.chapter_id, item.task);
     }
     return byChapter;
   }, [list.data]);

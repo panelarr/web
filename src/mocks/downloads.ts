@@ -123,10 +123,11 @@ export function tickDownloads(state: DownloadsState): boolean {
 /** A download as the downloads list shows it. */
 export function downloadItem(task: S["Task"]): S["DownloadItem"] | undefined {
   const p = task.payload as Record<string, unknown>;
-  if (typeof p.work_id !== "string") return undefined;
+  if (typeof p.work_id !== "string" || typeof p.chapter_id !== "string") return undefined;
   return {
     task,
     work_id: p.work_id,
+    chapter_id: p.chapter_id,
     work_title: String(p.work_title ?? ""),
     chapter_title: String(p.chapter_title ?? ""),
     ...(typeof p.chapter_number === "number" ? { chapter_number: p.chapter_number } : {}),

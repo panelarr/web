@@ -1024,6 +1024,17 @@ export interface paths {
          *     event's `data` is JSON. The stream opens with a `ready` event and
          *     sends a comment every 25 seconds to keep proxies from closing it.
          *     Events aren't replayed: after reconnecting, refetch what you show.
+         *
+         *     | Event | Who gets it | `data` schema |
+         *     |---|---|---|
+         *     | `ready` | the caller | `{}` |
+         *     | `task.queued`, `task.started`, `task.progress`, `task.updated` | admins, the task's requester | `TaskEvent` |
+         *     | `job.started`, `job.progress`, `job.done`, `job.failed` | admins | `JobEvent` |
+         *     | `work.updated` | admins, the work's followers | `WorkEvent` |
+         *     | `chapters.new` | admins, the work's followers | `WorkEvent` (`new`) |
+         *     | `chapter.downloaded` | admins, the work's followers | `WorkEvent` (`chapter_id`) |
+         *     | `library.changed` | the user | `WorkEvent` |
+         *     | `progress.synced` | the user (all devices) | `WorkEvent` (`chapter_id`, `page`, `completed` when one chapter changed) |
          */
         get: operations["streamEvents"];
         put?: never;
@@ -1761,6 +1772,8 @@ export interface components {
         DownloadItem: {
             task: components["schemas"]["Task"];
             /** Format: uuid */
+            chapter_id: string;
+            /** Format: uuid */
             work_id: string;
             work_title: string;
             chapter_number?: number;
@@ -2058,9 +2071,41 @@ export interface components {
         UpdateWorkSeriesRequest: {
             priority: number;
         };
+        /** @description Data of `task.*` events. */
+        TaskEvent: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            state: components["schemas"]["TaskState"];
+            attempts: number;
+            last_error?: string;
+            progress?: components["schemas"]["JobProgress"];
+        };
+        /** @description Data of `job.*` events. */
+        JobEvent: {
+            job_id: string;
+            /** Format: uuid */
+            run_id: string;
+            status?: components["schemas"]["JobRunStatus"];
+            progress?: components["schemas"]["JobProgress"];
+        };
+        /** @description Data of `work.updated`, `chapters.new`, `chapter.downloaded`, `library.changed` and `progress.synced`. */
+        WorkEvent: {
+            /** Format: uuid */
+            work_id: string;
+            /** Format: uuid */
+            chapter_id?: string;
+            /** @description `chapters.new`: how many chapters appeared. */
+            new?: number;
+            page?: number;
+            completed?: boolean;
+        };
         JobParam: {
             name: string;
-            /** @enum {string} */
+            /**
+             * @description How to send the value in `params`, always as a string; `string_list` is comma-separated (e.g. "en,de").
+             * @enum {string}
+             */
             type: "bool" | "int" | "string" | "string_list";
             description?: string;
             required: boolean;
@@ -2406,6 +2451,11 @@ export interface components {
         /** @enum {string} */
         EntryContentRating: "safe" | "suggestive" | "erotic" | "pornographic" | "unknown";
         CatalogEntrySummary: {
+            /**
+             * Format: uuid
+             * @description The work, when this entry is in your library.
+             */
+            library_work_id?: string;
             id: string;
             /** @description The title in the requested language when known. */
             title: string;
@@ -2484,6 +2534,11 @@ export interface components {
             title?: string;
         };
         CatalogEntry: {
+            /**
+             * Format: uuid
+             * @description The work, when this entry is in your library.
+             */
+            library_work_id?: string;
             id: string;
             title: string;
             type?: string;
@@ -2526,6 +2581,11 @@ export interface components {
             code: string;
             /** @description The request's ID, also in the X-Request-Id header and the server log. */
             request_id?: string;
+            /**
+             * Format: uuid
+             * @description With code `already_running`, the run that is going on.
+             */
+            current_run_id?: string;
             /** @description Per-field validation errors. */
             errors?: components["schemas"]["FieldError"][];
         };

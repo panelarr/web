@@ -52,10 +52,12 @@ export function RunJobButton({ job, size = "sm" }: { job: Job; size?: "sm" | "de
       // Someone else started it: offer the run that is going.
       setOpen(false);
       invalidate();
-      const current = await api
-        .GET("/jobs/{job_id}", { params: { path: { job_id: job.id } } })
-        .then((r) => r.data?.current_run_id)
-        .catch(() => undefined);
+      const current =
+        error.problem?.current_run_id ??
+        (await api
+          .GET("/jobs/{job_id}", { params: { path: { job_id: job.id } } })
+          .then((r) => r.data?.current_run_id)
+          .catch(() => undefined));
       toast.info(
         `${job.name} is already running.`,
         current ? { action: { label: "Watch", onClick: () => goToRun(current) } } : {},

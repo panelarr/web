@@ -165,6 +165,14 @@ function storageCheck(kind: string, settings: S["StorageSettings"]): string | un
   return undefined;
 }
 
+/** Marks a catalogue entry with the user's work for it, when it's in their library. */
+function inLibrary<T extends { id: string }>(user: S["User"], entry: T): T & { library_work_id?: string } {
+  const d = db();
+  const work = d.works.find((w) => w.entry_id === entry.id);
+  const mine = work && d.library.some((e) => e.user_id === user.id && e.work_id === work.id);
+  return mine && work ? { ...entry, library_work_id: work.id } : entry;
+}
+
 /** May the user fix matches? */
 function requireMatcher(): S["User"] | Response {
   const user = requireUser();
@@ -840,7 +848,9 @@ export const operations: MockOperation[] = [
     const found = visibleCatalog(user, url).flatMap(([entry, i]) => {
       const title = entry.titles.find((t) => t.text.toLowerCase().includes(q));
       if (!title) return [];
-      return [{ entry: summary(entry, i), ...(title.text !== entry.title ? { matched: title.text } : {}) }];
+      return [
+        { entry: inLibrary(user, summary(entry, i)), ...(title.text !== entry.title ? { matched: title.text } : {}) },
+      ];
     });
     const { items, next } = paginate(found, url);
     return json<S["CatalogSearchPage"]>({
@@ -858,7 +868,7 @@ export const operations: MockOperation[] = [
     if (!db().meta.check.providers.length) {
       return json<S["CatalogPage"]>({ entries: [], next_page_token: "", no_providers: true });
     }
-    const all = visibleCatalog(user, url).map(([entry, i]) => summary(entry, i));
+    const all = visibleCatalog(user, url).map(([entry, i]) => inLibrary(user, summary(entry, i)));
     const { items, next } = paginate(all, url);
     return json<S["CatalogPage"]>({
       entries: items,
@@ -875,7 +885,7 @@ export const operations: MockOperation[] = [
     if (!entry || !withinCeiling(entry.content_rating, user.grants.content_rating_ceiling)) {
       return problem(404, "not_found", "Not found");
     }
-    return json(entry);
+    return json(inLibrary(user, entry));
   }),
 
   op("get", "/catalog/entries/{entry_id}/cover", ({ params }) => {
@@ -1574,8 +1584,19 @@ export const operations: MockOperation[] = [
     const d = db();
     const job = d.jobs.find((j) => j.id === params.job_id);
     if (!job) return problem(404, "not_found", "Not found");
-    if (job.running)
-      return problem(409, "already_running", "Already running", `the job is running as ${job.current_run_id}`);
+    if (job.running) {
+      return HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "Already running",
+          status: 409,
+          code: "already_running",
+          detail: `the job is running as ${job.current_run_id}`,
+          ...(job.current_run_id ? { current_run_id: job.current_run_id } : {}),
+        },
+        { status: 409, headers: { "Content-Type": "application/problem+json" } },
+      );
+    }
     const text = await request.text();
     const given = (text ? (JSON.parse(text) as S["RunJobRequest"]).params : undefined) ?? {};
     const unknown = Object.keys(given).filter((name) => !job.params.some((p) => p.name === name));

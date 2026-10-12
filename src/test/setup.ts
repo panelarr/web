@@ -69,6 +69,12 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
       dispatchEvent: () => false,
     }) as MediaQueryList;
 }
+// Toasts and the reader capture the pointer while dragging.
+if (typeof window !== "undefined" && typeof Element.prototype.setPointerCapture !== "function") {
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+  Element.prototype.hasPointerCapture = () => false;
+}
 if (typeof window !== "undefined" && typeof window.ResizeObserver !== "function") {
   window.ResizeObserver = class {
     observe() {}

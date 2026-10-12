@@ -15,7 +15,7 @@ export const INVALIDATIONS: Partial<Record<EventType, readonly string[]>> = {
   "task.started": ["/tasks", "/queue", "/downloads"],
   "task.updated": ["/tasks", "/queue", "/downloads"],
   "work.updated": ["/works", "/library", "library-index"],
-  "library.changed": ["/library", "library-index"],
+  "library.changed": ["/library", "library-index", "/catalog"],
   "chapters.new": ["/works", "/library"],
   "chapter.downloaded": ["/works", "/downloads", "/chapters"],
   "progress.synced": ["/works", "/me/history", "/chapters"],

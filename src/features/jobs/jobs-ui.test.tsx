@@ -54,7 +54,7 @@ describe("the jobs page", () => {
   });
 
   it("offers the running run when someone else started the job", async () => {
-    await renderApp("/admin/jobs");
+    const { router } = await renderApp("/admin/jobs");
     const update = await waitFor(() => card("Check for new chapters"));
     // The schedule started it meanwhile; the page hasn't heard yet, so the button is still there.
     const job = db().jobs.find((j) => j.id === "update-check");
@@ -65,7 +65,11 @@ describe("the jobs page", () => {
     await userEvent.click(within(update).getByRole("button", { name: "Run now" }));
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Run now" }));
     expect(await screen.findByText("Check for new chapters is already running.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Watch" })).toBeInTheDocument();
+    // The error names the run that is going: "Watch" opens it.
+    await userEvent.click(screen.getByRole("button", { name: "Watch" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/admin/jobs/update-check/runs/0b0e1e2d-3c4b-4a5f-8e7d-6c5b4a3f2e1d"),
+    );
   });
 
   it("cancels a running run", async () => {

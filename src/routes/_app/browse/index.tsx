@@ -15,7 +15,6 @@ import { BrowseTabs } from "@/features/catalog/browse-tabs";
 import { EntryCard, EntryGrid } from "@/features/catalog/entry-card";
 import { CatalogFilters, type CatalogSearch, countFilters, validateCatalogSearch } from "@/features/catalog/filters";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
-import { useLibraryIndex } from "@/features/catalog/library-index";
 
 export const Route = createFileRoute("/_app/browse/")({
   validateSearch: validateCatalogSearch,
@@ -205,10 +204,9 @@ function CardItem({
   entry: Parameters<typeof EntryCard>[0]["entry"];
   matched?: string | undefined;
 }) {
-  const library = useLibraryIndex();
   return (
     <li>
-      <EntryCard entry={entry} matched={matched} inLibrary={library.data?.has(entry.id) ?? false} />
+      <EntryCard entry={entry} matched={matched} inLibrary={!!entry.library_work_id} />
     </li>
   );
 }

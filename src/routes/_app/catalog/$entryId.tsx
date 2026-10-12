@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ArrowLeft, Check, ExternalLink, Loader2, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Cover } from "@/features/catalog/cover";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
-import { LIBRARY_INDEX_KEY, useLibraryIndex } from "@/features/catalog/library-index";
+import { LIBRARY_INDEX_KEY } from "@/features/catalog/library-index";
 import { descriptionParagraphs, pickDescription } from "@/lib/description";
 
 type Entry = components["schemas"]["CatalogEntry"];
@@ -142,23 +142,28 @@ function EntryDetails({ entry }: { entry: Entry }) {
 function AddButton({ entry }: { entry: Entry }) {
   const { user } = useMe();
   const queryClient = useQueryClient();
-  const library = useLibraryIndex();
   const add = $api.useMutation("post", "/library", {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: LIBRARY_INDEX_KEY });
+      // The catalogue now marks the entry as in the library.
+      void queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[1]).startsWith("/catalog") });
       void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/library").queryKey.slice(0, 2) });
       toast.success(`Added ${entry.title}. Looking for it on your sources…`);
     },
   });
-  const inLibrary = library.data?.has(entry.id) ?? false;
+  const workId = entry.library_work_id ?? add.data?.work.id;
   const mayAdd = user.role === "admin" || user.grants.may_add;
 
-  if (inLibrary) {
+  if (workId) {
     return (
-      <p className="flex h-10 items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 text-sm font-medium text-primary md:w-full">
+      <Link
+        to="/works/$workId"
+        params={{ workId }}
+        className="flex h-10 items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 text-sm font-medium text-primary hover:bg-primary/15 md:w-full"
+      >
         <Check className="size-4" aria-hidden />
         In your library
-      </p>
+      </Link>
     );
   }
   return (
@@ -166,7 +171,7 @@ function AddButton({ entry }: { entry: Entry }) {
       <Button
         size="lg"
         className="w-full"
-        disabled={!mayAdd || add.isPending || library.isPending}
+        disabled={!mayAdd || add.isPending}
         onClick={() => add.mutate({ body: { entry_id: entry.id } })}
       >
         {add.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}

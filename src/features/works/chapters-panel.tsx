@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { VirtualList } from "@/components/virtual-list";
 import { HealthBadge } from "@/features/admin/health-badge";
-import { useLibraryIndex } from "@/features/catalog/library-index";
+import { useLibrary } from "@/features/catalog/library-index";
 import { downloadLabel, useCanDownload, useOpenDownloads } from "@/features/downloads/use-downloads";
 import { formatDate, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -89,8 +89,8 @@ export function ChaptersPanel({
   const { user } = useMe();
   const canDownload = useCanDownload();
   const downloads = useOpenDownloads(canDownload);
-  const library = useLibraryIndex();
-  const autoDownload = library.data?.get(work.entry_id)?.auto_download ?? false;
+  const library = useLibrary();
+  const autoDownload = library.data?.find((entry) => entry.work.id === work.id)?.auto_download ?? false;
   const queryClient = useQueryClient();
   const download = $api.useMutation("post", "/works/{work_id}/downloads", {
     onSuccess: (result) => {

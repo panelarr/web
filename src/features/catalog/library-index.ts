@@ -20,17 +20,7 @@ async function readLibrary(signal: AbortSignal): Promise<LibraryEntry[]> {
   return entries;
 }
 
-/** The user's whole library (every page), for the library grid and for marking works while browsing. */
+/** The user's whole library (every page), for the library grid. */
 export function useLibrary() {
   return useQuery({ queryKey: LIBRARY_INDEX_KEY, staleTime: 60_000, queryFn: ({ signal }) => readLibrary(signal) });
-}
-
-/** Which catalogue entries are in the library: entry ID → library entry. */
-export function useLibraryIndex() {
-  return useQuery({
-    queryKey: LIBRARY_INDEX_KEY,
-    staleTime: 60_000,
-    queryFn: ({ signal }) => readLibrary(signal),
-    select: (entries) => new Map(entries.map((entry) => [entry.work.entry_id, entry])),
-  });
 }
