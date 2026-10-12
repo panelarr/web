@@ -20,7 +20,7 @@ API, so anyone can build their own client against the same API.
 - **Chapters:** one list across sources, filling gaps from each, with the chosen copy and why; a tab per source; new chapter badges.
 - **Read:** a full-screen reader for phones and desktops: single or double page, vertical, webtoon or horizontal scroll, right to left or left to right, swipe, pinch and double-tap zoom, tap zones, keyboard shortcuts, settings per series, per source or everywhere, and progress that follows you across devices.
 - **Download:** chapters stored once for everyone, live progress, automatic downloads of new chapters, local or S3-compatible storage.
-- **Run it:** users and permissions, plugins and their extensions (install, update and uninstall from their stores, with languages), sources (an admin concern: on or off, by language and extension; browse one to test it, and add from there), jobs and the task queue, system health.
+- **Run it:** users and permissions, plugins and their extensions (install, update and uninstall from their stores, with languages), sources (an admin concern: on or off, by language and extension; browse one to test it, and add from there), network (shared proxies, challenge solvers and profiles, chosen per plugin, extension, source or provider; see `docs/network.md`), jobs and the task queue, system health.
 - **Make it yours:** themes (including true black), accent and key colours, fonts; saved to your account.
 - **Install it:** an installable app (PWA) on phones and desktops.
 
@@ -49,6 +49,7 @@ The dev server listens on http://localhost:5173.
 - [Architecture](docs/architecture.md): stack, layout, theming
 - [Working with the API](docs/api.md): the spec copy, generated types, drafts, mocks, errors, events
 - [Serving the web app](docs/embedding.md): the contract with the server (routing, caching, CSP)
+- [Network](docs/network.md): proxies, solvers and profiles, and where each is chosen
 
 ## Licence
 

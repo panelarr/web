@@ -41,7 +41,7 @@ Panelarr's own proxies, solvers and network profiles, offered to every plugin; c
 - [x] **N1. Admin → Network:** profiles (shared, or custom ones on request, each saying where it's used), proxies (password write-only, test by connecting or fetching a page), solvers (tested before saving), and the profile for everything; nothing used until chosen.
 - [x] **N2. Pickers:** a plugin's Network tab, an extension's details, a source's settings and the metadata service's page: what's in effect and from where, inherit, the plugin's own settings, a shared profile, or a custom one made in place; push state.
 - [x] **N3. Custom solvers and proxies** for one plugin, on its Network tab: its own proxies, solvers (when it can use one) and profiles, offered to it, its extensions and its sources only.
-- [ ] **N4. Finish:** a journey, docs.
+- [x] **N4. Finish:** a journey on desktop and phone (a proxy, a profile from it, chosen for a plugin, a source opting out, where it's used), the layout and accessibility checks over the new pages, docs (`docs/network.md`).
 
 ## Working assumptions
 
