@@ -37,6 +37,44 @@ describe("EventStream", () => {
     expect(stale()).toEqual(["/library", "library-index"]);
   });
 
+  it("refreshes one plugin on its health event, but leaves its settings alone", () => {
+    const { queryClient, stream } = setup();
+    const plugin = (id: string) => ["get", "/plugins/{plugin_id}", { params: { path: { plugin_id: id } } }];
+    queryClient.setQueryData(plugin("a"), { id: "a", health: "ok" });
+    queryClient.setQueryData(plugin("b"), { id: "b", health: "ok" });
+    queryClient.setQueryData(["get", "/plugins", {}], { plugins: [{ id: "a", health: "ok" }] });
+    queryClient.setQueryData(["get", "/sources", { params: { query: { plugin: "a" } } }], { sources: [] });
+    const config = ["get", "/plugins/{plugin_id}/config", { params: { path: { plugin_id: "a" } } }];
+    queryClient.setQueryData(config, { values: {} });
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+
+    const event = JSON.stringify({ plugin_id: "a", health: "degraded", health_message: "store can't be reached" });
+    stream.dispatch("plugin.health", event);
+    stream.dispatch("plugin.health", event); // checks repeat: one refetch
+    // The health shows at once, before any refetch.
+    expect(queryClient.getQueryData(plugin("a"))).toEqual({
+      id: "a",
+      health: "degraded",
+      health_message: "store can't be reached",
+    });
+    expect(queryClient.getQueryData(["get", "/plugins", {}])).toEqual({
+      plugins: [{ id: "a", health: "degraded", health_message: "store can't be reached" }],
+    });
+    stream.flush();
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    const stale = (key: unknown[]) =>
+      queryClient.getQueryCache().find({ queryKey: key, exact: true })?.state.isInvalidated;
+    expect(stale(plugin("a"))).toBe(true);
+    expect(stale(["get", "/plugins", {}])).toBe(true);
+    expect(stale(["get", "/sources", { params: { query: { plugin: "a" } } }])).toBe(true);
+    expect(stale(plugin("b"))).toBe(false);
+    expect(stale(config)).toBe(false);
+
+    // Back to healthy: the old message goes.
+    stream.dispatch("plugin.health", JSON.stringify({ plugin_id: "a", health: "ok" }));
+    expect(queryClient.getQueryData(plugin("a"))).toEqual({ id: "a", health: "ok" });
+  });
+
   it("patches task progress in place instead of refetching", () => {
     const { queryClient, stream, stale } = setup();
     queryClient.setQueryData(["get", "/tasks", { params: { query: {} } }], {

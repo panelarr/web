@@ -164,7 +164,7 @@ function SettingsCard({ plugin }: { plugin: Plugin }) {
     onSuccess: (saved) => {
       queryClient.setQueryData(options.queryKey, saved);
       toast.success("Settings saved.", {
-        description: "The plugin applies them in the background. Sync now shows how it went.",
+        description: "The plugin applies them in the background; its health here updates when it's done.",
       });
     },
   });

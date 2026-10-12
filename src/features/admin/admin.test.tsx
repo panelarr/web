@@ -189,11 +189,16 @@ describe("plugins", () => {
       "https://unreachable.example.net/index.json",
     );
     await userEvent.click(screen.getByRole("button", { name: "Save settings" }));
-    expect(await screen.findByText(/Sync now shows how it went/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    expect(await screen.findByText(/its health here updates when it's done/)).toBeInTheDocument();
+    // The server checks the plugin after the save and says so on the event stream: no Sync now.
     expect(
-      await screen.findByText("adding store https://unreachable.example.net/index.json: can't be reached"),
+      await screen.findByText(
+        "adding store https://unreachable.example.net/index.json: can't be reached",
+        {},
+        { timeout: 3000 },
+      ),
     ).toBeInTheDocument();
+    expect(screen.getByText("Degraded")).toBeInTheDocument();
   });
 
   it("shows a development build's version as it is, not as vdev", async () => {

@@ -657,18 +657,7 @@ export const operations: MockOperation[] = [
     if (user instanceof Response) return user;
     const found = db().plugins.find((p) => p.id === params.plugin_id);
     if (!found) return problem(404, "not_found", "Not found");
-    found.checked_at = now();
-    // Like a plugin that adds stores in the background: one it can't reach shows in its health.
-    const stores = (db().pluginConfigs[found.id]?.values.stores ?? []) as { url?: string }[];
-    const failing = stores.find((store) => store.url?.includes("unreachable"));
-    if (failing) {
-      found.health = "degraded";
-      found.health_message = `adding store ${failing.url}: can't be reached`;
-    } else if (found.health === "degraded") {
-      found.health = "ok";
-      delete found.health_message;
-    }
-    commit();
+    checkPlugin(found);
     return json(found);
   }),
 
@@ -708,6 +697,10 @@ export const operations: MockOperation[] = [
     // Secret fields come back empty; leaving them empty keeps the stored value.
     config.values = { ...values, api_token: "" };
     commit();
+    // Like the server: check the plugin soon after, once it has applied the settings.
+    const plugin = db().plugins.find((p) => p.id === String(params.plugin_id));
+    const state = db();
+    if (plugin) setTimeout(() => db() === state && checkPlugin(plugin), PLUGIN_RECHECK_MS);
     return json(config);
   }),
 
@@ -1721,6 +1714,30 @@ export const operations: MockOperation[] = [
     return json(queueState(d));
   }),
 ];
+
+/** The server checks a plugin seconds after its settings are saved; the mock, sooner. */
+const PLUGIN_RECHECK_MS = 300;
+
+/** A check of a plugin, as the server makes after a sync or a settings save. */
+function checkPlugin(plugin: S["Plugin"]): void {
+  plugin.checked_at = now();
+  // Like a plugin that adds stores in the background: one it can't reach shows in its health.
+  const stores = (db().pluginConfigs[plugin.id]?.values.stores ?? []) as { url?: string }[];
+  const failing = stores.find((store) => store.url?.includes("unreachable"));
+  if (failing) {
+    plugin.health = "degraded";
+    plugin.health_message = `adding store ${failing.url}: can't be reached`;
+  } else if (plugin.health === "degraded") {
+    plugin.health = "ok";
+    delete plugin.health_message;
+  }
+  commit();
+  emit("plugin.health", {
+    plugin_id: plugin.id,
+    health: plugin.health,
+    ...(plugin.health_message ? { health_message: plugin.health_message } : {}),
+  });
+}
 
 export const handlers = operations.map((operation) => operation.handler);
 

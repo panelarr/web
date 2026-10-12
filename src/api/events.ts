@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { Query, QueryClient } from "@tanstack/react-query";
-import type { EventMap, EventType, TaskEvent } from "./event-types";
+import type { EventMap, EventType, PluginEvent, TaskEvent } from "./event-types";
 
 /**
  * Which cached queries each server event makes stale: API path prefixes (the second part of
@@ -19,6 +19,25 @@ export const INVALIDATIONS: Partial<Record<EventType, readonly string[]>> = {
   "chapters.new": ["/works", "/library"],
   "chapter.downloaded": ["/works", "/downloads", "/chapters"],
   "progress.synced": ["/works", "/me/history", "/chapters"],
+};
+
+/**
+ * Events that make one thing's queries stale rather than everything under a path. Repeats of
+ * the same key before the batch runs refetch once.
+ */
+export const TARGETED: Partial<
+  Record<EventType, (data: never) => { key: string; matches: (query: Query) => boolean }>
+> = {
+  // After every check of a plugin (several follow a settings save): the plugin, the plugins
+  // list and the sources lists. Not its settings, which would reset a form being edited.
+  "plugin.health": (event: PluginEvent) => ({
+    key: `plugin:${event.plugin_id}`,
+    matches: (query) => {
+      const path = keyPath(query);
+      if (path === "/plugins" || path === "/sources") return true;
+      return path === "/plugins/{plugin_id}" && pathParam(query, "plugin_id") === event.plugin_id;
+    },
+  }),
 };
 
 /**
@@ -44,8 +63,31 @@ export const PATCHES: Partial<Record<EventType, (client: QueryClient, data: neve
         ),
     );
   },
+  // The health shows at once; the refetch (TARGETED) brings the rest.
+  "plugin.health": (client, event: PluginEvent) => {
+    const patch = (plugin: PluginHealth): PluginHealth => {
+      if (plugin.id !== event.plugin_id) return plugin;
+      const { health_message: _, ...rest } = plugin;
+      return {
+        ...rest,
+        health: event.health,
+        ...(event.health_message ? { health_message: event.health_message } : {}),
+      };
+    };
+    client.setQueriesData<PluginHealth>({ predicate: (q) => keyPath(q) === "/plugins/{plugin_id}" }, (old) =>
+      old ? patch(old) : old,
+    );
+    client.setQueriesData<{ plugins?: PluginHealth[] }>({ predicate: (q) => keyPath(q) === "/plugins" }, (old) =>
+      old?.plugins ? { ...old, plugins: old.plugins.map(patch) } : old,
+    );
+  },
 };
 
+interface PluginHealth {
+  id: string;
+  health: string;
+  health_message?: string;
+}
 interface DownloadPage {
   items?: Array<{ task: { id: string } }>;
 }
@@ -76,6 +118,12 @@ function keyPath(query: Query): string | undefined {
   return typeof second === "string" ? second : typeof first === "string" ? first : undefined;
 }
 
+/** A path parameter of an openapi-react-query key: [method, path, { params: { path } }]. */
+function pathParam(query: Query, name: string): unknown {
+  const init = query.queryKey[2] as { params?: { path?: Record<string, unknown> } } | undefined;
+  return init?.params?.path?.[name];
+}
+
 /**
  * The one connection to the server's event stream. Events invalidate or patch cached
  * queries, and components can listen for an event's data (e.g. live progress). The server
@@ -88,6 +136,7 @@ export class EventStream {
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private batchTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly pending = new Set<string>();
+  private readonly pendingTargets = new Map<string, (query: Query) => boolean>();
   private readonly listeners = new Map<string, Set<EventListener<EventType>>>();
   private readonly registered = new Set<string>();
 
@@ -102,7 +151,12 @@ export class EventStream {
     this.source = source;
     this.registered.clear();
     source.addEventListener("ready", () => this.onReady());
-    const types = new Set<string>([...Object.keys(INVALIDATIONS), ...Object.keys(PATCHES), ...this.listeners.keys()]);
+    const types = new Set<string>([
+      ...Object.keys(INVALIDATIONS),
+      ...Object.keys(TARGETED),
+      ...Object.keys(PATCHES),
+      ...this.listeners.keys(),
+    ]);
     for (const type of types) this.register(type);
     source.onerror = () => {
       // The browser reconnects by itself unless the server refused the stream (an HTTP
@@ -117,6 +171,7 @@ export class EventStream {
     this.retryTimer = undefined;
     this.batchTimer = undefined;
     this.pending.clear();
+    this.pendingTargets.clear();
     this.source?.close();
     this.source = undefined;
     this.connectedBefore = false;
@@ -145,7 +200,9 @@ export class EventStream {
     }
     PATCHES[type as EventType]?.(this.queryClient, data as never);
     for (const prefix of INVALIDATIONS[type as EventType] ?? []) this.pending.add(prefix);
-    if (this.pending.size > 0 && this.batchTimer === undefined) {
+    const target = TARGETED[type as EventType]?.(data as never);
+    if (target) this.pendingTargets.set(target.key, target.matches);
+    if ((this.pending.size > 0 || this.pendingTargets.size > 0) && this.batchTimer === undefined) {
       this.batchTimer = setTimeout(() => this.flush(), BATCH_MS);
     }
     for (const listener of this.listeners.get(type) ?? []) listener(data as never, type as EventType);
@@ -156,12 +213,17 @@ export class EventStream {
     clearTimeout(this.batchTimer);
     this.batchTimer = undefined;
     const prefixes = [...this.pending];
+    const targets = [...this.pendingTargets.values()];
     this.pending.clear();
-    if (prefixes.length === 0) return;
+    this.pendingTargets.clear();
+    if (prefixes.length === 0 && targets.length === 0) return;
     void this.queryClient.invalidateQueries({
       predicate: (query) => {
         const path = keyPath(query);
-        return path !== undefined && prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+        if (path !== undefined && prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+          return true;
+        }
+        return targets.some((matches) => matches(query));
       },
     });
   }

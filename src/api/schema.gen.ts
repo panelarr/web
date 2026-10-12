@@ -1040,6 +1040,7 @@ export interface paths {
          *     | `ready` | the caller | `{}` |
          *     | `task.queued`, `task.started`, `task.progress`, `task.updated` | admins, the task's requester | `TaskEvent` |
          *     | `job.started`, `job.progress`, `job.done`, `job.failed` | admins | `JobEvent` |
+         *     | `plugin.health` | admins | `PluginEvent` (after each check of a plugin; refetch it for its sources) |
          *     | `work.updated` | admins, the work's followers | `WorkEvent` |
          *     | `chapters.new` | admins, the work's followers | `WorkEvent` (`new`) |
          *     | `chapter.downloaded` | admins, the work's followers | `WorkEvent` (`chapter_id`) |
@@ -2098,6 +2099,13 @@ export interface components {
             run_id: string;
             status?: components["schemas"]["JobRunStatus"];
             progress?: components["schemas"]["JobProgress"];
+        };
+        /** @description Data of `plugin.health`. */
+        PluginEvent: {
+            plugin_id: string;
+            /** @enum {string} */
+            health: "ok" | "degraded" | "down" | "unknown";
+            health_message?: string;
         };
         /** @description Data of `work.updated`, `chapters.new`, `chapter.downloaded`, `library.changed` and `progress.synced`. */
         WorkEvent: {
