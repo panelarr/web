@@ -126,11 +126,9 @@ function SourcePage() {
             )}
           </p>
         </div>
-        {hasSettings(source) ? (
-          <div className="ml-auto">
-            <SourceSettingsButton source={source} variant="button" />
-          </div>
-        ) : null}
+        <div className="ml-auto">
+          <SourceSettingsButton source={source} settings={hasSettings(source)} variant="button" />
+        </div>
       </header>
     </>
   );

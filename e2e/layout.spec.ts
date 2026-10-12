@@ -100,6 +100,10 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
   await page.keyboard.press("Escape");
   await open("/admin/plugins/example");
   await check(page, "plugin settings", found);
+  for (const plugin of ["example", "stores"]) {
+    await open(`/admin/plugins/${plugin}?tab=network`);
+    await check(page, `${plugin} network`, found);
+  }
   for (const tab of ["profiles", "proxies", "solvers"]) {
     await open(`/admin/network?tab=${tab}`);
     await check(page, `network ${tab}`, found);

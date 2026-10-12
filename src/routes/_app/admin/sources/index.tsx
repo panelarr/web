@@ -239,7 +239,7 @@ function SourceRow({ source }: { source: Source }) {
         </p>
         {update.error ? <ErrorAlert error={update.error} /> : null}
       </div>
-      {hasSettings(source) ? <SourceSettingsButton source={source} /> : null}
+      <SourceSettingsButton source={source} settings={hasSettings(source)} />
       <Switch
         aria-label={`${source.name} on`}
         checked={source.enabled}

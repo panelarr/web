@@ -19,13 +19,18 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { ExtensionsPanel, type ExtensionsSearch } from "@/features/extensions/extensions-panel";
+import { PluginNetwork } from "@/features/network/plugin-network";
 import { formatRelative } from "@/lib/format";
 import { formatVersion } from "@/lib/version";
 
 type Plugin = components["schemas"]["Plugin"];
 
+/** The plugin page's sections beyond its overview; more come with its admin (jobs, health…). */
+const TABS = ["extensions", "network"] as const;
+type PluginTab = (typeof TABS)[number];
+
 interface PluginSearch extends ExtensionsSearch {
-  tab?: "extensions";
+  tab?: PluginTab;
 }
 
 const str = (value: unknown) => (typeof value === "string" && value ? value : undefined);
@@ -33,7 +38,7 @@ const str = (value: unknown) => (typeof value === "string" && value ? value : un
 export const Route = createFileRoute("/_app/admin/plugins/$pluginId")({
   validateSearch: (search: Record<string, unknown>): PluginSearch => {
     const out: PluginSearch = {};
-    if (search.tab === "extensions") out.tab = "extensions";
+    if (TABS.includes(search.tab as PluginTab)) out.tab = search.tab as PluginTab;
     for (const key of ["q", "lang", "pkg"] as const) {
       const value = str(search[key]);
       if (value) out[key] = value;
@@ -96,23 +101,26 @@ function PluginPage() {
           {plugin.data.health_message ? (
             <p className="mb-6 text-sm text-muted-foreground [overflow-wrap:anywhere]">{plugin.data.health_message}</p>
           ) : null}
-          {plugin.data.capabilities.includes("packages") ? (
-            // A plugin that hosts many sites (e.g. via extensions) manages them here.
-            <Tabs
-              value={search.tab ?? "overview"}
-              onValueChange={(value) =>
-                void navigate({ search: value === "extensions" ? { tab: "extensions" } : {}, replace: true })
-              }
-            >
-              <ScrollStrip>
-                <TabsList>
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
+          <Tabs
+            value={search.tab ?? "overview"}
+            onValueChange={(value) =>
+              void navigate({ search: value === "overview" ? {} : { tab: value as PluginTab }, replace: true })
+            }
+          >
+            <ScrollStrip>
+              <TabsList>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                {/* A plugin that hosts many sites (e.g. via extensions) manages them here. */}
+                {plugin.data.capabilities.includes("packages") ? (
                   <TabsTrigger value="extensions">Extensions</TabsTrigger>
-                </TabsList>
-              </ScrollStrip>
-              <TabsContent value="overview" className="mt-4">
-                <Overview plugin={plugin.data} />
-              </TabsContent>
+                ) : null}
+                <TabsTrigger value="network">Network</TabsTrigger>
+              </TabsList>
+            </ScrollStrip>
+            <TabsContent value="overview" className="mt-4">
+              <Overview plugin={plugin.data} />
+            </TabsContent>
+            {plugin.data.capabilities.includes("packages") ? (
               <TabsContent value="extensions" className="mt-4">
                 <ExtensionsPanel
                   pluginId={plugin.data.id}
@@ -120,10 +128,11 @@ function PluginPage() {
                   onSearch={(change) => void navigate({ search: (prev) => ({ ...prev, ...change }), replace: true })}
                 />
               </TabsContent>
-            </Tabs>
-          ) : (
-            <Overview plugin={plugin.data} />
-          )}
+            ) : null}
+            <TabsContent value="network" className="mt-4">
+              <PluginNetwork pluginId={plugin.data.id} pluginName={plugin.data.name} />
+            </TabsContent>
+          </Tabs>
         </>
       ) : null}
     </>

@@ -75,7 +75,9 @@ describe("browsing sources", () => {
     await renderApp("/admin/sources");
     await userEvent.click(await screen.findByRole("button", { name: "Settings for Example Source" }));
     const dialog = await screen.findByRole("dialog");
-    const labels = [...dialog.querySelectorAll("label, legend")].map((el) => el.textContent);
+    await within(dialog).findByLabelText("Image quality");
+    const form = dialog.querySelector("form") as HTMLFormElement;
+    const labels = [...form.querySelectorAll("label, legend")].map((el) => el.textContent);
     expect(labels).toEqual(["Image quality", "Mirror", "Account token", "Show extras"]);
     expect(within(dialog).getByLabelText("Account token")).toHaveAttribute("type", "password");
     expect(within(dialog).getByLabelText("Account token")).toHaveValue("");
@@ -97,8 +99,11 @@ describe("browsing sources", () => {
       mirror: "https://other.example.com",
       image_quality: "high",
     });
-    // Sources without settings have no such button.
-    expect(screen.queryByRole("button", { name: "Settings for Sample Scans" })).not.toBeInTheDocument();
+    // Sources without settings of their own still have their network.
+    await userEvent.click(screen.getByRole("button", { name: "Settings for Sample Scans" }));
+    const other = await screen.findByRole("dialog");
+    expect(await within(other).findByLabelText("Network profile for this source")).toBeInTheDocument();
+    expect(within(other).queryByRole("heading", { name: "Its own settings" })).not.toBeInTheDocument();
   });
 
   it("takes admins from old Browse → Sources links to the same page in Admin, search kept", async () => {

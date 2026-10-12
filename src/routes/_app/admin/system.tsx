@@ -5,6 +5,7 @@ import { $api } from "@/api/client";
 import { ErrorAlert, Loading, PageHeader } from "@/components/states";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HealthBadge } from "@/features/admin/health-badge";
+import { MetaNetwork } from "@/features/network/meta-network";
 import { MetaConnectionPanel } from "@/features/setup/meta-connection";
 
 export const Route = createFileRoute("/_app/admin/system")({
@@ -53,6 +54,18 @@ function SystemPage() {
           </CardHeader>
           <CardContent>
             <MetaConnectionPanel />
+          </CardContent>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Metadata service: network</CardTitle>
+            <CardDescription>
+              The proxy, solver and limits its providers use, from Panelarr's profiles. Nothing is chosen until you
+              choose it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MetaNetwork />
           </CardContent>
         </Card>
       </div>

@@ -102,3 +102,114 @@ export function networkTest(url: string, what: string): S["NetworkTest"] {
     latency_ms: 40 + Math.round(Math.random() * 80),
   };
 }
+
+/** Which plugins take network profiles, and solvers in them (from their declared services). */
+const ACCEPTS: Record<string, { profiles: boolean; solver: boolean }> = {
+  example: { profiles: true, solver: true },
+  stores: { profiles: true, solver: false },
+};
+
+export const accepts = (pluginId: string) => ACCEPTS[pluginId] ?? { profiles: false, solver: false };
+
+type Target = { kind: S["NetworkAssignment"]["target_kind"]; id: string };
+
+function assigned(state: NetworkState, target: Target): S["NetworkAssignment"] | undefined {
+  return state.assignments.find((a) => a.target_kind === target.kind && a.target_id === target.id);
+}
+
+/** The most specific assignment along a chain decides; with none, nothing is in effect. */
+function resolve(state: NetworkState, chain: Target[]): { effective: S["NetworkEffective"]; at?: string } {
+  for (const target of chain) {
+    const found = assigned(state, target);
+    if (found) {
+      return {
+        effective: {
+          level: target.kind as S["NetworkEffective"]["level"],
+          plugin_default: found.plugin_default,
+          ...(found.profile_id ? { profile_id: found.profile_id } : {}),
+        },
+        at: found.updated_at,
+      };
+    }
+  }
+  return { effective: { level: "none", plugin_default: false } };
+}
+
+/** Changes reach plugins within a second or so: until then they're on their way. */
+function push(accepted: boolean, at: string | undefined): S["NetworkPush"] {
+  if (!accepted) return { state: "not_accepted" };
+  if (!at) return { state: "not_needed" };
+  const since = Date.now() - Date.parse(at);
+  return since < 1200
+    ? { state: "pending" }
+    : { state: "pushed", pushed_at: new Date(Date.parse(at) + 1000).toISOString() };
+}
+
+export function sourceNetwork(state: NetworkState, source: S["SourceInfo"]): S["SourceNetwork"] {
+  const plugin = source.plugin_id;
+  const chain: Target[] = [
+    { kind: "source", id: source.id },
+    ...(source.package_id ? [{ kind: "package" as const, id: `${plugin}:${source.package_id}` }] : []),
+    { kind: "plugin", id: plugin },
+    { kind: "global", id: "" },
+  ];
+  const { effective, at } = resolve(state, chain);
+  const own = assigned(state, { kind: "source", id: source.id });
+  return {
+    source_id: source.id,
+    name: source.name,
+    lang: source.lang,
+    ...(source.package_id ? { package_id: source.package_id } : {}),
+    present: source.present,
+    ...(own ? { assignment: own } : {}),
+    effective,
+    push: push(accepts(plugin).profiles, at),
+  };
+}
+
+export function pluginNetwork(state: NetworkState, pluginId: string, sources: S["SourceInfo"][]): S["PluginNetwork"] {
+  const own = assigned(state, { kind: "plugin", id: pluginId });
+  return {
+    plugin_id: pluginId,
+    accepts_profiles: accepts(pluginId).profiles,
+    accepts_solver: accepts(pluginId).solver,
+    ...(own ? { assignment: own } : {}),
+    packages: state.assignments.filter((a) => a.target_kind === "package" && a.target_id.startsWith(`${pluginId}:`)),
+    sources: sources.filter((s) => s.plugin_id === pluginId).map((s) => sourceNetwork(state, s)),
+  };
+}
+
+/** What the plugin says it uses for a source (asked live, on a source's own view). */
+export function applied(state: NetworkState, view: S["SourceNetwork"]): S["NetworkApplied"] {
+  if (view.push?.state === "not_accepted") return { origin: "unknown" };
+  if (view.effective.plugin_default || view.effective.level === "none") return { origin: "plugin" };
+  const profile = state.profiles.find((p) => p.id === view.effective.profile_id);
+  return { origin: "pushed", ...(profile ? { profile_name: profile.name } : {}) };
+}
+
+export function metaNetwork(state: NetworkState, providers: string[]): S["MetaNetwork"] {
+  const own = assigned(state, { kind: "meta", id: "" });
+  return {
+    ...(own ? { assignment: own } : {}),
+    providers: providers.map((id) => {
+      const { effective, at } = resolve(state, [
+        { kind: "provider", id },
+        { kind: "meta", id: "" },
+        { kind: "global", id: "" },
+      ]);
+      const mine = assigned(state, { kind: "provider", id });
+      const profile = state.profiles.find((p) => p.id === effective.profile_id);
+      return {
+        provider_id: id,
+        accepts_profiles: true,
+        ...(mine ? { assignment: mine } : {}),
+        effective,
+        push: push(true, at),
+        applied:
+          effective.level === "none" || effective.plugin_default
+            ? { origin: "meta_default" as const }
+            : { origin: "pushed" as const, ...(profile ? { profile_name: profile.name } : {}) },
+      };
+    }),
+  };
+}

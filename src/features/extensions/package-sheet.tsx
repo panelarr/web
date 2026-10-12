@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ProfilePicker } from "@/features/network/profile-picker";
 import { hasSettings, SourceSettingsButton } from "@/features/sources/source-settings";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,13 @@ function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tas
     { enabled: pkg.installed },
   );
   const settable = new Set((sources.data?.sources ?? []).filter(hasSettings).map((source) => source.id));
+  const network = $api.useQuery(
+    "get",
+    "/plugins/{plugin_id}/network",
+    { params: { path: { plugin_id: pluginId } } },
+    { enabled: pkg.installed },
+  );
+  const target = `${pluginId}:${pkg.id}`;
   return (
     <>
       <SheetHeader>
@@ -94,6 +102,17 @@ function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tas
           // Keyed by what's saved, so the form starts over once a save comes back.
           <LanguagesForm key={pkg.enabled_langs.join()} pluginId={pluginId} pkg={pkg} />
         ) : null}
+        {pkg.installed && network.data ? (
+          <section className="grid gap-2" aria-label="Network">
+            <ProfilePicker
+              target={{ kind: "package", id: target, owner: { kind: "package", id: target }, label: "this extension" }}
+              assignment={network.data.packages.find((a) => a.target_id === target)}
+              accepted={network.data.accepts_profiles}
+              acceptsSolver={network.data.accepts_solver}
+            />
+            <p className="text-xs text-muted-foreground">For its sources, unless a source has its own.</p>
+          </section>
+        ) : null}
         <section className="grid gap-2" aria-label="Its sources">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-sm font-medium">Sources</h3>
@@ -115,7 +134,7 @@ function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tas
                   {source.lang}
                 </Badge>
                 {source.available ? null : <Badge variant="secondary">Not available</Badge>}
-                {settable.has(source.id) ? <SourceSettingsButton source={source} /> : null}
+                {pkg.installed ? <SourceSettingsButton source={source} settings={settable.has(source.id)} /> : null}
               </li>
             ))}
           </ul>

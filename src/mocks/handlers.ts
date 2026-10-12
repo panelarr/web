@@ -10,7 +10,7 @@ import { commit, currentUser, db, type MockInvite, newId, syncSessionCookie } fr
 import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
 import { finishRun, queueState, startRun, taskEvent } from "./jobs";
-import { filterOwned, networkTest, profileView } from "./network";
+import { applied, filterOwned, metaNetwork, networkTest, pluginNetwork, profileView, sourceNetwork } from "./network";
 import { type MockOperation, mockUrl, op, problem } from "./op";
 import { type MockPackage, packageIconSvg, packageView, queuePackageTask, syncPackageSources } from "./packages";
 import { pageCount, pageSvg } from "./reader";
@@ -869,6 +869,39 @@ export const operations: MockOperation[] = [
     d.profiles = d.profiles.filter((p) => p.id !== params.profile_id);
     commit();
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("get", "/plugins/{plugin_id}/network", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    if (!d.plugins.some((p) => p.id === params.plugin_id)) return problem(404, "not_found", "Not found");
+    return json(pluginNetwork(d, String(params.plugin_id), d.sources));
+  }),
+
+  op("get", "/sources/{source_id}/network", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const source = d.sources.find((s) => s.id === params.source_id);
+    if (!source) return problem(404, "not_found", "Not found");
+    const view = sourceNetwork(d, source);
+    return json<S["SourceNetwork"]>({ ...view, applied: applied(d, view) });
+  }),
+
+  op("get", "/system/meta/network", () => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    if (!d.meta.check.configured) {
+      return problem(503, "meta_unavailable", "Metadata service unavailable", "Connect the metadata service first.");
+    }
+    return json(
+      metaNetwork(
+        d,
+        d.meta.check.providers.map((p) => p.id),
+      ),
+    );
   }),
 
   op("get", "/network/assignments", () => {
