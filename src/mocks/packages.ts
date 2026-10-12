@@ -135,7 +135,8 @@ function packageSources(pkg: MockPackage, known: S["SourceInfo"][] | undefined):
       name: s.name,
       lang: s.lang,
       content_rating: pkg.content_rating,
-      capabilities: ["latest", "search"],
+      // Lantern Reader's source has settings of its own.
+      capabilities: s.key === "3101" ? ["latest", "search", "settings"] : ["latest", "search"],
       health: before?.health ?? { status: "unknown" },
       // Polyglot's Japanese source starts turned off by the admin.
       enabled: before?.enabled ?? s.key !== "3002",

@@ -71,6 +71,36 @@ describe("browsing sources", () => {
     expect(screen.queryByRole("navigation", { name: "Lists" })).not.toBeInTheDocument();
   });
 
+  it("sets a source's own settings, in its schema's order, secrets write-only", async () => {
+    await renderApp("/admin/sources");
+    await userEvent.click(await screen.findByRole("button", { name: "Settings for Example Source" }));
+    const dialog = await screen.findByRole("dialog");
+    const labels = [...dialog.querySelectorAll("label, legend")].map((el) => el.textContent);
+    expect(labels).toEqual(["Image quality", "Mirror", "Account token", "Show extras"]);
+    expect(within(dialog).getByLabelText("Account token")).toHaveAttribute("type", "password");
+    expect(within(dialog).getByLabelText("Account token")).toHaveValue("");
+
+    const mirror = within(dialog).getByLabelText("Mirror");
+    await userEvent.clear(mirror);
+    await userEvent.type(mirror, "ftp://nope");
+    // The browser checks the URL first; past it, the plugin's reason shows.
+    mirror.setAttribute("type", "text");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save settings" }));
+    expect(await within(dialog).findByText(/not a web address/)).toBeInTheDocument();
+
+    await userEvent.clear(mirror);
+    await userEvent.type(mirror, "https://other.example.com");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Image quality"), "high");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save settings" }));
+    expect(await screen.findByText("Settings for Example Source saved.")).toBeInTheDocument();
+    expect(db().sourceSettings["example:1001"]?.values).toMatchObject({
+      mirror: "https://other.example.com",
+      image_quality: "high",
+    });
+    // Sources without settings have no such button.
+    expect(screen.queryByRole("button", { name: "Settings for Sample Scans" })).not.toBeInTheDocument();
+  });
+
   it("takes admins from old Browse → Sources links to the same page in Admin, search kept", async () => {
     const { router } = await renderApp("/browse/sources/example:1001?list=search&q=the");
     await waitFor(() => expect(decodeURIComponent(router.state.location.pathname)).toBe("/admin/sources/example:1001"));

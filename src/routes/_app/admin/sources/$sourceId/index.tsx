@@ -23,6 +23,7 @@ import {
   type SourceFilter,
 } from "@/features/sources/filters";
 import { SourceFiltersSheet } from "@/features/sources/filters-sheet";
+import { hasSettings, SourceSettingsButton } from "@/features/sources/source-settings";
 import { cn } from "@/lib/utils";
 
 type Series = components["schemas"]["SourceSeries"];
@@ -108,7 +109,7 @@ function SourcePage() {
           Sources
         </Link>
       </Button>
-      <header className="mb-4 flex items-center gap-3">
+      <header className="mb-4 flex flex-wrap items-center gap-3">
         <SourceIcon name={source.name} url={source.icon_url} className="size-10" />
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{source.name}</h1>
@@ -125,6 +126,11 @@ function SourcePage() {
             )}
           </p>
         </div>
+        {hasSettings(source) ? (
+          <div className="ml-auto">
+            <SourceSettingsButton source={source} variant="button" />
+          </div>
+        ) : null}
       </header>
     </>
   );

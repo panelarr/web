@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { hasSettings, SourceSettingsButton } from "@/features/sources/source-settings";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { formatVersion } from "@/lib/version";
@@ -49,6 +50,14 @@ export function PackageSheet({
 
 function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tasks: PackageTasks }) {
   const [origin, setOrigin] = useState("");
+  // Its sources as the server knows them (once installed): which ones have settings.
+  const sources = $api.useQuery(
+    "get",
+    "/sources",
+    { params: { query: { all: true, package_id: pkg.id } } },
+    { enabled: pkg.installed },
+  );
+  const settable = new Set((sources.data?.sources ?? []).filter(hasSettings).map((source) => source.id));
   return (
     <>
       <SheetHeader>
@@ -100,12 +109,13 @@ function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tas
           </div>
           <ul className="divide-y rounded-lg border text-sm">
             {pkg.sources.map((source) => (
-              <li key={source.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+              <li key={source.id} className="flex flex-wrap items-center gap-2 px-3 py-1.5">
                 <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{source.name}</span>
                 <Badge variant="outline" className="uppercase">
                   {source.lang}
                 </Badge>
                 {source.available ? null : <Badge variant="secondary">Not available</Badge>}
+                {settable.has(source.id) ? <SourceSettingsButton source={source} /> : null}
               </li>
             ))}
           </ul>

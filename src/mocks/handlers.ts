@@ -813,6 +813,30 @@ export const operations: MockOperation[] = [
 
   // Sources
 
+  op("get", "/sources/{source_id}/settings", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const settings = db().sourceSettings[String(params.source_id)];
+    if (!settings) return problem(422, "unsupported", "No settings", "This source has no settings.");
+    return json(settings);
+  }),
+
+  op("patch", "/sources/{source_id}/settings", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const settings = db().sourceSettings[String(params.source_id)];
+    if (!settings) return problem(422, "unsupported", "No settings", "This source has no settings.");
+    const { values } = (await request.json()) as { values: Record<string, unknown> };
+    if (typeof values.mirror === "string" && values.mirror && !/^https?:\/\//.test(values.mirror)) {
+      return problem(400, "invalid_request", "Invalid settings", "The source refused the mirror: not a web address.");
+    }
+    // Secrets left empty keep their value; they never come back.
+    const next = { ...settings.values, ...values, account_token: "" };
+    settings.values = next;
+    commit();
+    return json(settings);
+  }),
+
   // Sources are an admin concern: users see them only on a work.
   op("get", "/sources", ({ request }) => {
     const user = requireAdmin();

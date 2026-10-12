@@ -128,6 +128,26 @@ export const storePlugin = {
   created_at: "2026-10-02T09:00:00Z",
 } satisfies Schemas["Plugin"];
 
+/** A source's own settings (e.g. an extension's preferences), as JSON Schema with order hints. */
+export const sourceSettings = {
+  schema: {
+    type: "object",
+    properties: {
+      image_quality: {
+        type: "string",
+        title: "Image quality",
+        enum: ["original", "high", "data saver"],
+        default: "original",
+        "x-order": 0,
+      },
+      mirror: { type: "string", title: "Mirror", format: "uri", "x-order": 1 },
+      account_token: { type: "string", title: "Account token", writeOnly: true, "x-order": 2 },
+      show_extras: { type: "boolean", title: "Show extras", default: true, "x-order": 3 },
+    },
+  },
+  values: { image_quality: "original", mirror: "https://mirror.example.com", account_token: "", show_extras: true },
+} satisfies Schemas["SourceSettings"];
+
 export const health = {
   status: "ok",
   version: "dev",
@@ -145,7 +165,7 @@ export const sources = [
     lang: "en",
     content_rating: "safe",
     home_url: "https://example.com",
-    capabilities: ["latest", "search", "filters"],
+    capabilities: ["latest", "search", "filters", "settings"],
     health: { status: "ok", checked_at: "2026-10-11T08:00:00Z" },
     enabled: true,
     present: true,

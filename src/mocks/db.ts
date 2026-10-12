@@ -20,6 +20,7 @@ import {
   pluginConfig,
   readerUser,
   session,
+  sourceSettings,
   sources,
   storePlugin,
 } from "./data";
@@ -74,6 +75,8 @@ export interface MockDb extends JobsState {
   /** Per user: app preferences. */
   preferences: Record<string, Record<string, unknown>>;
   storages: S["StorageInfo"][];
+  /** Per source with the settings capability: its settings. */
+  sourceSettings: Record<string, S["SourceSettings"]>;
   /** Per plugin with the packages capability: its packages. */
   packages: Record<string, MockPackage[]>;
 }
@@ -103,6 +106,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     syncing: [],
     plugins: [clone(plugin), clone(storePlugin)],
     pluginConfigs: { [plugin.id]: clone(pluginConfig) },
+    sourceSettings: { "example:1001": clone(sourceSettings), "stores:3101": clone(sourceSettings) },
     sources: [...clone(sources), ...initialPackageSources(packages)],
     packages: { [storePlugin.id]: packages },
     invites: [{ ...clone(invite), token: "open-invite-token" }],

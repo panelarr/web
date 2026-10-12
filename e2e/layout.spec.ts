@@ -100,6 +100,11 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
   await page.keyboard.press("Escape");
   await open("/admin/plugins/example");
   await check(page, "plugin settings", found);
+  await open("/admin/sources");
+  await page.getByRole("button", { name: "Settings for Example Source" }).click();
+  await expect(dialog().getByLabel("Image quality")).toBeVisible();
+  await check(page, "a source's settings", found);
+  await page.keyboard.press("Escape");
   await open("/admin/plugins/stores?tab=extensions");
   await check(page, "extensions", found);
   await open("/admin/plugins/stores?tab=extensions&pkg=org.example.polyglot");

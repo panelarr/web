@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { HealthBadge } from "@/features/admin/health-badge";
+import { hasSettings, SourceSettingsButton } from "@/features/sources/source-settings";
 
 type Source = components["schemas"]["SourceInfo"];
 
@@ -238,6 +239,7 @@ function SourceRow({ source }: { source: Source }) {
         </p>
         {update.error ? <ErrorAlert error={update.error} /> : null}
       </div>
+      {hasSettings(source) ? <SourceSettingsButton source={source} /> : null}
       <Switch
         aria-label={`${source.name} on`}
         checked={source.enabled}

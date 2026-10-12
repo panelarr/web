@@ -1057,6 +1057,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/meta/network": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The network profile in force for each metadata provider
+         * @description For each provider meta has: what is assigned (at the provider, all
+         *     of meta, or global), whether its plugin takes profiles, whether
+         *     meta has the profile, and what meta applies. Calls meta: `502`
+         *     when it can't be reached.
+         */
+        get: operations["getMetaNetwork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/{source_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A source's own settings and their schema
+         * @description Read from its plugin (e.g. an extension's preferences). Only for
+         *     sources with the `settings` capability, else `422`, code
+         *     `unsupported`. Secret fields (`writeOnly` in the schema) come back
+         *     empty. Works on a source turned off too.
+         */
+        get: operations["getSourceSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change some of a source's settings
+         * @description Keys left out keep their value, and so does a secret left empty. The plugin checks the values (`400` with its reason).
+         */
+        patch: operations["setSourceSettings"];
+        trace?: never;
+    };
     "/sources/{source_id}/network": {
         parameters: {
             query?: never;
@@ -3215,6 +3268,29 @@ export interface components {
             origin: "pushed" | "plugin" | "none" | "unknown";
             profile_name?: string;
         };
+        MetaNetwork: {
+            assignment?: components["schemas"]["NetworkAssignment"];
+            providers: components["schemas"]["ProviderNetwork"][];
+        };
+        ProviderNetwork: {
+            provider_id: string;
+            /** @description Its plugin takes network profiles (meta gives them only to those). */
+            accepts_profiles: boolean;
+            assignment?: components["schemas"]["NetworkAssignment"];
+            effective: components["schemas"]["NetworkEffective"];
+            push: components["schemas"]["NetworkPush"];
+            /** @description What meta applies to the provider. */
+            applied: {
+                /**
+                 * @description `pushed`: Panelarr's profile; `meta`/`meta_default`: meta's own assignment or default; `none`: a direct connection.
+                 * @enum {string}
+                 */
+                origin: "pushed" | "meta" | "meta_default" | "none";
+                profile_name?: string;
+                /** Format: date-time */
+                pushed_at?: string;
+            };
+        };
         PluginNetwork: {
             plugin_id: string;
             /** @description The plugin declares the network profile service; others never receive profiles. */
@@ -3225,6 +3301,20 @@ export interface components {
             /** @description Assignments at the plugin's packages. */
             packages: components["schemas"]["NetworkAssignment"][];
             sources: components["schemas"]["SourceNetwork"][];
+        };
+        SourceSettings: {
+            /** @description The source's JSON Schema for its settings. Render the form from it. */
+            schema: {
+                [key: string]: unknown;
+            };
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        SetSourceSettingsRequest: {
+            values: {
+                [key: string]: unknown;
+            };
         };
         /** @description How a work already knows a series. */
         SeriesMatchRef: {
@@ -5514,6 +5604,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PluginNetwork"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMetaNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The providers' network settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaNetwork"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSourceSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSettings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setSourceSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSourceSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description All the settings after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSettings"];
                 };
             };
             default: components["responses"]["Problem"];

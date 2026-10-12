@@ -64,6 +64,12 @@ describe("the Extensions tab", () => {
     expect(await screen.findByText("Lantern Reader installed.")).toBeInTheDocument();
     await waitFor(() => expect(within(row("Lantern Reader")).getByText("Installed")).toBeInTheDocument());
     expect(source("stores:3101")).toMatchObject({ present: true, package_name: "Lantern Reader" });
+
+    // Its source's own settings, from the extension's details.
+    await userEvent.click(within(row("Lantern Reader")).getByRole("button", { name: "Lantern Reader" }));
+    const sheet = await screen.findByRole("dialog");
+    await userEvent.click(await within(sheet).findByRole("button", { name: "Settings for Lantern Reader" }));
+    expect(await screen.findByLabelText("Image quality")).toBeInTheDocument();
   });
 
   it("updates and uninstalls; an uninstalled extension's sources become absent", async () => {
