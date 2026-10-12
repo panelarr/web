@@ -26,7 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cover } from "@/features/catalog/cover";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
 import { LIBRARY_INDEX_KEY } from "@/features/catalog/library-index";
-import { type ChapterOrder, useChapterOrder } from "@/features/works/chapter-order";
+import { useChapterPrefs } from "@/features/works/chapter-order";
+import type { ChapterView } from "@/features/works/chapter-view";
 import { ChaptersPanel } from "@/features/works/chapters-panel";
 import { SeriesChaptersPanel } from "@/features/works/series-chapters";
 import { SourcesPanel } from "@/features/works/sources-panel";
@@ -38,10 +39,17 @@ type Tab = string;
 
 interface WorkSearch {
   tab?: Tab;
-  /** Chosen here; without it, the user's remembered order (newest first by default). */
-  order?: ChapterOrder;
+  /** Chosen here; without them, the user's remembered view (newest first by default). */
+  order?: ChapterView["order"];
+  sort?: ChapterView["sort"];
+  display?: ChapterView["display"];
   unread?: true;
+  downloaded?: true;
+  bookmarked?: true;
+  scanlator?: string;
 }
+
+const flag = (value: unknown) => value === true || value === "true";
 
 export const Route = createFileRoute("/_app/works/$workId")({
   validateSearch: (search: Record<string, unknown>): WorkSearch => ({
@@ -49,7 +57,12 @@ export const Route = createFileRoute("/_app/works/$workId")({
       ? { tab: search.tab }
       : {}),
     ...(search.order === "desc" || search.order === "asc" ? { order: search.order } : {}),
-    ...(search.unread === true || search.unread === "true" ? { unread: true as const } : {}),
+    ...(search.sort === "number" || search.sort === "date" ? { sort: search.sort } : {}),
+    ...(search.display === "title" || search.display === "number" ? { display: search.display } : {}),
+    ...(flag(search.unread) ? { unread: true as const } : {}),
+    ...(flag(search.downloaded) ? { downloaded: true as const } : {}),
+    ...(flag(search.bookmarked) ? { bookmarked: true as const } : {}),
+    ...(typeof search.scanlator === "string" && search.scanlator ? { scanlator: search.scanlator } : {}),
   }),
   component: WorkPage,
 });
@@ -85,7 +98,16 @@ function WorkDetails({ work }: { work: Work }) {
       ? "chapters"
       : requested;
   const navigate = useNavigate({ from: Route.fullPath });
-  const chapterOrder = useChapterOrder();
+  const prefs = useChapterPrefs();
+  const view: ChapterView = {
+    order: search.order ?? prefs.saved.order,
+    sort: search.sort ?? prefs.saved.sort,
+    display: search.display ?? prefs.saved.display,
+    unread: search.unread ?? false,
+    downloaded: search.downloaded ?? false,
+    bookmarked: search.bookmarked ?? false,
+    scanlator: search.scanlator,
+  };
   return (
     <>
       <header className="mb-6 flex gap-4 sm:gap-6">
@@ -130,11 +152,21 @@ function WorkDetails({ work }: { work: Work }) {
         <TabsContent value="chapters" className="mt-4">
           <ChaptersPanel
             work={work}
-            view={{ order: search.order ?? chapterOrder.order, unread: search.unread ?? false }}
-            onViewChange={(view) => {
-              chapterOrder.remember(view.order);
+            view={view}
+            onViewChange={(change) => {
+              const next = { ...view, ...change };
+              prefs.remember({ order: next.order, sort: next.sort, display: next.display });
               void navigate({
-                search: (prev) => ({ ...prev, order: view.order, unread: view.unread ? true : undefined }),
+                search: (prev) => ({
+                  ...prev,
+                  order: next.order,
+                  sort: next.sort,
+                  display: next.display,
+                  unread: next.unread ? true : undefined,
+                  downloaded: next.downloaded ? true : undefined,
+                  bookmarked: next.bookmarked ? true : undefined,
+                  scanlator: next.scanlator,
+                }),
                 replace: true,
               });
             }}

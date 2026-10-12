@@ -16,6 +16,8 @@ export interface ChaptersState {
   progress: Record<string, Record<string, S["ChapterProgress"]>>;
   /** Chapters found since each user last marked a work seen: user → work → chapter IDs. */
   fresh: Record<string, Record<string, string[]>>;
+  /** Per user, per work: bookmarked chapters, oldest bookmark first. */
+  bookmarks: Record<string, Record<string, string[]>>;
   /** Downloaded chapters (shared). */
   downloaded: string[];
 }
@@ -61,6 +63,7 @@ export function unifiedChapters(
     }
   }
   const fresh = new Set(state.fresh[userId]?.[workId] ?? []);
+  const bookmarked = new Set(state.bookmarks[userId]?.[workId] ?? []);
   const build = (id: string, variants: S["ChapterVariant"][], number?: number) => {
     const pinnedId = state.pins[workId]?.[id];
     const pinned = variants.find((v) => v.id === pinnedId);
@@ -86,6 +89,7 @@ export function unifiedChapters(
       extra: number === undefined,
       available: true,
       new: fresh.has(id),
+      bookmarked: bookmarked.has(id),
       variants: variants.length,
       reason,
       pinned: pinned !== undefined,

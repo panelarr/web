@@ -791,6 +791,295 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/network/solvers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The solvers */
+        get: operations["listSolvers"];
+        put?: never;
+        /**
+         * Add a solver
+         * @description A FlareSolverr-compatible endpoint (FlareSolverr, Byparr). The check asks it for its state.
+         */
+        post: operations["createSolver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/network/solvers/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a solver before saving it */
+        post: operations["testSolverSettings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/network/solvers/{solver_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solver_id: components["parameters"]["SolverId"];
+            };
+            cookie?: never;
+        };
+        /** One solver */
+        get: operations["getSolver"];
+        put?: never;
+        post?: never;
+        /**
+         * Remove a solver
+         * @description A solver a network profile uses can't be removed: `409`, code `in_use`.
+         */
+        delete: operations["deleteSolver"];
+        options?: never;
+        head?: never;
+        /** Change a solver */
+        patch: operations["updateSolver"];
+        trace?: never;
+    };
+    "/network/solvers/{solver_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solver_id: components["parameters"]["SolverId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a saved solver */
+        post: operations["testSolver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/network/proxies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The proxys */
+        get: operations["listProxies"];
+        put?: never;
+        /**
+         * Add a proxy
+         * @description An HTTP, HTTPS or SOCKS5 proxy, e.g. a VPN container. The password is stored encrypted and never returned.
+         */
+        post: operations["createProxy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/network/proxies/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a proxy before saving it */
+        post: operations["testProxySettings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/network/proxies/{proxy_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proxy_id: components["parameters"]["ProxyId"];
+            };
+            cookie?: never;
+        };
+        /** One proxy */
+        get: operations["getProxy"];
+        put?: never;
+        post?: never;
+        /**
+         * Remove a proxy
+         * @description A proxy a network profile uses can't be removed: `409`, code `in_use`.
+         */
+        delete: operations["deleteProxy"];
+        options?: never;
+        head?: never;
+        /** Change a proxy */
+        patch: operations["updateProxy"];
+        trace?: never;
+    };
+    "/network/proxies/{proxy_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proxy_id: components["parameters"]["ProxyId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a saved proxy */
+        post: operations["testProxy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/network/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Network profiles
+         * @description Shared profiles; with `include_custom` also the custom ones; with `owner_kind` and `owner_id` only that owner's custom profiles.
+         */
+        get: operations["listNetworkProfiles"];
+        put?: never;
+        /**
+         * Add a network profile
+         * @description Shared, or custom to one plugin, extension (package), source or
+         *     metadata provider (`owner`): a custom profile can only be assigned
+         *     to its owner, and goes when its plugin is removed. Creating a
+         *     profile assigns it nowhere; "create new" from a plugin is this
+         *     then `PUT /network/assignments`.
+         */
+        post: operations["createNetworkProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/network/profiles/{profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        /** One network profile */
+        get: operations["getNetworkProfile"];
+        /**
+         * Replace a profile's settings
+         * @description Everything but its ID and owner; parts left out go back to the plugin's defaults.
+         */
+        put: operations["replaceNetworkProfile"];
+        post?: never;
+        /**
+         * Remove a profile
+         * @description An assigned profile can't be removed: `409`, code `in_use`.
+         */
+        delete: operations["deleteNetworkProfile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/network/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where profiles are assigned */
+        get: operations["listNetworkAssignments"];
+        /**
+         * Assign a profile at one level
+         * @description Levels: `global`; a `plugin`; a `package` ("plugin:package"); a
+         *     `source`; all of `meta`; a metadata `provider`. The most specific
+         *     assignment wins: for a source, source → package → plugin →
+         *     global; for a provider, provider → meta → global. Give
+         *     `profile_id`, or `plugin_default: true` to use the plugin's own
+         *     settings there and stop inheriting. Nothing is assigned by default.
+         */
+        put: operations["assignNetworkProfile"];
+        post?: never;
+        /** Remove the assignment at one level, which then inherits */
+        delete: operations["unassignNetworkProfile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plugins/{plugin_id}/network": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The network profile in force for each of a plugin's sources
+         * @description With what is assigned at the plugin and at each source, and where each source's profile comes from.
+         */
+        get: operations["getPluginNetwork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/{source_id}/network": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A source's network profile, and what its plugin applies
+         * @description As in GET /plugins/{plugin_id}/network, plus `applied`, which asks the plugin.
+         */
+        get: operations["getSourceNetwork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sources": {
         parameters: {
             query?: never;
@@ -1222,6 +1511,7 @@ export interface paths {
          *     | `chapter.downloaded` | admins, the work's followers | `WorkEvent` (`chapter_id`) |
          *     | `library.changed` | the user | `WorkEvent` |
          *     | `progress.synced` | the user (all devices) | `WorkEvent` (`chapter_id`, `page`, `completed` when one chapter changed) |
+         *     | `bookmarks.changed` | the user (all devices) | `WorkEvent` |
          */
         get: operations["streamEvents"];
         put?: never;
@@ -1645,6 +1935,29 @@ export interface paths {
          */
         put: operations["setChapterProgress"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        /** Your bookmarked chapters of a work */
+        get: operations["listBookmarks"];
+        put?: never;
+        /**
+         * Bookmark chapters, or remove their bookmarks
+         * @description One chapter or many at once, like marking chapters read. Bookmarks are yours; other devices hear `bookmarks.changed`.
+         */
+        post: operations["setBookmarks"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2105,6 +2418,8 @@ export interface components {
             source_health: "ok" | "failing" | "unknown";
         };
         UnifiedChapter: {
+            /** @description You bookmarked it. */
+            bookmarked: boolean;
             /** Format: uuid */
             id: string;
             /** @description Absent for chapters without a number (extras). */
@@ -2191,6 +2506,8 @@ export interface components {
             added_at: string;
             /** @description Chapters found since you last marked the work seen. */
             new_chapters: number;
+            /** @description Chapters of it you bookmarked. */
+            bookmarks: number;
         };
         LibraryPage: {
             entries: components["schemas"]["LibraryEntry"][];
@@ -2628,6 +2945,286 @@ export interface components {
         };
         PackageLanguages: {
             enabled_langs: string[];
+        };
+        /** @description A challenge solver (FlareSolverr-compatible). */
+        Solver: {
+            id: string;
+            name: string;
+            type: components["schemas"]["SolverType"];
+            /** @description Its base URL, e.g. http://flaresolverr:8191. */
+            url: string;
+            /** @description How long a session or its clearance cookies are reused; absent means the plugin's default. */
+            session_ttl_seconds?: number;
+            /** @description Upper bound for one solve; absent means the plugin's default. */
+            max_timeout_seconds?: number;
+            /** @description Use the solver's own response when a fresh request still fails. */
+            as_response_fallback: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @enum {string} */
+        SolverType: "flaresolverr" | "byparr";
+        SolverList: {
+            solvers: components["schemas"]["Solver"][];
+        };
+        NewSolver: {
+            id: string;
+            name: string;
+            type: components["schemas"]["SolverType"];
+            url: string;
+            session_ttl_seconds?: number;
+            max_timeout_seconds?: number;
+            as_response_fallback?: boolean;
+        };
+        UpdateSolverRequest: {
+            name?: string;
+            type?: components["schemas"]["SolverType"];
+            url?: string;
+            session_ttl_seconds?: number;
+            max_timeout_seconds?: number;
+            as_response_fallback?: boolean;
+        };
+        /** @description An HTTP, HTTPS or SOCKS5 proxy. The password is never returned. */
+        Proxy: {
+            id: string;
+            name: string;
+            /** @description http://, https:// or socks5://host:port, without credentials. */
+            url: string;
+            username?: string;
+            has_password: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ProxyList: {
+            proxies: components["schemas"]["Proxy"][];
+        };
+        NewProxy: {
+            id: string;
+            name: string;
+            url: string;
+            username?: string;
+            /** @description Stored encrypted; never returned. */
+            password?: string;
+        };
+        UpdateProxyRequest: {
+            name?: string;
+            url?: string;
+            /** @description Empty removes the credentials. */
+            username?: string;
+            /** @description Empty or absent keeps the stored one. */
+            password?: string;
+        };
+        ProxyTarget: {
+            /** @description An http(s) URL to request through the proxy. Without it, the check only connects to the proxy. */
+            url?: string;
+        };
+        ProxyTestRequest: {
+            proxy: components["schemas"]["NewProxy"];
+            /** @description An http(s) URL to request through the proxy. Without it, the check only connects to the proxy. A saved proxy's stored password is used when the password is left empty. */
+            url?: string;
+        };
+        NetworkTest: {
+            ok: boolean;
+            message: string;
+            /** @description The solver's version, when it says. */
+            version?: string;
+            latency_ms: number;
+        };
+        SetBookmarksRequest: {
+            chapter_ids: string[];
+            bookmarked: boolean;
+        };
+        BookmarkList: {
+            chapter_ids: string[];
+        };
+        /** @enum {string} */
+        ProfileOwnerKind: "plugin" | "package" | "source" | "provider";
+        ProfileOwner: {
+            kind: components["schemas"]["ProfileOwnerKind"];
+            /** @description A plugin ID, "plugin:package", a source ID or a provider ID. */
+            id: string;
+        };
+        NetworkRateLimit: {
+            requests: number;
+            period_seconds: number;
+            burst?: number;
+            /**
+             * @description One budget per source (the default) or per target host.
+             * @enum {string}
+             */
+            scope?: "source" | "host";
+        };
+        NetworkUserAgent: {
+            /**
+             * @description `default`: the plugin's; `from_solver` needs a solver.
+             * @enum {string}
+             */
+            mode: "default" | "fixed" | "random_desktop" | "from_solver";
+            /** @description The user agent, for `fixed`. */
+            value?: string;
+        };
+        NetworkTimeouts: {
+            connect_seconds?: number;
+            read_seconds?: number;
+            call_seconds?: number;
+        };
+        NetworkProfileSettings: {
+            name: string;
+            /** @description The proxy; absent means a direct connection. */
+            proxy_id?: string;
+            /** @description The challenge solver; absent means none. */
+            solver_id?: string;
+            rate_limit?: components["schemas"]["NetworkRateLimit"];
+            /** @description Parallel requests per source; absent or 0 means the plugin's default. */
+            concurrency?: number;
+            user_agent?: components["schemas"]["NetworkUserAgent"];
+            /** @description DNS-over-HTTPS resolver; absent means the system resolver. */
+            doh_url?: string;
+            /** @description Extra headers on every request. */
+            headers?: {
+                [key: string]: string;
+            };
+            /** @description Name of a cookie jar shared with other sources; absent means each source has its own. */
+            shared_cookie_jar?: string;
+            timeouts?: components["schemas"]["NetworkTimeouts"];
+        };
+        NewNetworkProfile: {
+            id: string;
+            owner?: components["schemas"]["ProfileOwner"];
+            name: string;
+            /** @description The proxy; absent means a direct connection. */
+            proxy_id?: string;
+            /** @description The challenge solver; absent means none. */
+            solver_id?: string;
+            rate_limit?: components["schemas"]["NetworkRateLimit"];
+            /** @description Parallel requests per source; absent or 0 means the plugin's default. */
+            concurrency?: number;
+            user_agent?: components["schemas"]["NetworkUserAgent"];
+            /** @description DNS-over-HTTPS resolver; absent means the system resolver. */
+            doh_url?: string;
+            /** @description Extra headers on every request. */
+            headers?: {
+                [key: string]: string;
+            };
+            /** @description Name of a cookie jar shared with other sources; absent means each source has its own. */
+            shared_cookie_jar?: string;
+            timeouts?: components["schemas"]["NetworkTimeouts"];
+        };
+        NetworkProfile: {
+            id: string;
+            owner?: components["schemas"]["ProfileOwner"];
+            name: string;
+            /** @description The proxy; absent means a direct connection. */
+            proxy_id?: string;
+            /** @description The challenge solver; absent means none. */
+            solver_id?: string;
+            rate_limit?: components["schemas"]["NetworkRateLimit"];
+            /** @description Parallel requests per source; absent or 0 means the plugin's default. */
+            concurrency?: number;
+            user_agent: components["schemas"]["NetworkUserAgent"];
+            /** @description DNS-over-HTTPS resolver; absent means the system resolver. */
+            doh_url?: string;
+            /** @description Extra headers on every request. */
+            headers: {
+                [key: string]: string;
+            };
+            /** @description Name of a cookie jar shared with other sources; absent means each source has its own. */
+            shared_cookie_jar?: string;
+            timeouts: components["schemas"]["NetworkTimeouts"];
+            /** @description Where it is assigned. */
+            assigned_to: components["schemas"]["NetworkTarget"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        NetworkProfileList: {
+            profiles: components["schemas"]["NetworkProfile"][];
+        };
+        /** @enum {string} */
+        NetworkTargetKind: "global" | "plugin" | "package" | "source" | "meta" | "provider";
+        NetworkTarget: {
+            target_kind: components["schemas"]["NetworkTargetKind"];
+            /** @description Empty for `global` and `meta`. */
+            target_id: string;
+        };
+        NetworkAssignmentRequest: {
+            target_kind: components["schemas"]["NetworkTargetKind"];
+            target_id?: string;
+            profile_id?: string;
+            /** @description Use the plugin's own settings here (instead of profile_id). */
+            plugin_default?: boolean;
+        };
+        NetworkAssignment: {
+            target_kind: components["schemas"]["NetworkTargetKind"];
+            target_id: string;
+            profile_id?: string;
+            plugin_default: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        NetworkAssignmentList: {
+            assignments: components["schemas"]["NetworkAssignment"][];
+        };
+        NetworkEffective: {
+            /**
+             * @description Where it comes from; `none` means nothing is assigned (the plugin's own settings).
+             * @enum {string}
+             */
+            level: "source" | "package" | "plugin" | "global" | "provider" | "meta" | "none";
+            profile_id?: string;
+            /** @description The plugin's own settings are in force. */
+            plugin_default: boolean;
+        };
+        SourceNetwork: {
+            source_id: string;
+            name: string;
+            lang?: string;
+            package_id?: string;
+            present?: boolean;
+            assignment?: components["schemas"]["NetworkAssignment"];
+            effective: components["schemas"]["NetworkEffective"];
+            push?: components["schemas"]["NetworkPush"];
+            applied?: components["schemas"]["NetworkApplied"];
+        };
+        /** @description Whether the plugin has the profile in force. */
+        NetworkPush: {
+            /**
+             * @description `pushed`: the plugin has it; `pending`: it changed and is on its
+             *     way (or the plugin is down); `failed`: the last push failed
+             *     (tried again at the next sync); `not_needed`: nothing assigned
+             *     and nothing pushed before; `not_accepted`: the plugin doesn't
+             *     take network profiles.
+             * @enum {string}
+             */
+            state: "pushed" | "pending" | "failed" | "not_needed" | "not_accepted";
+            /** Format: date-time */
+            pushed_at?: string;
+            error?: string;
+        };
+        /** @description What the plugin says it applies (only from GET /sources/{source_id}/network). */
+        NetworkApplied: {
+            /**
+             * @description `pushed`: Panelarr's profile; `plugin`: the plugin's own settings; `none`: a direct connection; `unknown`: the plugin can't say.
+             * @enum {string}
+             */
+            origin: "pushed" | "plugin" | "none" | "unknown";
+            profile_name?: string;
+        };
+        PluginNetwork: {
+            plugin_id: string;
+            /** @description The plugin declares the network profile service; others never receive profiles. */
+            accepts_profiles: boolean;
+            /** @description The plugin declares the solver service; others receive profiles without the solver. */
+            accepts_solver: boolean;
+            assignment?: components["schemas"]["NetworkAssignment"];
+            /** @description Assignments at the plugin's packages. */
+            packages: components["schemas"]["NetworkAssignment"][];
+            sources: components["schemas"]["SourceNetwork"][];
         };
         /** @description How a work already knows a series. */
         SeriesMatchRef: {
@@ -3145,6 +3742,9 @@ export interface components {
         };
     };
     parameters: {
+        ProfileId: string;
+        SolverId: string;
+        ProxyId: string;
         StorageId: string;
         /** @description Read this copy instead of the chosen one. */
         VariantIdQuery: string;
@@ -4373,6 +4973,576 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    listSolvers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The solvers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SolverList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createSolver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSolver"];
+            };
+        };
+        responses: {
+            /** @description Added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Solver"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testSolverSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSolver"];
+            };
+        };
+        responses: {
+            /** @description How the check went. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkTest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSolver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solver_id: components["parameters"]["SolverId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The solver. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Solver"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteSolver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solver_id: components["parameters"]["SolverId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateSolver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solver_id: components["parameters"]["SolverId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSolverRequest"];
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Solver"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testSolver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solver_id: components["parameters"]["SolverId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How the check went. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkTest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listProxies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proxys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createProxy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProxy"];
+            };
+        };
+        responses: {
+            /** @description Added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proxy"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testProxySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProxyTestRequest"];
+            };
+        };
+        responses: {
+            /** @description How the check went. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkTest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getProxy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proxy_id: components["parameters"]["ProxyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proxy. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proxy"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteProxy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proxy_id: components["parameters"]["ProxyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateProxy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proxy_id: components["parameters"]["ProxyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProxyRequest"];
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proxy"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testProxy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proxy_id: components["parameters"]["ProxyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ProxyTarget"];
+            };
+        };
+        responses: {
+            /** @description How the check went. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkTest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listNetworkProfiles: {
+        parameters: {
+            query?: {
+                include_custom?: boolean;
+                owner_kind?: components["schemas"]["ProfileOwnerKind"];
+                owner_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The profiles. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkProfileList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createNetworkProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewNetworkProfile"];
+            };
+        };
+        responses: {
+            /** @description Added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkProfile"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getNetworkProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkProfile"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    replaceNetworkProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkProfileSettings"];
+            };
+        };
+        responses: {
+            /** @description Replaced. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkProfile"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteNetworkProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listNetworkAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every assignment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkAssignmentList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    assignNetworkProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Assigned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkAssignment"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    unassignNetworkProfile: {
+        parameters: {
+            query: {
+                target_kind: components["schemas"]["NetworkTargetKind"];
+                target_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPluginNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugin's network settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginNetwork"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSourceNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The source's network settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceNetwork"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     listSources: {
         parameters: {
             query?: {
@@ -4598,6 +5768,8 @@ export interface operations {
         parameters: {
             query: {
                 ref: string;
+                /** @description `icon` for a source's icon (part of the signed link): fetched from the plugin's address rather than through the source, and refreshed weekly. */
+                kind?: "icon";
                 sig: string;
             };
             header?: never;
@@ -5253,6 +6425,8 @@ export interface operations {
             query?: {
                 /** @description asc (reading order, the default) or desc. */
                 order?: "asc" | "desc";
+                /** @description Only chapters you bookmarked (`true`) or didn't (`false`). */
+                bookmarked?: boolean;
             };
             header?: never;
             path: {
@@ -5470,6 +6644,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChapterProgress"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listBookmarks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bookmarked chapters, oldest bookmark first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setBookmarks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetBookmarksRequest"];
+            };
+        };
+        responses: {
+            /** @description The work's bookmarked chapters now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkList"];
                 };
             };
             default: components["responses"]["Problem"];

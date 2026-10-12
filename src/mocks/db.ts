@@ -67,6 +67,7 @@ export interface MockDb extends JobsState {
   pins: Record<string, Record<string, string>>;
   progress: Record<string, Record<string, S["ChapterProgress"]>>;
   fresh: Record<string, Record<string, string[]>>;
+  bookmarks: Record<string, Record<string, string[]>>;
   downloaded: string[];
   /** Per user: reader settings by scope ("global", "source:<id>", "work:<id>"). */
   readerSettings: Record<string, Record<string, Record<string, unknown>>>;
@@ -112,6 +113,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     pins: {},
     progress: {},
     fresh: {},
+    bookmarks: {},
     downloaded: [],
     readerSettings: {},
     preferences: {},

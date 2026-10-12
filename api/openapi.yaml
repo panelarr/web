@@ -68,6 +68,11 @@ tags:
     description: Searching and browsing the metadata catalogue, to find works to add.
   - name: plugins
     description: Source plugins (admins).
+  - name: network
+    description: |
+      Shared network services (admins): challenge solvers and proxies, set
+      up once and used through network profiles. They are options: nothing
+      uses one until an admin assigns a profile.
   - name: sources
     description: |
       Listing and browsing sources through their plugins (admins). Sources
@@ -1138,6 +1143,472 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /network/solvers:
+    get:
+      operationId: listSolvers
+      tags: [network]
+      summary: The solvers
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The solvers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SolverList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createSolver
+      tags: [network]
+      summary: Add a solver
+      description: "A FlareSolverr-compatible endpoint (FlareSolverr, Byparr). The check asks it for its state."
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewSolver"
+      responses:
+        "201":
+          description: Added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Solver"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/solvers/test:
+    post:
+      operationId: testSolverSettings
+      tags: [network]
+      summary: Check a solver before saving it
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewSolver"
+      responses:
+        "200":
+          description: How the check went.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkTest"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/solvers/{solver_id}:
+    parameters:
+      - $ref: "#/components/parameters/SolverId"
+    get:
+      operationId: getSolver
+      tags: [network]
+      summary: One solver
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The solver.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Solver"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: updateSolver
+      tags: [network]
+      summary: Change a solver
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSolverRequest"
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Solver"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteSolver
+      tags: [network]
+      summary: Remove a solver
+      description: "A solver a network profile uses can't be removed: `409`, code `in_use`."
+      x-panelarr-access: admin
+      responses:
+        "204":
+          description: Removed.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/solvers/{solver_id}/test:
+    parameters:
+      - $ref: "#/components/parameters/SolverId"
+    post:
+      operationId: testSolver
+      tags: [network]
+      summary: Check a saved solver
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: How the check went.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkTest"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/proxies:
+    get:
+      operationId: listProxies
+      tags: [network]
+      summary: The proxys
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The proxys.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createProxy
+      tags: [network]
+      summary: Add a proxy
+      description: "An HTTP, HTTPS or SOCKS5 proxy, e.g. a VPN container. The password is stored encrypted and never returned."
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewProxy"
+      responses:
+        "201":
+          description: Added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proxy"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/proxies/test:
+    post:
+      operationId: testProxySettings
+      tags: [network]
+      summary: Check a proxy before saving it
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProxyTestRequest"
+      responses:
+        "200":
+          description: How the check went.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkTest"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/proxies/{proxy_id}:
+    parameters:
+      - $ref: "#/components/parameters/ProxyId"
+    get:
+      operationId: getProxy
+      tags: [network]
+      summary: One proxy
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The proxy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proxy"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: updateProxy
+      tags: [network]
+      summary: Change a proxy
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProxyRequest"
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proxy"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteProxy
+      tags: [network]
+      summary: Remove a proxy
+      description: "A proxy a network profile uses can't be removed: `409`, code `in_use`."
+      x-panelarr-access: admin
+      responses:
+        "204":
+          description: Removed.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/proxies/{proxy_id}/test:
+    parameters:
+      - $ref: "#/components/parameters/ProxyId"
+    post:
+      operationId: testProxy
+      tags: [network]
+      summary: Check a saved proxy
+      x-panelarr-access: admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProxyTarget"
+      responses:
+        "200":
+          description: How the check went.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkTest"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/profiles:
+    get:
+      operationId: listNetworkProfiles
+      tags: [network]
+      summary: Network profiles
+      description: Shared profiles; with `include_custom` also the custom ones; with `owner_kind` and `owner_id` only that owner's custom profiles.
+      x-panelarr-access: admin
+      parameters:
+        - name: include_custom
+          in: query
+          schema:
+            type: boolean
+        - name: owner_kind
+          in: query
+          schema:
+            $ref: "#/components/schemas/ProfileOwnerKind"
+        - name: owner_id
+          in: query
+          schema:
+            type: string
+            maxLength: 300
+      responses:
+        "200":
+          description: The profiles.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkProfileList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createNetworkProfile
+      tags: [network]
+      summary: Add a network profile
+      description: |
+        Shared, or custom to one plugin, extension (package), source or
+        metadata provider (`owner`): a custom profile can only be assigned
+        to its owner, and goes when its plugin is removed. Creating a
+        profile assigns it nowhere; "create new" from a plugin is this
+        then `PUT /network/assignments`.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewNetworkProfile"
+      responses:
+        "201":
+          description: Added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkProfile"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/profiles/{profile_id}:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+    get:
+      operationId: getNetworkProfile
+      tags: [network]
+      summary: One network profile
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkProfile"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: replaceNetworkProfile
+      tags: [network]
+      summary: Replace a profile's settings
+      description: Everything but its ID and owner; parts left out go back to the plugin's defaults.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkProfileSettings"
+      responses:
+        "200":
+          description: Replaced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkProfile"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteNetworkProfile
+      tags: [network]
+      summary: Remove a profile
+      description: "An assigned profile can't be removed: `409`, code `in_use`."
+      x-panelarr-access: admin
+      responses:
+        "204":
+          description: Removed.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /network/assignments:
+    get:
+      operationId: listNetworkAssignments
+      tags: [network]
+      summary: Where profiles are assigned
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: Every assignment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkAssignmentList"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: assignNetworkProfile
+      tags: [network]
+      summary: Assign a profile at one level
+      description: |
+        Levels: `global`; a `plugin`; a `package` ("plugin:package"); a
+        `source`; all of `meta`; a metadata `provider`. The most specific
+        assignment wins: for a source, source → package → plugin →
+        global; for a provider, provider → meta → global. Give
+        `profile_id`, or `plugin_default: true` to use the plugin's own
+        settings there and stop inheriting. Nothing is assigned by default.
+      x-panelarr-access: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkAssignmentRequest"
+      responses:
+        "200":
+          description: Assigned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkAssignment"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: unassignNetworkProfile
+      tags: [network]
+      summary: Remove the assignment at one level, which then inherits
+      x-panelarr-access: admin
+      parameters:
+        - name: target_kind
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/NetworkTargetKind"
+        - name: target_id
+          in: query
+          schema:
+            type: string
+            maxLength: 300
+      responses:
+        "204":
+          description: Removed.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /plugins/{plugin_id}/network:
+    parameters:
+      - $ref: "#/components/parameters/PluginId"
+    get:
+      operationId: getPluginNetwork
+      tags: [network]
+      summary: The network profile in force for each of a plugin's sources
+      description: With what is assigned at the plugin and at each source, and where each source's profile comes from.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The plugin's network settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginNetwork"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sources/{source_id}/network:
+    parameters:
+      - $ref: "#/components/parameters/SourceId"
+    get:
+      operationId: getSourceNetwork
+      tags: [network]
+      summary: A source's network profile, and what its plugin applies
+      description: As in GET /plugins/{plugin_id}/network, plus `applied`, which asks the plugin.
+      x-panelarr-access: admin
+      responses:
+        "200":
+          description: The source's network settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceNetwork"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /sources:
     get:
       operationId: listSources
@@ -1364,6 +1835,12 @@ paths:
             type: string
             minLength: 1
             maxLength: 4000
+        - name: kind
+          in: query
+          description: "`icon` for a source's icon (part of the signed link): fetched from the plugin's address rather than through the source, and refreshed weekly."
+          schema:
+            type: string
+            enum: [icon]
         - name: sig
           in: query
           required: true
@@ -1662,6 +2139,7 @@ paths:
         | `chapter.downloaded` | admins, the work's followers | `WorkEvent` (`chapter_id`) |
         | `library.changed` | the user | `WorkEvent` |
         | `progress.synced` | the user (all devices) | `WorkEvent` (`chapter_id`, `page`, `completed` when one chapter changed) |
+        | `bookmarks.changed` | the user (all devices) | `WorkEvent` |
       x-panelarr-access: user
       responses:
         "200":
@@ -1995,6 +2473,11 @@ paths:
           schema:
             type: string
             enum: [asc, desc]
+        - name: bookmarked
+          in: query
+          description: Only chapters you bookmarked (`true`) or didn't (`false`).
+          schema:
+            type: boolean
       responses:
         "200":
           description: The chapters.
@@ -2179,6 +2662,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChapterProgress"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /works/{work_id}/bookmarks:
+    parameters:
+      - $ref: "#/components/parameters/WorkId"
+    get:
+      operationId: listBookmarks
+      tags: [reader]
+      summary: Your bookmarked chapters of a work
+      x-panelarr-access: user
+      responses:
+        "200":
+          description: The bookmarked chapters, oldest bookmark first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: setBookmarks
+      tags: [reader]
+      summary: Bookmark chapters, or remove their bookmarks
+      description: One chapter or many at once, like marking chapters read. Bookmarks are yours; other devices hear `bookmarks.changed`.
+      x-panelarr-access: user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetBookmarksRequest"
+      responses:
+        "200":
+          description: The work's bookmarked chapters now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkList"
         default:
           $ref: "#/components/responses/Problem"
 
@@ -2569,6 +3091,27 @@ components:
       description: A personal API key as a bearer token.
 
   parameters:
+    ProfileId:
+      name: profile_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
+    SolverId:
+      name: solver_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
+    ProxyId:
+      name: proxy_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
     StorageId:
       name: storage_id
       in: path
@@ -3138,8 +3681,11 @@ components:
           enum: [ok, failing, unknown]
     UnifiedChapter:
       type: object
-      required: [id, title, extra, available, new, variants, reason, pinned, downloaded, created_at]
+      required: [id, title, extra, available, new, variants, reason, pinned, downloaded, bookmarked, created_at]
       properties:
+        bookmarked:
+          type: boolean
+          description: You bookmarked it.
         id:
           type: string
           format: uuid
@@ -3277,7 +3823,7 @@ components:
           description: Sources a series is attached on.
     LibraryEntry:
       type: object
-      required: [work, added_at, new_chapters, auto_download]
+      required: [work, added_at, new_chapters, bookmarks, auto_download]
       properties:
         auto_download:
           type: boolean
@@ -3290,6 +3836,9 @@ components:
         new_chapters:
           type: integer
           description: Chapters found since you last marked the work seen.
+        bookmarks:
+          type: integer
+          description: Chapters of it you bookmarked.
     LibraryPage:
       type: object
       required: [entries, next_page_token]
@@ -4107,6 +4656,562 @@ components:
             type: string
             minLength: 1
             maxLength: 35
+    Solver:
+      type: object
+      description: A challenge solver (FlareSolverr-compatible).
+      required: [id, name, type, url, as_response_fallback, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/SolverType"
+        url:
+          type: string
+          description: Its base URL, e.g. http://flaresolverr:8191.
+        session_ttl_seconds:
+          type: integer
+          description: How long a session or its clearance cookies are reused; absent means the plugin's default.
+        max_timeout_seconds:
+          type: integer
+          description: Upper bound for one solve; absent means the plugin's default.
+        as_response_fallback:
+          type: boolean
+          description: Use the solver's own response when a fresh request still fails.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    SolverType:
+      type: string
+      enum: [flaresolverr, byparr]
+    SolverList:
+      type: object
+      required: [solvers]
+      properties:
+        solvers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Solver"
+    NewSolver:
+      type: object
+      required: [id, name, type, url]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        type:
+          $ref: "#/components/schemas/SolverType"
+        url:
+          type: string
+          maxLength: 2000
+        session_ttl_seconds:
+          type: integer
+          minimum: 0
+          maximum: 604800
+        max_timeout_seconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+        as_response_fallback:
+          type: boolean
+    UpdateSolverRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        type:
+          $ref: "#/components/schemas/SolverType"
+        url:
+          type: string
+          maxLength: 2000
+        session_ttl_seconds:
+          type: integer
+          minimum: 0
+          maximum: 604800
+        max_timeout_seconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+        as_response_fallback:
+          type: boolean
+    Proxy:
+      type: object
+      description: An HTTP, HTTPS or SOCKS5 proxy. The password is never returned.
+      required: [id, name, url, has_password, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+          description: http://, https:// or socks5://host:port, without credentials.
+        username:
+          type: string
+        has_password:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProxyList:
+      type: object
+      required: [proxies]
+      properties:
+        proxies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Proxy"
+    NewProxy:
+      type: object
+      required: [id, name, url]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        url:
+          type: string
+          maxLength: 2000
+        username:
+          type: string
+          maxLength: 500
+        password:
+          type: string
+          maxLength: 2000
+          description: Stored encrypted; never returned.
+    UpdateProxyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        url:
+          type: string
+          maxLength: 2000
+        username:
+          type: string
+          maxLength: 500
+          description: Empty removes the credentials.
+        password:
+          type: string
+          maxLength: 2000
+          description: Empty or absent keeps the stored one.
+    ProxyTarget:
+      type: object
+      properties:
+        url:
+          type: string
+          maxLength: 2000
+          description: An http(s) URL to request through the proxy. Without it, the check only connects to the proxy.
+    ProxyTestRequest:
+      type: object
+      required: [proxy]
+      properties:
+        proxy:
+          $ref: "#/components/schemas/NewProxy"
+        url:
+          type: string
+          maxLength: 2000
+          description: An http(s) URL to request through the proxy. Without it, the check only connects to the proxy. A saved proxy's stored password is used when the password is left empty.
+    NetworkTest:
+      type: object
+      required: [ok, message, latency_ms]
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+        version:
+          type: string
+          description: The solver's version, when it says.
+        latency_ms:
+          type: integer
+    SetBookmarksRequest:
+      type: object
+      required: [chapter_ids, bookmarked]
+      properties:
+        chapter_ids:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            type: string
+            format: uuid
+        bookmarked:
+          type: boolean
+    BookmarkList:
+      type: object
+      required: [chapter_ids]
+      properties:
+        chapter_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    ProfileOwnerKind:
+      type: string
+      enum: [plugin, package, source, provider]
+    ProfileOwner:
+      type: object
+      required: [kind, id]
+      properties:
+        kind:
+          $ref: "#/components/schemas/ProfileOwnerKind"
+        id:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: A plugin ID, "plugin:package", a source ID or a provider ID.
+    NetworkRateLimit:
+      type: object
+      required: [requests, period_seconds]
+      properties:
+        requests:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        period_seconds:
+          type: number
+          minimum: 0.001
+          maximum: 86400
+        burst:
+          type: integer
+          minimum: 0
+          maximum: 100000
+        scope:
+          type: string
+          enum: [source, host]
+          description: One budget per source (the default) or per target host.
+    NetworkUserAgent:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [default, fixed, random_desktop, from_solver]
+          description: "`default`: the plugin's; `from_solver` needs a solver."
+        value:
+          type: string
+          maxLength: 1000
+          description: The user agent, for `fixed`.
+    NetworkTimeouts:
+      type: object
+      properties:
+        connect_seconds:
+          type: number
+          minimum: 0
+          maximum: 3600
+        read_seconds:
+          type: number
+          minimum: 0
+          maximum: 3600
+        call_seconds:
+          type: number
+          minimum: 0
+          maximum: 3600
+    NetworkProfileSettings:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        proxy_id:
+          type: string
+          description: The proxy; absent means a direct connection.
+        solver_id:
+          type: string
+          description: The challenge solver; absent means none.
+        rate_limit:
+          $ref: "#/components/schemas/NetworkRateLimit"
+        concurrency:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: Parallel requests per source; absent or 0 means the plugin's default.
+        user_agent:
+          $ref: "#/components/schemas/NetworkUserAgent"
+        doh_url:
+          type: string
+          maxLength: 2000
+          description: DNS-over-HTTPS resolver; absent means the system resolver.
+        headers:
+          type: object
+          maxProperties: 50
+          additionalProperties:
+            type: string
+            maxLength: 2000
+          description: Extra headers on every request.
+        shared_cookie_jar:
+          type: string
+          maxLength: 100
+          description: Name of a cookie jar shared with other sources; absent means each source has its own.
+        timeouts:
+          $ref: "#/components/schemas/NetworkTimeouts"
+    NewNetworkProfile:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{0,39}$"
+        owner:
+          $ref: "#/components/schemas/ProfileOwner"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        proxy_id:
+          type: string
+          description: The proxy; absent means a direct connection.
+        solver_id:
+          type: string
+          description: The challenge solver; absent means none.
+        rate_limit:
+          $ref: "#/components/schemas/NetworkRateLimit"
+        concurrency:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: Parallel requests per source; absent or 0 means the plugin's default.
+        user_agent:
+          $ref: "#/components/schemas/NetworkUserAgent"
+        doh_url:
+          type: string
+          maxLength: 2000
+          description: DNS-over-HTTPS resolver; absent means the system resolver.
+        headers:
+          type: object
+          maxProperties: 50
+          additionalProperties:
+            type: string
+            maxLength: 2000
+          description: Extra headers on every request.
+        shared_cookie_jar:
+          type: string
+          maxLength: 100
+          description: Name of a cookie jar shared with other sources; absent means each source has its own.
+        timeouts:
+          $ref: "#/components/schemas/NetworkTimeouts"
+    NetworkProfile:
+      type: object
+      required: [id, name, user_agent, headers, timeouts, assigned_to, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        owner:
+          $ref: "#/components/schemas/ProfileOwner"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        proxy_id:
+          type: string
+          description: The proxy; absent means a direct connection.
+        solver_id:
+          type: string
+          description: The challenge solver; absent means none.
+        rate_limit:
+          $ref: "#/components/schemas/NetworkRateLimit"
+        concurrency:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: Parallel requests per source; absent or 0 means the plugin's default.
+        user_agent:
+          $ref: "#/components/schemas/NetworkUserAgent"
+        doh_url:
+          type: string
+          maxLength: 2000
+          description: DNS-over-HTTPS resolver; absent means the system resolver.
+        headers:
+          type: object
+          maxProperties: 50
+          additionalProperties:
+            type: string
+            maxLength: 2000
+          description: Extra headers on every request.
+        shared_cookie_jar:
+          type: string
+          maxLength: 100
+          description: Name of a cookie jar shared with other sources; absent means each source has its own.
+        timeouts:
+          $ref: "#/components/schemas/NetworkTimeouts"
+        assigned_to:
+          type: array
+          description: Where it is assigned.
+          items:
+            $ref: "#/components/schemas/NetworkTarget"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    NetworkProfileList:
+      type: object
+      required: [profiles]
+      properties:
+        profiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkProfile"
+    NetworkTargetKind:
+      type: string
+      enum: [global, plugin, package, source, meta, provider]
+    NetworkTarget:
+      type: object
+      required: [target_kind, target_id]
+      properties:
+        target_kind:
+          $ref: "#/components/schemas/NetworkTargetKind"
+        target_id:
+          type: string
+          description: Empty for `global` and `meta`.
+    NetworkAssignmentRequest:
+      type: object
+      required: [target_kind]
+      properties:
+        target_kind:
+          $ref: "#/components/schemas/NetworkTargetKind"
+        target_id:
+          type: string
+          maxLength: 300
+        profile_id:
+          type: string
+          maxLength: 40
+        plugin_default:
+          type: boolean
+          description: Use the plugin's own settings here (instead of profile_id).
+    NetworkAssignment:
+      type: object
+      required: [target_kind, target_id, plugin_default, updated_at]
+      properties:
+        target_kind:
+          $ref: "#/components/schemas/NetworkTargetKind"
+        target_id:
+          type: string
+        profile_id:
+          type: string
+        plugin_default:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+    NetworkAssignmentList:
+      type: object
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkAssignment"
+    NetworkEffective:
+      type: object
+      required: [level, plugin_default]
+      properties:
+        level:
+          type: string
+          enum: [source, package, plugin, global, provider, meta, none]
+          description: Where it comes from; `none` means nothing is assigned (the plugin's own settings).
+        profile_id:
+          type: string
+        plugin_default:
+          type: boolean
+          description: The plugin's own settings are in force.
+    SourceNetwork:
+      type: object
+      required: [source_id, name, effective]
+      properties:
+        source_id:
+          type: string
+        name:
+          type: string
+        lang:
+          type: string
+        package_id:
+          type: string
+        present:
+          type: boolean
+        assignment:
+          $ref: "#/components/schemas/NetworkAssignment"
+        effective:
+          $ref: "#/components/schemas/NetworkEffective"
+        push:
+          $ref: "#/components/schemas/NetworkPush"
+        applied:
+          $ref: "#/components/schemas/NetworkApplied"
+    NetworkPush:
+      type: object
+      required: [state]
+      description: Whether the plugin has the profile in force.
+      properties:
+        state:
+          type: string
+          enum: [pushed, pending, failed, not_needed, not_accepted]
+          description: |
+            `pushed`: the plugin has it; `pending`: it changed and is on its
+            way (or the plugin is down); `failed`: the last push failed
+            (tried again at the next sync); `not_needed`: nothing assigned
+            and nothing pushed before; `not_accepted`: the plugin doesn't
+            take network profiles.
+        pushed_at:
+          type: string
+          format: date-time
+        error:
+          type: string
+    NetworkApplied:
+      type: object
+      required: [origin]
+      description: What the plugin says it applies (only from GET /sources/{source_id}/network).
+      properties:
+        origin:
+          type: string
+          enum: [pushed, plugin, none, unknown]
+          description: "`pushed`: Panelarr's profile; `plugin`: the plugin's own settings; `none`: a direct connection; `unknown`: the plugin can't say."
+        profile_name:
+          type: string
+    PluginNetwork:
+      type: object
+      required: [plugin_id, accepts_profiles, accepts_solver, packages, sources]
+      properties:
+        plugin_id:
+          type: string
+        accepts_profiles:
+          type: boolean
+          description: The plugin declares the network profile service; others never receive profiles.
+        accepts_solver:
+          type: boolean
+          description: The plugin declares the solver service; others receive profiles without the solver.
+        assignment:
+          $ref: "#/components/schemas/NetworkAssignment"
+        packages:
+          type: array
+          description: Assignments at the plugin's packages.
+          items:
+            $ref: "#/components/schemas/NetworkAssignment"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceNetwork"
     SeriesMatchRef:
       type: object
       description: How a work already knows a series.

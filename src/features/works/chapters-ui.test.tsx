@@ -42,12 +42,17 @@ describe("a work's chapters", () => {
         .getAllByRole("link", { name: /Chapter/ })
         .map((link) => link.getAttribute("aria-label") ?? link.textContent);
     await waitFor(() => expect(labels()[0]).toMatch(/Chapter 1[0-9]/));
-    await userEvent.click(screen.getByRole("button", { name: "Newest first" }));
+    await userEvent.click(screen.getByRole("button", { name: "Filter, sort and display" }));
+    await userEvent.click(await screen.findByRole("tab", { name: "Sort" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Oldest first" }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ order: "asc" }));
+    await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(labels()[0]).toMatch(/Chapter 1\b/), { timeout: 3000 });
     await waitFor(() =>
       expect((db().preferences[db().currentUserId ?? ""] as { chapters?: unknown }).chapters).toEqual({
         order: "asc",
+        sort: "number",
+        display: "title",
       }),
     );
     // Another work (or a later visit) opens in the order remembered.
@@ -58,7 +63,9 @@ describe("a work's chapters", () => {
 
   it("unifies the sources' chapters, one row each, with the chosen copy and why", async () => {
     await renderApp(`/works/${workId}`);
-    expect(await screen.findByText(/^15 chapters · 0 read$/)).toBeInTheDocument();
+    expect(await screen.findByText(/^15 chapters · 15 unread$/)).toBeInTheDocument();
+    // Plain rows: no "New" badges.
+    expect(screen.queryByText("New")).not.toBeInTheDocument();
     const one = chapterRow("Vol. 1 · Chapter 1");
     expect(within(one).getByText(/Example Source · Official · EN · .* · first source/)).toBeInTheDocument();
     expect(within(one).getByRole("button", { name: /2 copies/ })).toBeInTheDocument();
@@ -96,15 +103,16 @@ describe("a work's chapters", () => {
       await within(await waitFor(() => chapterRow("Vol. 1 · Chapter 4"))).findByRole("button", { name: /More for/ }),
     );
     await userEvent.click(await screen.findByRole("menuitem", { name: "Mark earlier chapters as read" }));
-    expect(await screen.findByText(/^15 chapters · 3 read$/)).toBeInTheDocument();
-    expect(within(chapterRow("Vol. 1 · Chapter 2")).getByLabelText("Read")).toBeInTheDocument();
+    expect(await screen.findByText(/^15 chapters · 12 unread$/)).toBeInTheDocument();
+    // Read ones are dimmed, and say so.
+    expect(screen.getByRole("link", { name: "Vol. 1 · Chapter 2 (read)" })).toBeInTheDocument();
 
-    await userEvent.click(within(chapterRow("Vol. 1 · Chapter 2")).getByRole("button", { name: /More for/ }));
+    await userEvent.click(within(chapterRow("Vol. 1 · Chapter 2 (read)")).getByRole("button", { name: /More for/ }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Mark as unread" }));
-    expect(await screen.findByText(/^15 chapters · 2 read$/)).toBeInTheDocument();
+    expect(await screen.findByText(/^15 chapters · 13 unread$/)).toBeInTheDocument();
   });
 
-  it("filters to unread and flips the order, from the URL", async () => {
+  it("filters to unread, newest first, from the URL", async () => {
     const user = db().users[0];
     const first = (await import("@/mocks/chapters")).unifiedChapters(db(), workId, user?.id ?? "")[0];
     db().progress[user?.id ?? ""] = {
@@ -116,22 +124,35 @@ describe("a work's chapters", () => {
       },
     };
     const { router } = await renderApp(`/works/${workId}?unread=true&order=desc`);
-    await screen.findByText(/^15 chapters · 1 read$/);
+    await screen.findByText(/^15 chapters · 14 unread$/);
     expect(screen.queryByRole("link", { name: "Vol. 1 · Chapter 1" })).not.toBeInTheDocument();
     const rows = within(screen.getByRole("list", { name: "Chapters" })).getAllByRole("listitem");
     expect(rows[0]).toHaveTextContent("Extra: Character sketches");
-    await userEvent.click(screen.getByRole("button", { name: "Unread only" }));
-    await waitFor(() => expect(router.state.location.search).toEqual({ order: "desc" }));
+    await userEvent.click(screen.getByRole("button", { name: "Filter, sort and display (1 filters on)" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Unread" }));
+    await waitFor(() => expect(router.state.location.search).not.toHaveProperty("unread"));
+    expect(router.state.location.search).toMatchObject({ order: "desc" });
   });
 
-  it("checks for new chapters and clears the badges when seen", async () => {
+  it("checks for new chapters from the menu", async () => {
     await renderApp(`/works/${workId}`);
-    await userEvent.click(await screen.findByRole("button", { name: "Check for new" }));
+    await userEvent.click(await screen.findByRole("button", { name: "More" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Check for new chapters" }));
     expect(await screen.findByText("Checking 2 sources…")).toBeInTheDocument();
-    expect(await screen.findByText("New", {}, { timeout: 2000 })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Mark seen" }));
-    await waitFor(() => expect(screen.queryByText("New")).not.toBeInTheDocument());
-    expect(db().library[0]?.new_chapters).toBe(0);
+  });
+
+  it("selects chapters and marks them read at once", async () => {
+    await renderApp(`/works/${workId}`);
+    await screen.findByText(/^15 chapters · 15 unread$/);
+    await userEvent.click(screen.getByRole("button", { name: "Select chapters" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Vol. 1 · Chapter 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Vol. 1 · Chapter 2" }));
+    const bar = screen.getByRole("toolbar", { name: "Selected chapters" });
+    expect(bar).toHaveTextContent("2 selected");
+    await userEvent.click(within(bar).getByRole("button", { name: "Actions" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Mark as read" }));
+    expect(await screen.findByText(/^15 chapters · 13 unread$/)).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "Selected chapters" })).not.toBeInTheDocument();
   });
 
   it("has a tab per source with that source's own list", async () => {

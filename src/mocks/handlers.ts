@@ -304,12 +304,23 @@ export function addToLibrary(
   const existing = d.library.find((e) => e.user_id === user.id && e.work_id === work.id);
   if (existing) {
     const { added_at, new_chapters, auto_download } = existing;
-    return { entry: { work, added_at, new_chapters, auto_download }, created: false };
+    return {
+      entry: { work, added_at, new_chapters, auto_download, bookmarks: bookmarksOf(user.id, work.id).length },
+      created: false,
+    };
   }
   const added = { user_id: user.id, work_id: work.id, added_at: now(), new_chapters: 0, auto_download: false };
   d.library.push(added);
   emit("library.changed", { work_id: work.id });
-  return { entry: { work, added_at: added.added_at, new_chapters: 0, auto_download: false }, created: true };
+  return {
+    entry: { work, added_at: added.added_at, new_chapters: 0, auto_download: false, bookmarks: 0 },
+    created: true,
+  };
+}
+
+/** A user's bookmarked chapters in a work, oldest bookmark first. */
+function bookmarksOf(userId: string, workId: string): string[] {
+  return db().bookmarks[userId]?.[workId] ?? [];
 }
 
 // --- the operations -----------------------------------------------------------------------
@@ -1016,7 +1027,15 @@ export const operations: MockOperation[] = [
       .flatMap((e) => {
         const work = d.works.find((w) => w.id === e.work_id);
         if (!work || (q && !work.title.toLowerCase().includes(q))) return [];
-        return [{ work, added_at: e.added_at, new_chapters: e.new_chapters, auto_download: e.auto_download }];
+        return [
+          {
+            work,
+            added_at: e.added_at,
+            new_chapters: e.new_chapters,
+            auto_download: e.auto_download,
+            bookmarks: bookmarksOf(user.id, work.id).length,
+          },
+        ];
       })
       .sort((a, b) => a.work.title.localeCompare(b.work.title));
     const { items, next } = paginate(entries, new URL(request.url));
@@ -1172,9 +1191,42 @@ export const operations: MockOperation[] = [
     if (user instanceof Response) return user;
     const workId = String(params.work_id);
     if (!workView(user, workId)) return problem(404, "not_found", "Not found");
-    const chapters = unifiedChapters(db(), workId, user.id).map((c) => c.chapter);
-    if (new URL(request.url).searchParams.get("order") === "desc") chapters.reverse();
+    const url = new URL(request.url);
+    const bookmarked = url.searchParams.get("bookmarked");
+    const chapters = unifiedChapters(db(), workId, user.id)
+      .map((c) => c.chapter)
+      .filter((c) => bookmarked === null || c.bookmarked === (bookmarked === "true"));
+    if (url.searchParams.get("order") === "desc") chapters.reverse();
     return json<S["ChapterList"]>({ chapters });
+  }),
+
+  op("get", "/works/{work_id}/bookmarks", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const workId = String(params.work_id);
+    if (!workView(user, workId)) return problem(404, "not_found", "Not found");
+    return json<S["BookmarkList"]>({ chapter_ids: bookmarksOf(user.id, workId) });
+  }),
+
+  op("post", "/works/{work_id}/bookmarks", async ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const workId = String(params.work_id);
+    if (!workView(user, workId)) return problem(404, "not_found", "Not found");
+    const body = (await request.json()) as S["SetBookmarksRequest"];
+    const known = new Set(unifiedChapters(db(), workId, user.id).map((c) => c.chapter.id));
+    if (body.chapter_ids.some((id) => !known.has(id)))
+      return problem(404, "not_found", "Not found", "No such chapter.");
+    const d = db();
+    if (!d.bookmarks[user.id]) d.bookmarks[user.id] = {};
+    const mine = d.bookmarks[user.id] as Record<string, string[]>;
+    const before = mine[workId] ?? [];
+    mine[workId] = body.bookmarked
+      ? [...before, ...body.chapter_ids.filter((id) => !before.includes(id))]
+      : before.filter((id) => !body.chapter_ids.includes(id));
+    commit();
+    emit("bookmarks.changed", { work_id: workId });
+    return json<S["BookmarkList"]>({ chapter_ids: mine[workId] });
   }),
 
   op("get", "/works/{work_id}/chapters/{chapter_id}", ({ params }) => {

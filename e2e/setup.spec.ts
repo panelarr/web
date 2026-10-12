@@ -84,7 +84,7 @@ test("adds a series from a source, then fixes its match on another source", asyn
 
   await page.getByRole("tab", { name: "Chapters" }).click();
   await expect(page.getByRole("list", { name: "Chapters" })).toBeVisible();
-  await expect(page.getByText(/\d+ chapters · 0 read/)).toBeVisible();
+  await expect(page.getByText(/\d+ chapters · \d+ unread/)).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

@@ -32,19 +32,19 @@ describe("downloading from a work", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Download" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Unread chapters" }));
     expect(await screen.findByText(/^Downloads: \d+ queued\.$/)).toBeInTheDocument();
-    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText("Queued")).toBeInTheDocument();
+    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/· Queued/)).toBeInTheDocument();
 
     act(() => {
       tickDownloads(db()); // starts two
       tickDownloads(db()); // 4 of 12 pages
     });
-    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText("Downloading 33%")).toBeInTheDocument();
+    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/· Downloading 33%/)).toBeInTheDocument();
     act(() => {
       tickDownloads(db());
       tickDownloads(db());
     });
     expect(
-      await within(chapterRow("Vol. 1 · Chapter 1")).findByLabelText("Downloaded", {}, { timeout: 2000 }),
+      await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/· Downloaded/, {}, { timeout: 2000 }),
     ).toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe("downloading from a work", () => {
     if (reader) reader.grants.all_sources = true;
     const id = seedWork();
     await renderApp(`/works/${id}`);
-    await screen.findByRole("button", { name: "Check for new" });
+    await screen.findByRole("button", { name: "More" });
     expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
   });
 

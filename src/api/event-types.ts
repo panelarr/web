@@ -25,6 +25,7 @@ export interface EventMap {
   "chapters.new": WorkEvent;
   "chapter.downloaded": WorkEvent;
   "progress.synced": WorkEvent;
+  "bookmarks.changed": WorkEvent;
 }
 
 export type EventType = keyof EventMap;

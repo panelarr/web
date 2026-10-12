@@ -19,6 +19,7 @@ export const INVALIDATIONS: Partial<Record<EventType, readonly string[]>> = {
   "chapters.new": ["/works", "/library"],
   "chapter.downloaded": ["/works", "/downloads", "/chapters"],
   "progress.synced": ["/works", "/me/history", "/chapters"],
+  "bookmarks.changed": ["/works", "/library"],
 };
 
 /**
