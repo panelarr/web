@@ -21,7 +21,6 @@ import { Route as AppMoreRouteImport } from './routes/_app/more'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
 import { Route as AppAdminQueueRouteImport } from './routes/_app/admin/queue'
-import { Route as AppAdminSourcesRouteImport } from './routes/_app/admin/sources'
 import { Route as AppAdminStorageRouteImport } from './routes/_app/admin/storage'
 import { Route as AppAdminSystemRouteImport } from './routes/_app/admin/system'
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
@@ -31,12 +30,14 @@ import { Route as ReaderReadChapterIdRouteImport } from './routes/_reader/read/$
 import { Route as AppAdminJobsIndexRouteImport } from './routes/_app/admin/jobs/index'
 import { Route as AppAdminPluginsIndexRouteImport } from './routes/_app/admin/plugins/index'
 import { Route as AppAdminPluginsPluginIdRouteImport } from './routes/_app/admin/plugins/$pluginId'
+import { Route as AppAdminSourcesIndexRouteImport } from './routes/_app/admin/sources/index'
 import { Route as AppAdminUsersIndexRouteImport } from './routes/_app/admin/users/index'
 import { Route as AppAdminUsersUserIdRouteImport } from './routes/_app/admin/users/$userId'
 import { Route as AppBrowseSourcesIndexRouteImport } from './routes/_app/browse/sources/index'
+import { Route as AppBrowseSourcesSplatRouteImport } from './routes/_app/browse/sources/$'
 import { Route as AppAdminJobsJobIdIndexRouteImport } from './routes/_app/admin/jobs/$jobId/index'
-import { Route as AppBrowseSourcesSourceIdIndexRouteImport } from './routes/_app/browse/sources/$sourceId/index'
-import { Route as AppBrowseSourcesSourceIdSeriesRouteImport } from './routes/_app/browse/sources/$sourceId/series'
+import { Route as AppAdminSourcesSourceIdIndexRouteImport } from './routes/_app/admin/sources/$sourceId/index'
+import { Route as AppAdminSourcesSourceIdSeriesRouteImport } from './routes/_app/admin/sources/$sourceId/series'
 import { Route as AppAdminJobsJobIdRunsRunIdRouteImport } from './routes/_app/admin/jobs/$jobId/runs/$runId'
 
 const AppRoute = AppRouteImport.update({
@@ -97,11 +98,6 @@ const AppAdminQueueRoute = AppAdminQueueRouteImport.update({
   path: '/queue',
   getParentRoute: () => AppAdminRoute,
 } as any)
-const AppAdminSourcesRoute = AppAdminSourcesRouteImport.update({
-  id: '/sources',
-  path: '/sources',
-  getParentRoute: () => AppAdminRoute,
-} as any)
 const AppAdminStorageRoute = AppAdminStorageRouteImport.update({
   id: '/storage',
   path: '/storage',
@@ -147,6 +143,11 @@ const AppAdminPluginsPluginIdRoute = AppAdminPluginsPluginIdRouteImport.update({
   path: '/plugins/$pluginId',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminSourcesIndexRoute = AppAdminSourcesIndexRouteImport.update({
+  id: '/sources/',
+  path: '/sources/',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppAdminUsersIndexRoute = AppAdminUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -162,22 +163,27 @@ const AppBrowseSourcesIndexRoute = AppBrowseSourcesIndexRouteImport.update({
   path: '/browse/sources/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBrowseSourcesSplatRoute = AppBrowseSourcesSplatRouteImport.update({
+  id: '/browse/sources/$',
+  path: '/browse/sources/$',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminJobsJobIdIndexRoute = AppAdminJobsJobIdIndexRouteImport.update({
   id: '/jobs/$jobId/',
   path: '/jobs/$jobId/',
   getParentRoute: () => AppAdminRoute,
 } as any)
-const AppBrowseSourcesSourceIdIndexRoute =
-  AppBrowseSourcesSourceIdIndexRouteImport.update({
-    id: '/browse/sources/$sourceId/',
-    path: '/browse/sources/$sourceId/',
-    getParentRoute: () => AppRoute,
+const AppAdminSourcesSourceIdIndexRoute =
+  AppAdminSourcesSourceIdIndexRouteImport.update({
+    id: '/sources/$sourceId/',
+    path: '/sources/$sourceId/',
+    getParentRoute: () => AppAdminRoute,
   } as any)
-const AppBrowseSourcesSourceIdSeriesRoute =
-  AppBrowseSourcesSourceIdSeriesRouteImport.update({
-    id: '/browse/sources/$sourceId/series',
-    path: '/browse/sources/$sourceId/series',
-    getParentRoute: () => AppRoute,
+const AppAdminSourcesSourceIdSeriesRoute =
+  AppAdminSourcesSourceIdSeriesRouteImport.update({
+    id: '/sources/$sourceId/series',
+    path: '/sources/$sourceId/series',
+    getParentRoute: () => AppAdminRoute,
   } as any)
 const AppAdminJobsJobIdRunsRunIdRoute =
   AppAdminJobsJobIdRunsRunIdRouteImport.update({
@@ -196,7 +202,6 @@ export interface FileRoutesByFullPath {
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
   '/admin/queue': typeof AppAdminQueueRoute
-  '/admin/sources': typeof AppAdminSourcesRoute
   '/admin/storage': typeof AppAdminStorageRoute
   '/admin/system': typeof AppAdminSystemRoute
   '/catalog/$entryId': typeof AppCatalogEntryIdRoute
@@ -206,13 +211,15 @@ export interface FileRoutesByFullPath {
   '/browse/': typeof AppBrowseIndexRoute
   '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/admin/users/$userId': typeof AppAdminUsersUserIdRoute
+  '/browse/sources/$': typeof AppBrowseSourcesSplatRoute
   '/admin/jobs/': typeof AppAdminJobsIndexRoute
   '/admin/plugins/': typeof AppAdminPluginsIndexRoute
+  '/admin/sources/': typeof AppAdminSourcesIndexRoute
   '/admin/users/': typeof AppAdminUsersIndexRoute
   '/browse/sources/': typeof AppBrowseSourcesIndexRoute
-  '/browse/sources/$sourceId/series': typeof AppBrowseSourcesSourceIdSeriesRoute
+  '/admin/sources/$sourceId/series': typeof AppAdminSourcesSourceIdSeriesRoute
   '/admin/jobs/$jobId/': typeof AppAdminJobsJobIdIndexRoute
-  '/browse/sources/$sourceId/': typeof AppBrowseSourcesSourceIdIndexRoute
+  '/admin/sources/$sourceId/': typeof AppAdminSourcesSourceIdIndexRoute
   '/admin/jobs/$jobId/runs/$runId': typeof AppAdminJobsJobIdRunsRunIdRoute
 }
 export interface FileRoutesByTo {
@@ -224,7 +231,6 @@ export interface FileRoutesByTo {
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
   '/admin/queue': typeof AppAdminQueueRoute
-  '/admin/sources': typeof AppAdminSourcesRoute
   '/admin/storage': typeof AppAdminStorageRoute
   '/admin/system': typeof AppAdminSystemRoute
   '/catalog/$entryId': typeof AppCatalogEntryIdRoute
@@ -234,13 +240,15 @@ export interface FileRoutesByTo {
   '/browse': typeof AppBrowseIndexRoute
   '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/admin/users/$userId': typeof AppAdminUsersUserIdRoute
+  '/browse/sources/$': typeof AppBrowseSourcesSplatRoute
   '/admin/jobs': typeof AppAdminJobsIndexRoute
   '/admin/plugins': typeof AppAdminPluginsIndexRoute
+  '/admin/sources': typeof AppAdminSourcesIndexRoute
   '/admin/users': typeof AppAdminUsersIndexRoute
   '/browse/sources': typeof AppBrowseSourcesIndexRoute
-  '/browse/sources/$sourceId/series': typeof AppBrowseSourcesSourceIdSeriesRoute
+  '/admin/sources/$sourceId/series': typeof AppAdminSourcesSourceIdSeriesRoute
   '/admin/jobs/$jobId': typeof AppAdminJobsJobIdIndexRoute
-  '/browse/sources/$sourceId': typeof AppBrowseSourcesSourceIdIndexRoute
+  '/admin/sources/$sourceId': typeof AppAdminSourcesSourceIdIndexRoute
   '/admin/jobs/$jobId/runs/$runId': typeof AppAdminJobsJobIdRunsRunIdRoute
 }
 export interface FileRoutesById {
@@ -256,7 +264,6 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/admin/queue': typeof AppAdminQueueRoute
-  '/_app/admin/sources': typeof AppAdminSourcesRoute
   '/_app/admin/storage': typeof AppAdminStorageRoute
   '/_app/admin/system': typeof AppAdminSystemRoute
   '/_app/catalog/$entryId': typeof AppCatalogEntryIdRoute
@@ -266,13 +273,15 @@ export interface FileRoutesById {
   '/_app/browse/': typeof AppBrowseIndexRoute
   '/_app/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/_app/admin/users/$userId': typeof AppAdminUsersUserIdRoute
+  '/_app/browse/sources/$': typeof AppBrowseSourcesSplatRoute
   '/_app/admin/jobs/': typeof AppAdminJobsIndexRoute
   '/_app/admin/plugins/': typeof AppAdminPluginsIndexRoute
+  '/_app/admin/sources/': typeof AppAdminSourcesIndexRoute
   '/_app/admin/users/': typeof AppAdminUsersIndexRoute
   '/_app/browse/sources/': typeof AppBrowseSourcesIndexRoute
-  '/_app/browse/sources/$sourceId/series': typeof AppBrowseSourcesSourceIdSeriesRoute
+  '/_app/admin/sources/$sourceId/series': typeof AppAdminSourcesSourceIdSeriesRoute
   '/_app/admin/jobs/$jobId/': typeof AppAdminJobsJobIdIndexRoute
-  '/_app/browse/sources/$sourceId/': typeof AppBrowseSourcesSourceIdIndexRoute
+  '/_app/admin/sources/$sourceId/': typeof AppAdminSourcesSourceIdIndexRoute
   '/_app/admin/jobs/$jobId/runs/$runId': typeof AppAdminJobsJobIdRunsRunIdRoute
 }
 export interface FileRouteTypes {
@@ -287,7 +296,6 @@ export interface FileRouteTypes {
     | '/more'
     | '/settings'
     | '/admin/queue'
-    | '/admin/sources'
     | '/admin/storage'
     | '/admin/system'
     | '/catalog/$entryId'
@@ -297,13 +305,15 @@ export interface FileRouteTypes {
     | '/browse/'
     | '/admin/plugins/$pluginId'
     | '/admin/users/$userId'
+    | '/browse/sources/$'
     | '/admin/jobs/'
     | '/admin/plugins/'
+    | '/admin/sources/'
     | '/admin/users/'
     | '/browse/sources/'
-    | '/browse/sources/$sourceId/series'
+    | '/admin/sources/$sourceId/series'
     | '/admin/jobs/$jobId/'
-    | '/browse/sources/$sourceId/'
+    | '/admin/sources/$sourceId/'
     | '/admin/jobs/$jobId/runs/$runId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -315,7 +325,6 @@ export interface FileRouteTypes {
     | '/more'
     | '/settings'
     | '/admin/queue'
-    | '/admin/sources'
     | '/admin/storage'
     | '/admin/system'
     | '/catalog/$entryId'
@@ -325,13 +334,15 @@ export interface FileRouteTypes {
     | '/browse'
     | '/admin/plugins/$pluginId'
     | '/admin/users/$userId'
+    | '/browse/sources/$'
     | '/admin/jobs'
     | '/admin/plugins'
+    | '/admin/sources'
     | '/admin/users'
     | '/browse/sources'
-    | '/browse/sources/$sourceId/series'
+    | '/admin/sources/$sourceId/series'
     | '/admin/jobs/$jobId'
-    | '/browse/sources/$sourceId'
+    | '/admin/sources/$sourceId'
     | '/admin/jobs/$jobId/runs/$runId'
   id:
     | '__root__'
@@ -346,7 +357,6 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/'
     | '/_app/admin/queue'
-    | '/_app/admin/sources'
     | '/_app/admin/storage'
     | '/_app/admin/system'
     | '/_app/catalog/$entryId'
@@ -356,13 +366,15 @@ export interface FileRouteTypes {
     | '/_app/browse/'
     | '/_app/admin/plugins/$pluginId'
     | '/_app/admin/users/$userId'
+    | '/_app/browse/sources/$'
     | '/_app/admin/jobs/'
     | '/_app/admin/plugins/'
+    | '/_app/admin/sources/'
     | '/_app/admin/users/'
     | '/_app/browse/sources/'
-    | '/_app/browse/sources/$sourceId/series'
+    | '/_app/admin/sources/$sourceId/series'
     | '/_app/admin/jobs/$jobId/'
-    | '/_app/browse/sources/$sourceId/'
+    | '/_app/admin/sources/$sourceId/'
     | '/_app/admin/jobs/$jobId/runs/$runId'
   fileRoutesById: FileRoutesById
 }
@@ -460,13 +472,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminQueueRouteImport
       parentRoute: typeof AppAdminRoute
     }
-    '/_app/admin/sources': {
-      id: '/_app/admin/sources'
-      path: '/sources'
-      fullPath: '/admin/sources'
-      preLoaderRoute: typeof AppAdminSourcesRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
     '/_app/admin/storage': {
       id: '/_app/admin/storage'
       path: '/storage'
@@ -530,6 +535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminPluginsPluginIdRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/sources/': {
+      id: '/_app/admin/sources/'
+      path: '/sources'
+      fullPath: '/admin/sources/'
+      preLoaderRoute: typeof AppAdminSourcesIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/users/': {
       id: '/_app/admin/users/'
       path: '/users'
@@ -551,6 +563,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBrowseSourcesIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/browse/sources/$': {
+      id: '/_app/browse/sources/$'
+      path: '/browse/sources/$'
+      fullPath: '/browse/sources/$'
+      preLoaderRoute: typeof AppBrowseSourcesSplatRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/jobs/$jobId/': {
       id: '/_app/admin/jobs/$jobId/'
       path: '/jobs/$jobId'
@@ -558,19 +577,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminJobsJobIdIndexRouteImport
       parentRoute: typeof AppAdminRoute
     }
-    '/_app/browse/sources/$sourceId/': {
-      id: '/_app/browse/sources/$sourceId/'
-      path: '/browse/sources/$sourceId'
-      fullPath: '/browse/sources/$sourceId/'
-      preLoaderRoute: typeof AppBrowseSourcesSourceIdIndexRouteImport
-      parentRoute: typeof AppRoute
+    '/_app/admin/sources/$sourceId/': {
+      id: '/_app/admin/sources/$sourceId/'
+      path: '/sources/$sourceId'
+      fullPath: '/admin/sources/$sourceId/'
+      preLoaderRoute: typeof AppAdminSourcesSourceIdIndexRouteImport
+      parentRoute: typeof AppAdminRoute
     }
-    '/_app/browse/sources/$sourceId/series': {
-      id: '/_app/browse/sources/$sourceId/series'
-      path: '/browse/sources/$sourceId/series'
-      fullPath: '/browse/sources/$sourceId/series'
-      preLoaderRoute: typeof AppBrowseSourcesSourceIdSeriesRouteImport
-      parentRoute: typeof AppRoute
+    '/_app/admin/sources/$sourceId/series': {
+      id: '/_app/admin/sources/$sourceId/series'
+      path: '/sources/$sourceId/series'
+      fullPath: '/admin/sources/$sourceId/series'
+      preLoaderRoute: typeof AppAdminSourcesSourceIdSeriesRouteImport
+      parentRoute: typeof AppAdminRoute
     }
     '/_app/admin/jobs/$jobId/runs/$runId': {
       id: '/_app/admin/jobs/$jobId/runs/$runId'
@@ -584,7 +603,6 @@ declare module '@tanstack/react-router' {
 
 interface AppAdminRouteChildren {
   AppAdminQueueRoute: typeof AppAdminQueueRoute
-  AppAdminSourcesRoute: typeof AppAdminSourcesRoute
   AppAdminStorageRoute: typeof AppAdminStorageRoute
   AppAdminSystemRoute: typeof AppAdminSystemRoute
   AppAdminIndexRoute: typeof AppAdminIndexRoute
@@ -592,14 +610,16 @@ interface AppAdminRouteChildren {
   AppAdminUsersUserIdRoute: typeof AppAdminUsersUserIdRoute
   AppAdminJobsIndexRoute: typeof AppAdminJobsIndexRoute
   AppAdminPluginsIndexRoute: typeof AppAdminPluginsIndexRoute
+  AppAdminSourcesIndexRoute: typeof AppAdminSourcesIndexRoute
   AppAdminUsersIndexRoute: typeof AppAdminUsersIndexRoute
+  AppAdminSourcesSourceIdSeriesRoute: typeof AppAdminSourcesSourceIdSeriesRoute
   AppAdminJobsJobIdIndexRoute: typeof AppAdminJobsJobIdIndexRoute
+  AppAdminSourcesSourceIdIndexRoute: typeof AppAdminSourcesSourceIdIndexRoute
   AppAdminJobsJobIdRunsRunIdRoute: typeof AppAdminJobsJobIdRunsRunIdRoute
 }
 
 const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminQueueRoute: AppAdminQueueRoute,
-  AppAdminSourcesRoute: AppAdminSourcesRoute,
   AppAdminStorageRoute: AppAdminStorageRoute,
   AppAdminSystemRoute: AppAdminSystemRoute,
   AppAdminIndexRoute: AppAdminIndexRoute,
@@ -607,8 +627,11 @@ const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminUsersUserIdRoute: AppAdminUsersUserIdRoute,
   AppAdminJobsIndexRoute: AppAdminJobsIndexRoute,
   AppAdminPluginsIndexRoute: AppAdminPluginsIndexRoute,
+  AppAdminSourcesIndexRoute: AppAdminSourcesIndexRoute,
   AppAdminUsersIndexRoute: AppAdminUsersIndexRoute,
+  AppAdminSourcesSourceIdSeriesRoute: AppAdminSourcesSourceIdSeriesRoute,
   AppAdminJobsJobIdIndexRoute: AppAdminJobsJobIdIndexRoute,
+  AppAdminSourcesSourceIdIndexRoute: AppAdminSourcesSourceIdIndexRoute,
   AppAdminJobsJobIdRunsRunIdRoute: AppAdminJobsJobIdRunsRunIdRoute,
 }
 
@@ -625,9 +648,8 @@ interface AppRouteChildren {
   AppCatalogEntryIdRoute: typeof AppCatalogEntryIdRoute
   AppWorksWorkIdRoute: typeof AppWorksWorkIdRoute
   AppBrowseIndexRoute: typeof AppBrowseIndexRoute
+  AppBrowseSourcesSplatRoute: typeof AppBrowseSourcesSplatRoute
   AppBrowseSourcesIndexRoute: typeof AppBrowseSourcesIndexRoute
-  AppBrowseSourcesSourceIdSeriesRoute: typeof AppBrowseSourcesSourceIdSeriesRoute
-  AppBrowseSourcesSourceIdIndexRoute: typeof AppBrowseSourcesSourceIdIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -639,9 +661,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppCatalogEntryIdRoute: AppCatalogEntryIdRoute,
   AppWorksWorkIdRoute: AppWorksWorkIdRoute,
   AppBrowseIndexRoute: AppBrowseIndexRoute,
+  AppBrowseSourcesSplatRoute: AppBrowseSourcesSplatRoute,
   AppBrowseSourcesIndexRoute: AppBrowseSourcesIndexRoute,
-  AppBrowseSourcesSourceIdSeriesRoute: AppBrowseSourcesSourceIdSeriesRoute,
-  AppBrowseSourcesSourceIdIndexRoute: AppBrowseSourcesSourceIdIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

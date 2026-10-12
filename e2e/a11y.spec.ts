@@ -11,7 +11,7 @@ const PAGES = [
   "/?mock=ready",
   "/browse",
   "/catalog/ent_1001",
-  "/browse/sources/example:1001",
+  "/admin/sources/example:1001",
   "/downloads",
   "/settings?tab=appearance",
   "/settings?tab=api-keys",

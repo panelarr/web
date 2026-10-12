@@ -15,6 +15,15 @@ The plan for the web app's first version, in slices. Each slice works end to end
 - [x] **9. Themes and fonts:** themes Light, Sepia, Dark, True black, Frost, Forest (and System); accent swatches or any colour, with a warning when it's hard to see on the theme; custom background and surface colours with text colour picked for contrast; fonts Inter, Atkinson Hyperlegible, Lexend, Noto Sans, Nunito or the system's (bundled, only the chosen one loads); saved to the account (`/me/preferences`), the account's choices winning on sign-in, so every device looks the same; reset; the reader's background stays a reader setting.
 - [x] **10. PWA and hardening:** a maskable icon and shortcuts in the manifest; "Install the app" (the browser's prompt, or the steps on iOS); an offline notice; a skip-to-content link; axe accessibility checks over the main pages (light and dark) in the browser tests, with the problems they found fixed; a full journey test (set up, add, read, download) on desktop and phone; size budgets in the build check; docs. Checked against a real server (the full compose stack): every page signed in and out, and real writes (appearance, API keys, invites, a job run followed live, a plugin's settings form from its own schema), with no console errors, failed requests or CSP violations; the serving contract (routing, caching, headers) holds.
 
+## Extensions and admin sources (GOAL-0014)
+
+Sources become an admin concern; plugins that host many sites get an Extensions tab.
+
+- [x] **S0. Admin-only sources:** source browsing (popular, latest, search with the source's filters, a series' page, add from there) moves to Admin → Sources as a view for testing; Browse is the catalogue only; old Browse → Sources links redirect (admins to the same page in Admin, everyone else to Browse); a work's source tabs show each source's language; searching a source by hand on a work is for admins until the server can search on a work's behalf.
+- [ ] **S1. Admin → Sources:** language and providing extension per source, filters by plugin, language, on/off and presence in the URL, on/off per source; "Off", "Not available" (language turned off) and "Absent" kept apart.
+- [ ] **S2. Extensions tab:** on a plugin's page when it manages extensions: the stores' extensions (virtualised; search and language filter in the URL), install, update and uninstall as queued tasks with live progress, per-extension languages and the sources each provides.
+- [ ] **S3. Finish:** layout and accessibility checks on the new pages, a journey (add a store, install, sources appear, browse one), docs.
+
 ## Working assumptions
 
 Settled for now, cheap to change:

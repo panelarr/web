@@ -15,12 +15,12 @@ API, so anyone can build their own client against the same API.
 ## What it does
 
 - **Set up and sign in:** a first-run wizard (admin account, metadata service, source plugins), sign-in, invite links, sessions and API keys.
-- **Find and add works:** search and browse the catalogue (every title, in every language), or browse a source and add from there. One entry per work, matched on all your sources.
-- **Fix matches:** see how a work is matched on each source, with the evidence; attach, reject, search a source yourself or paste a link.
+- **Find and add works:** search and browse the catalogue (every title, in every language). One entry per work, matched on all your sources; each work shows its sources and their languages.
+- **Fix matches:** see how a work is matched on each source, with the evidence; attach, reject or paste a link (admins can also search a source themselves).
 - **Chapters:** one list across sources, filling gaps from each, with the chosen copy and why; a tab per source; new chapter badges.
 - **Read:** a full-screen reader for phones and desktops: single or double page, vertical, webtoon or horizontal scroll, right to left or left to right, swipe, pinch and double-tap zoom, tap zones, keyboard shortcuts, settings per series, per source or everywhere, and progress that follows you across devices.
 - **Download:** chapters stored once for everyone, live progress, automatic downloads of new chapters, local or S3-compatible storage.
-- **Run it:** users and permissions, plugins and sources, jobs and the task queue, system health.
+- **Run it:** users and permissions, plugins, sources (an admin concern: browse one to test it, and add from there), jobs and the task queue, system health.
 - **Make it yours:** themes (including true black), accent and key colours, fonts; saved to your account.
 - **Install it:** an installable app (PWA) on phones and desktops.
 

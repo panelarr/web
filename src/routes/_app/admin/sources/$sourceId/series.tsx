@@ -27,7 +27,7 @@ import { formatDate } from "@/lib/format";
 
 type Candidate = components["schemas"]["EntryCandidate"];
 
-export const Route = createFileRoute("/_app/browse/sources/$sourceId/series")({
+export const Route = createFileRoute("/_app/admin/sources/$sourceId/series")({
   validateSearch: (search: Record<string, unknown>): { key: string } => ({
     key: typeof search.key === "string" ? search.key : "",
   }),

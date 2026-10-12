@@ -382,7 +382,6 @@ function ObjectListField({
       {value.length === 0 ? <p className="text-sm text-muted-foreground">None yet.</p> : null}
       {value.map((item, index) => (
         // Items have no identity of their own; the fields are controlled, so the index is enough.
-        // biome-ignore lint/suspicious/noArrayIndexKey: see above
         <div key={index} className="grid gap-4 rounded-lg border p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium">

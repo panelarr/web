@@ -124,6 +124,17 @@ describe("fixing matches", () => {
     expect(await screen.findByText("Attached on 2 of 2 sources.")).toBeInTheDocument();
   });
 
+  it("leaves searching a source by hand to admins, for users who fix matches", async () => {
+    resetDb("user");
+    for (const source of db().sources) source.health = { status: "ok" };
+    const reader = db().users.find((u) => u.username === "reader");
+    if (reader) Object.assign(reader.grants, { all_sources: true, may_manage_matches: true });
+    const [work] = seed("ent_1000");
+    await renderApp(`/works/${work?.id}?tab=sources`);
+    expect(await screen.findByRole("button", { name: "Attach by URL" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /yourself/ })).not.toBeInTheDocument();
+  });
+
   it("is read-only without the right to fix matches", async () => {
     resetDb("user");
     for (const source of db().sources) source.health = { status: "ok" };

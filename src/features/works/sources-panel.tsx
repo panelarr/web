@@ -122,7 +122,16 @@ export function SourcesPanel({ work }: { work: Work }) {
       </div>
       <ul className="grid gap-3">
         {work.sources.map((state) => (
-          <SourceRow key={state.source.id} work={work} state={state} canFix={canFix} m={m} />
+          <SourceRow
+            key={state.source.id}
+            work={work}
+            state={state}
+            canFix={canFix}
+            // Searching a source directly is for admins (sources are theirs to browse) until the
+            // server can search one on a work's behalf.
+            canSearch={canFix && user.role === "admin"}
+            m={m}
+          />
         ))}
       </ul>
       <AttachUrlDialog work={work} open={byUrl} onOpenChange={setByUrl} m={m} />
@@ -130,7 +139,19 @@ export function SourcesPanel({ work }: { work: Work }) {
   );
 }
 
-function SourceRow({ work, state, canFix, m }: { work: Work; state: SourceState; canFix: boolean; m: WorkMutations }) {
+function SourceRow({
+  work,
+  state,
+  canFix,
+  canSearch,
+  m,
+}: {
+  work: Work;
+  state: SourceState;
+  canFix: boolean;
+  canSearch: boolean;
+  m: WorkMutations;
+}) {
   const [searching, setSearching] = useState(false);
   const status = STATUS[state.status];
   const candidates = state.candidates.filter((c) => c.state === "candidate");
@@ -201,7 +222,7 @@ function SourceRow({ work, state, canFix, m }: { work: Work; state: SourceState;
           </ul>
         </details>
       ) : null}
-      {canFix && state.source.capabilities.includes("search") ? (
+      {canSearch && state.source.capabilities.includes("search") ? (
         <div>
           <Button variant="ghost" size="sm" onClick={() => setSearching(true)}>
             <Search aria-hidden />

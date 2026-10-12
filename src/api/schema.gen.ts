@@ -638,8 +638,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Sources the caller may use
-         * @description Users see enabled sources their grants allow, within their content-rating ceiling. Admins see every usable source, and with `all=true` also disabled ones and ones their plugin no longer lists.
+         * The sources of every plugin
+         * @description Every usable source; with `all=true` also disabled ones and ones
+         *     their plugin no longer lists. Admins only since v1's admin-only sources change (users see sources only on a work; see docs/api.md).
          */
         get: operations["listSources"];
         put?: never;
@@ -677,6 +678,7 @@ export interface paths {
         /**
          * A source's popular series
          * @description Errors from the source answer `502` with code `source_failed` (the reason, e.g. a challenge page or the site being down, is in the detail), or `429` with code `rate_limited`.
+         *     Admins only since v1's admin-only sources change (users see sources only on a work; see docs/api.md).
          */
         get: operations["sourcePopular"];
         put?: never;
@@ -697,6 +699,7 @@ export interface paths {
         /**
          * A source's latest updates
          * @description `422`, code `unsupported`, when the source has no latest list.
+         *     Admins only since v1's admin-only sources change (users see sources only on a work; see docs/api.md).
          */
         get: operations["sourceLatest"];
         put?: never;
@@ -718,7 +721,8 @@ export interface paths {
         put?: never;
         /**
          * Search a source
-         * @description A POST because filter values are structured; it only reads, so a `read` API key may call it.
+         * @description A POST because filter values are structured; it only reads, so an API key needs `read` (and `admin`), not `write`.
+         *     Admins only since v1's admin-only sources change (users see sources only on a work; see docs/api.md).
          */
         post: operations["sourceSearch"];
         delete?: never;
@@ -734,7 +738,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A source's search filters */
+        /**
+         * A source's search filters
+         * @description Admins only since v1's admin-only sources change (users see sources only on a work; see docs/api.md).
+         */
         get: operations["sourceFilters"];
         put?: never;
         post?: never;
@@ -751,7 +758,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A series on a source, in full */
+        /**
+         * A series on a source, in full
+         * @description Admins only since v1's admin-only sources change (users see sources only on a work; see docs/api.md).
+         */
         get: operations["sourceSeries"];
         put?: never;
         post?: never;
@@ -768,7 +778,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A series' chapters exactly as the source lists them */
+        /**
+         * A series' chapters exactly as the source lists them
+         * @description Admins only since v1's admin-only sources change (users see sources only on a work; see docs/api.md).
+         */
         get: operations["sourceChapters"];
         put?: never;
         post?: never;
@@ -787,7 +800,9 @@ export interface paths {
         };
         /**
          * An image from a source (covers, icons)
-         * @description Only image links the server handed out work (they are signed); the image is fetched through the source's plugin and cached.
+         * @description Only image links the server handed out work (they are signed); the
+         *     image is fetched through the source's plugin and cached. Stays open
+         *     to users: a work's series carry these links for their covers.
          */
         get: operations["sourceImage"];
         put?: never;
@@ -1101,6 +1116,10 @@ export interface paths {
          *     attached (`added`). Otherwise the likely entries come back as
          *     `candidates`: pick one and add it with `POST /library` and this
          *     series as `source`. Needs `may_add`.
+         *
+         *     Stays open to users although browsing sources is for admins: the
+         *     caller's grants and `may_add` still apply, and admins add from
+         *     their source view with it.
          */
         post: operations["addFromSource"];
         delete?: never;

@@ -37,7 +37,7 @@ interface SourceSearch {
   filters?: FilterState;
 }
 
-export const Route = createFileRoute("/_app/browse/sources/$sourceId/")({
+export const Route = createFileRoute("/_app/admin/sources/$sourceId/")({
   validateSearch: (search: Record<string, unknown>): SourceSearch => ({
     ...(LISTS.includes(search.list as List) ? { list: search.list as List } : {}),
     ...(typeof search.q === "string" && search.q ? { q: search.q } : {}),
@@ -102,7 +102,7 @@ function SourcePage() {
   return (
     <>
       <Button variant="ghost" size="sm" asChild className="-ml-2 mb-2">
-        <Link to="/browse/sources">
+        <Link to="/admin/sources">
           <ArrowLeft aria-hidden />
           Sources
         </Link>
@@ -230,7 +230,7 @@ function SourcePage() {
 function SeriesCard({ sourceId, series }: { sourceId: string; series: Series }) {
   return (
     <Link
-      to="/browse/sources/$sourceId/series"
+      to="/admin/sources/$sourceId/series"
       params={{ sourceId }}
       search={{ key: series.key }}
       className="group flex min-w-0 flex-col gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"

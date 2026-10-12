@@ -114,7 +114,8 @@ describe("a work's chapters", () => {
 
   it("has a tab per source with that source's own list", async () => {
     const { router } = await renderApp(`/works/${workId}`);
-    await userEvent.click(await screen.findByRole("tab", { name: "Sample Scans" }));
+    // Each source's tab shows its language.
+    await userEvent.click(await screen.findByRole("tab", { name: "Sample Scans en" }));
     const list = await screen.findByRole("list", { name: /Chapters on Tourou no Bannin/ });
     expect(within(list).getByText("Chapter 5.5: Side story")).toBeInTheDocument();
     expect(within(list).getAllByText(/Sample Scans Team/).length).toBeGreaterThan(0);

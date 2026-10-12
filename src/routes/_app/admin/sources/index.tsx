@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Library } from "lucide-react";
 import { useMemo } from "react";
 import { $api } from "@/api/client";
@@ -26,7 +26,7 @@ interface SourcesSearch {
   status?: StatusFilter;
 }
 
-export const Route = createFileRoute("/_app/admin/sources")({
+export const Route = createFileRoute("/_app/admin/sources/")({
   validateSearch: (search: Record<string, unknown>): SourcesSearch => ({
     ...(typeof search.q === "string" && search.q ? { q: search.q } : {}),
     ...(typeof search.plugin === "string" && search.plugin ? { plugin: search.plugin } : {}),
@@ -148,7 +148,14 @@ function SourceRow({ source }: { source: Source }) {
       <SourceIcon name={source.name} url={source.icon_url} />
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="font-medium [overflow-wrap:anywhere]">{source.name}</span>
+          {/* The source's own lists, for testing it. */}
+          <Link
+            to="/admin/sources/$sourceId"
+            params={{ sourceId: source.id }}
+            className="font-medium underline-offset-4 [overflow-wrap:anywhere] hover:underline"
+          >
+            {source.name}
+          </Link>
           <Badge variant="outline" className="uppercase">
             {source.lang}
           </Badge>

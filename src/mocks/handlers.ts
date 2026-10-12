@@ -706,8 +706,9 @@ export const operations: MockOperation[] = [
 
   // Sources
 
+  // Sources are an admin concern: users see them only on a work.
   op("get", "/sources", ({ request }) => {
-    const user = requireUser();
+    const user = requireAdmin();
     if (user instanceof Response) return user;
     const url = new URL(request.url);
     const all = url.searchParams.get("all") === "true" && user.role === "admin";
@@ -1507,7 +1508,7 @@ export const operations: MockOperation[] = [
   // Browsing sources
 
   op("get", "/sources/{source_id}/popular", ({ params, request }) => {
-    const user = requireUser();
+    const user = requireAdmin();
     if (user instanceof Response) return user;
     const source = usableSource(user, String(params.source_id));
     if (source instanceof Response) return source;
@@ -1515,7 +1516,7 @@ export const operations: MockOperation[] = [
   }),
 
   op("get", "/sources/{source_id}/latest", ({ params, request }) => {
-    const user = requireUser();
+    const user = requireAdmin();
     if (user instanceof Response) return user;
     const source = usableSource(user, String(params.source_id));
     if (source instanceof Response) return source;
@@ -1525,7 +1526,7 @@ export const operations: MockOperation[] = [
   }),
 
   op("post", "/sources/{source_id}/search", async ({ params, request }) => {
-    const user = requireUser();
+    const user = requireAdmin();
     if (user instanceof Response) return user;
     const source = usableSource(user, String(params.source_id));
     if (source instanceof Response) return source;
@@ -1536,7 +1537,7 @@ export const operations: MockOperation[] = [
   }),
 
   op("get", "/sources/{source_id}/filters", ({ params }) => {
-    const user = requireUser();
+    const user = requireAdmin();
     if (user instanceof Response) return user;
     const source = usableSource(user, String(params.source_id));
     if (source instanceof Response) return source;
@@ -1544,7 +1545,7 @@ export const operations: MockOperation[] = [
   }),
 
   op("get", "/sources/{source_id}/series", ({ params, request }) => {
-    const user = requireUser();
+    const user = requireAdmin();
     if (user instanceof Response) return user;
     const source = usableSource(user, String(params.source_id));
     if (source instanceof Response) return source;
@@ -1553,7 +1554,7 @@ export const operations: MockOperation[] = [
   }),
 
   op("get", "/sources/{source_id}/chapters", ({ params, request }) => {
-    const user = requireUser();
+    const user = requireAdmin();
     if (user instanceof Response) return user;
     const source = usableSource(user, String(params.source_id));
     if (source instanceof Response) return source;

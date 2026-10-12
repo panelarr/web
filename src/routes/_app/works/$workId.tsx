@@ -117,7 +117,8 @@ function WorkDetails({ work }: { work: Work }) {
             <TabsTrigger value="chapters">Chapters</TabsTrigger>
             {attached.map((state) => (
               <TabsTrigger key={state.attached?.id} value={`series:${state.attached?.id}`}>
-                {state.source.name}
+                {state.source.name}{" "}
+                <span className="text-xs font-normal text-muted-foreground uppercase">{state.source.lang}</span>
               </TabsTrigger>
             ))}
             <TabsTrigger value="sources">Sources</TabsTrigger>

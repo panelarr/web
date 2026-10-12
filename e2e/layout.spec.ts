@@ -101,7 +101,15 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
   await open("/admin/plugins/example");
   await check(page, "plugin settings", found);
 
-  for (const path of ["/admin/sources", "/admin/jobs", "/admin/queue", "/admin/system"]) {
+  for (const path of [
+    "/admin/sources",
+    "/admin/sources/example:1001",
+    "/admin/sources/example:1001?list=search&q=the",
+    "/admin/sources/example:1001/series?key=%2Fseries%2F1000",
+    "/admin/jobs",
+    "/admin/queue",
+    "/admin/system",
+  ]) {
     await open(path);
     await check(page, path, found);
   }
