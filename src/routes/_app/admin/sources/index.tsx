@@ -57,7 +57,9 @@ function SourcesPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const sources = $api.useQuery("get", "/sources", { params: { query: { all: true } } });
   const all = sources.data?.sources ?? [];
+  const pluginList = $api.useQuery("get", "/plugins");
   const plugins = useMemo(() => [...new Set(all.map((s) => s.plugin_id))].sort(), [all]);
+  const pluginName = (id: string) => pluginList.data?.plugins.find((p) => p.id === id)?.name ?? id;
   const langs = useMemo(() => [...new Set(all.map((s) => s.lang))].sort(), [all]);
   const shown = all.filter((source) => matches(source, search));
   const failing = all.filter((s) => s.health.status === "failing").length;
@@ -91,7 +93,7 @@ function SourcesPage() {
           <option value="">All plugins</option>
           {plugins.map((plugin) => (
             <option key={plugin} value={plugin}>
-              {plugin}
+              {pluginName(plugin)}
             </option>
           ))}
         </NativeSelect>
@@ -116,8 +118,8 @@ function SourcesPage() {
           <option value="ok">Healthy</option>
           <option value="failing">Failing</option>
           <option value="unknown">Not checked</option>
-          <option value="off">Turned off</option>
-          <option value="gone">No longer listed</option>
+          <option value="off">Off</option>
+          <option value="gone">Absent (no longer listed)</option>
         </NativeSelect>
       </div>
       {sources.error ? <ErrorAlert error={sources.error} onRetry={() => void sources.refetch()} /> : null}
@@ -162,11 +164,18 @@ function SourceRow({ source }: { source: Source }) {
           {source.content_rating === "nsfw" || source.content_rating === "mixed" ? (
             <Badge variant="secondary">{source.content_rating}</Badge>
           ) : null}
-          {source.present ? null : <Badge variant="destructive">No longer listed</Badge>}
+          {/* Off is the admin's switch; Absent means the plugin no longer lists the source. */}
+          {source.enabled ? null : <Badge variant="secondary">Off</Badge>}
+          {source.present ? null : <Badge variant="destructive">Absent</Badge>}
         </p>
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <HealthBadge status={source.health.status} />
           <span className="[overflow-wrap:anywhere]">{source.id}</span>
+          {source.present ? null : (
+            <span className="basis-full [overflow-wrap:anywhere]">
+              No longer listed by its plugin. Works keep its chapters; copies come from other sources.
+            </span>
+          )}
           {source.health.status === "failing" && (source.health.message || source.health.reason) ? (
             <span className="basis-full text-destructive [overflow-wrap:anywhere]">
               {source.health.message ?? source.health.reason}

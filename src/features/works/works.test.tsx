@@ -124,15 +124,28 @@ describe("fixing matches", () => {
     expect(await screen.findByText("Attached on 2 of 2 sources.")).toBeInTheDocument();
   });
 
-  it("leaves searching a source by hand to admins, for users who fix matches", async () => {
+  it("lets users who fix matches search the work's source, marking what the work knows", async () => {
     resetDb("user");
     for (const source of db().sources) source.health = { status: "ok" };
     const reader = db().users.find((u) => u.username === "reader");
     if (reader) Object.assign(reader.grants, { all_sources: true, may_manage_matches: true });
     const [work] = seed("ent_1000");
     await renderApp(`/works/${work?.id}?tab=sources`);
-    expect(await screen.findByRole("button", { name: "Attach by URL" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /yourself/ })).not.toBeInTheDocument();
+    await userEvent.click(
+      await within(await waitFor(() => row("Sample Scans"))).findByRole("button", {
+        name: "Search Sample Scans yourself",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    const search = within(dialog).getByRole("textbox", { name: "Search the source" });
+    await userEvent.clear(search);
+    await userEvent.type(search, "Tourou");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Search" }));
+    // The work's own search, not the admin's source search (sources are admin-only).
+    expect((await within(dialog).findAllByText("Candidate")).length).toBeGreaterThan(0);
+    const [attach] = within(dialog).getAllByRole("button", { name: "Attach" });
+    await userEvent.click(attach as HTMLElement);
+    expect(await screen.findByText("Attached on 2 of 2 sources.")).toBeInTheDocument();
   });
 
   it("is read-only without the right to fix matches", async () => {

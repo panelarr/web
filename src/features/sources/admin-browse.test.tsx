@@ -14,6 +14,34 @@ describe("browsing sources", () => {
     expect(decodeURIComponent(link.getAttribute("href") ?? "")).toBe("/admin/sources/example:1001");
   });
 
+  it("tells Off from Absent, and names plugins in the filter", async () => {
+    const gone = db().sources.find((source) => source.id === "example:1002");
+    if (gone) gone.present = false;
+    await renderApp("/admin/sources");
+    const off = (await screen.findByText("Demo Comics")).closest("li") as HTMLElement;
+    expect(within(off).getByText("Off")).toBeInTheDocument();
+    const absent = screen.getByText("Sample Scans").closest("li") as HTMLElement;
+    expect(within(absent).getByText("Absent")).toBeInTheDocument();
+    expect(within(absent).getByText(/No longer listed by its plugin/)).toBeInTheDocument();
+    expect(within(absent).queryByText("Off")).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Example Source Plugin" })).toBeInTheDocument();
+  });
+
+  it("browses a source that's turned off, to test it, but not one that's absent", async () => {
+    const { router } = await renderApp("/admin/sources/example:1003");
+    expect(await screen.findByRole("heading", { name: "Demo Comics" })).toBeInTheDocument();
+    expect(screen.getByText("Off")).toBeInTheDocument();
+    // Its lists are fetched, not refused.
+    expect(await screen.findByText("灯籠の番人")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Lists" })).toBeInTheDocument();
+
+    const gone = db().sources.find((source) => source.id === "example:1002");
+    if (gone) gone.present = false;
+    await router.navigate({ to: "/admin/sources/$sourceId", params: { sourceId: "example:1002" } });
+    expect(await screen.findByText("No longer listed by its plugin")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Lists" })).not.toBeInTheDocument();
+  });
+
   it("takes admins from old Browse → Sources links to the same page in Admin, search kept", async () => {
     const { router } = await renderApp("/browse/sources/example:1001?list=search&q=the");
     await waitFor(() => expect(decodeURIComponent(router.state.location.pathname)).toBe("/admin/sources/example:1001"));

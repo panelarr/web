@@ -193,6 +193,18 @@ function usableSource(user: S["User"], id: string): S["SourceInfo"] | Response {
   return source && canUseSource(user, source) ? source : problem(404, "not_found", "Not found", "No such source.");
 }
 
+/**
+ * A source an admin may browse to test it: turned off is fine, but one its plugin no longer
+ * lists, or of a plugin turned off, is gone.
+ */
+function browsableSource(id: string): S["SourceInfo"] | Response {
+  const source = db().sources.find((s) => s.id === id);
+  const plugin = db().plugins.find((p) => p.id === source?.plugin_id);
+  return source?.present && plugin?.enabled !== false
+    ? source
+    : problem(404, "not_found", "Not found", "No such source, or its plugin no longer lists it.");
+}
+
 function seriesPage(list: S["SourceSeries"][], page: string | null): S["SourceSeriesPage"] {
   const n = Math.max(1, Number(page) || 1);
   const size = 12;
@@ -1510,7 +1522,7 @@ export const operations: MockOperation[] = [
   op("get", "/sources/{source_id}/popular", ({ params, request }) => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
-    const source = usableSource(user, String(params.source_id));
+    const source = browsableSource(String(params.source_id));
     if (source instanceof Response) return source;
     return json(seriesPage(listSeries(source.id), new URL(request.url).searchParams.get("page")));
   }),
@@ -1518,17 +1530,40 @@ export const operations: MockOperation[] = [
   op("get", "/sources/{source_id}/latest", ({ params, request }) => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
-    const source = usableSource(user, String(params.source_id));
+    const source = browsableSource(String(params.source_id));
     if (source instanceof Response) return source;
     if (!source.capabilities.includes("latest"))
       return problem(422, "unsupported", "Not supported", "This source has no latest list.");
     return json(seriesPage([...listSeries(source.id)].reverse(), new URL(request.url).searchParams.get("page")));
   }),
 
+  // Searching one of a work's sources to fix its match: for users who may fix matches.
+  op("post", "/works/{work_id}/sources/{source_id}/search", async ({ params, request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    if (user.role !== "admin" && !user.grants.may_manage_matches) {
+      return problem(403, "grant_required", "Not allowed", "You may not fix matches.");
+    }
+    if (!workView(user, String(params.work_id))) return problem(404, "not_found", "Not found", "No such work.");
+    const source = usableSource(user, String(params.source_id));
+    if (source instanceof Response) return source;
+    const body = (await request.json()) as S["SourceSearchRequest"];
+    const q = (body.query ?? "").toLowerCase();
+    const row = (db().matching[String(params.work_id)] ?? []).find((r) => r.source.id === source.id);
+    const known = [...(row?.attached ? [row.attached] : []), ...(row?.candidates ?? [])];
+    const found = listSeries(source.id)
+      .filter((series) => series.title.toLowerCase().includes(q))
+      .map((series) => {
+        const match = known.find((m) => m.key === series.key);
+        return match ? { ...series, match: { series_id: match.id, state: match.state } } : series;
+      });
+    return json(seriesPage(found, String(body.page ?? 1)));
+  }),
+
   op("post", "/sources/{source_id}/search", async ({ params, request }) => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
-    const source = usableSource(user, String(params.source_id));
+    const source = browsableSource(String(params.source_id));
     if (source instanceof Response) return source;
     const body = (await request.json()) as S["SourceSearchRequest"];
     const q = (body.query ?? "").toLowerCase();
@@ -1539,7 +1574,7 @@ export const operations: MockOperation[] = [
   op("get", "/sources/{source_id}/filters", ({ params }) => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
-    const source = usableSource(user, String(params.source_id));
+    const source = browsableSource(String(params.source_id));
     if (source instanceof Response) return source;
     return json(FILTERS);
   }),
@@ -1547,7 +1582,7 @@ export const operations: MockOperation[] = [
   op("get", "/sources/{source_id}/series", ({ params, request }) => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
-    const source = usableSource(user, String(params.source_id));
+    const source = browsableSource(String(params.source_id));
     if (source instanceof Response) return source;
     const series = sourceSeries(source.id, seriesIndex(new URL(request.url).searchParams.get("key") ?? ""));
     return series ? json(series) : problem(404, "not_found", "Not found");
@@ -1556,7 +1591,7 @@ export const operations: MockOperation[] = [
   op("get", "/sources/{source_id}/chapters", ({ params, request }) => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
-    const source = usableSource(user, String(params.source_id));
+    const source = browsableSource(String(params.source_id));
     if (source instanceof Response) return source;
     const i = seriesIndex(new URL(request.url).searchParams.get("key") ?? "");
     if (!sourceSeries(source.id, i)) return problem(404, "not_found", "Not found");

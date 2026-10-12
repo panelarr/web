@@ -122,16 +122,7 @@ export function SourcesPanel({ work }: { work: Work }) {
       </div>
       <ul className="grid gap-3">
         {work.sources.map((state) => (
-          <SourceRow
-            key={state.source.id}
-            work={work}
-            state={state}
-            canFix={canFix}
-            // Searching a source directly is for admins (sources are theirs to browse) until the
-            // server can search one on a work's behalf.
-            canSearch={canFix && user.role === "admin"}
-            m={m}
-          />
+          <SourceRow key={state.source.id} work={work} state={state} canFix={canFix} m={m} />
         ))}
       </ul>
       <AttachUrlDialog work={work} open={byUrl} onOpenChange={setByUrl} m={m} />
@@ -139,19 +130,7 @@ export function SourcesPanel({ work }: { work: Work }) {
   );
 }
 
-function SourceRow({
-  work,
-  state,
-  canFix,
-  canSearch,
-  m,
-}: {
-  work: Work;
-  state: SourceState;
-  canFix: boolean;
-  canSearch: boolean;
-  m: WorkMutations;
-}) {
+function SourceRow({ work, state, canFix, m }: { work: Work; state: SourceState; canFix: boolean; m: WorkMutations }) {
   const [searching, setSearching] = useState(false);
   const status = STATUS[state.status];
   const candidates = state.candidates.filter((c) => c.state === "candidate");
@@ -222,7 +201,7 @@ function SourceRow({
           </ul>
         </details>
       ) : null}
-      {canSearch && state.source.capabilities.includes("search") ? (
+      {canFix && state.source.capabilities.includes("search") ? (
         <div>
           <Button variant="ghost" size="sm" onClick={() => setSearching(true)}>
             <Search aria-hidden />
@@ -384,6 +363,9 @@ function AttachUrlDialog({
   );
 }
 
+/** How the work already knows a search result. */
+const MATCH_LABELS = { attached: "Attached", candidate: "Candidate", rejected: "Rejected" } as const;
+
 function SearchSourceDialog({
   work,
   state,
@@ -398,8 +380,14 @@ function SearchSourceDialog({
   m: WorkMutations;
 }) {
   const [query, setQuery] = useState(work.title);
-  const search = $api.useMutation("post", "/sources/{source_id}/search");
-  const run = () => search.mutate({ params: { path: { source_id: state.source.id } }, body: { query, page: 1 } });
+  // The work's own search of the source: open to anyone who may fix matches (browsing a source
+  // directly is for admins), and it says which results the work already knows.
+  const search = $api.useMutation("post", "/works/{work_id}/sources/{source_id}/search");
+  const run = () =>
+    search.mutate({
+      params: { path: { work_id: work.id, source_id: state.source.id } },
+      body: { query, page: 1 },
+    });
   return (
     <Dialog
       open={open}
@@ -436,9 +424,10 @@ function SearchSourceDialog({
                 <p className="text-sm font-medium [overflow-wrap:anywhere]">{series.title}</p>
                 <p className="truncate text-xs text-muted-foreground">{series.authors.join(", ")}</p>
               </div>
+              {series.match ? <Badge variant="outline">{MATCH_LABELS[series.match.state]}</Badge> : null}
               <Button
                 size="sm"
-                disabled={m.add.isPending}
+                disabled={m.add.isPending || series.match?.state === "attached"}
                 onClick={() =>
                   m.add.mutate(
                     { params: { path: { work_id: work.id } }, body: { source_id: state.source.id, key: series.key } },
@@ -451,7 +440,7 @@ function SearchSourceDialog({
                   )
                 }
               >
-                Attach
+                {series.match?.state === "rejected" ? "Attach anyway" : "Attach"}
               </Button>
             </li>
           ))}

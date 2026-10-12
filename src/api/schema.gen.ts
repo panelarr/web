@@ -1225,6 +1225,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/works/{work_id}/sources/{source_id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search one of the work's sources by hand, to fix its match
+         * @description The source search for fixing a work's match, open to users with
+         *     `may_manage_matches` (browsing a source directly is for admins).
+         *     The source must be usable and allowed by the caller's source
+         *     grants, else `404`. Each result carries `match` when the work
+         *     already knows that series (attached, candidate or rejected); any
+         *     result can be attached with `POST /works/{work_id}/series` and its
+         *     `key`. A POST because filter values are structured; it only reads.
+         */
+        post: operations["searchWorkSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/works/{work_id}/series/{series_id}": {
         parameters: {
             query?: never;
@@ -2373,6 +2399,16 @@ export interface components {
         UpdateSourceRequest: {
             enabled: boolean;
         };
+        /** @description How a work already knows a series. */
+        SeriesMatchRef: {
+            /**
+             * Format: uuid
+             * @description The work's series (`/works/{work_id}/series/{series_id}`).
+             */
+            series_id: string;
+            /** @enum {string} */
+            state: "attached" | "candidate" | "rejected";
+        };
         SourceSeries: {
             /** @description The series' key on the source; pass it back as is. */
             key: string;
@@ -2388,6 +2424,8 @@ export interface components {
             cover_url?: string;
             /** @description The series' page on the site. */
             url?: string;
+            /** @description Only in a work's source search, when the work already knows the series. */
+            match?: components["schemas"]["SeriesMatchRef"];
         };
         SourceSeriesPage: {
             series: components["schemas"]["SourceSeries"][];
@@ -3913,6 +3951,12 @@ export interface operations {
                 all?: boolean;
                 /** @description Only sources in this language. */
                 lang?: string;
+                /** @description Only this plugin's sources. */
+                plugin_id?: string;
+                /** @description Only sources turned on (`true`) or off (`false`) by an admin. Turned-off sources show only with `all=true`. */
+                enabled?: boolean;
+                /** @description Only sources their plugin lists (`true`) or no longer lists (`false`). Absent sources show only with `all=true`. */
+                present?: boolean;
             };
             header?: never;
             path?: never;
@@ -4664,6 +4708,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchSeries"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    searchWorkSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description A page of series. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSeriesPage"];
                 };
             };
             default: components["responses"]["Problem"];

@@ -52,7 +52,8 @@ function SourcePage() {
   const { sourceId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const sources = $api.useQuery("get", "/sources");
+  // Every source, so one that's turned off can still be tested.
+  const sources = $api.useQuery("get", "/sources", { params: { query: { all: true } } });
   const source = sources.data?.sources.find((s) => s.id === sourceId);
   const canLatest = source?.capabilities.includes("latest") ?? false;
   const canSearch = source?.capabilities.includes("search") ?? false;
@@ -70,7 +71,7 @@ function SourcePage() {
 
   const results = useInfiniteQuery({
     queryKey: ["source-list", sourceId, list, search.q ?? "", list === "search" ? filterValues(declared, state) : []],
-    enabled: source !== undefined && (list !== "search" || !!search.q || changedCount(declared, state) > 0),
+    enabled: source?.present === true && (list !== "search" || !!search.q || changedCount(declared, state) > 0),
     initialPageParam: 1,
     getNextPageParam: nextPage,
     queryFn: async ({ pageParam, signal }) => {
@@ -99,7 +100,7 @@ function SourcePage() {
   if (sources.isPending) return <Loading />;
   if (!source) return <EmptyState title="Source not found">It doesn't exist, or you can't use it.</EmptyState>;
 
-  return (
+  const top = (
     <>
       <Button variant="ghost" size="sm" asChild className="-ml-2 mb-2">
         <Link to="/admin/sources">
@@ -116,9 +117,32 @@ function SourcePage() {
               {source.lang}
             </Badge>
             {source.health.status !== "ok" ? <HealthBadge status={source.health.status} /> : null}
+            {source.enabled ? null : <Badge variant="secondary">Off</Badge>}
+            {source.present ? null : <Badge variant="destructive">Absent</Badge>}
           </p>
         </div>
       </header>
+    </>
+  );
+  // A source its plugin no longer lists (or of a plugin turned off) can't be browsed; one that's
+  // only turned off can, so an admin can test it before turning it back on.
+  if (!source.present || isApiError(results.error, "not_found")) {
+    return (
+      <>
+        {top}
+        <EmptyState title="No longer listed by its plugin">
+          {source.present
+            ? "Its plugin is turned off, or no longer offers it."
+            : "Its plugin doesn't offer it any more."}{" "}
+          Works keep the chapters they had from it.
+        </EmptyState>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {top}
       <nav aria-label="Lists" className="mb-4 flex flex-wrap gap-2">
         {(["popular", ...(canLatest ? ["latest"] : []), ...(canSearch ? ["search"] : [])] as List[]).map((id) => (
           <button
