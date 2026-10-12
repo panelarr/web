@@ -24,31 +24,42 @@ describe("schedules", () => {
     expect(scheduleText({ enabled: false })).toBe("Runs by hand only");
   });
 
-  it("from cron read like words where they can, in UTC", () => {
-    expect(cronText("0 3 * * *")).toBe("daily at 03:00 UTC");
-    expect(cronText("30 4 * * 1")).toBe("every Monday at 04:30 UTC");
-    expect(cronText("30 4 * * 0")).toBe("every Sunday at 04:30 UTC");
-    expect(cronText("30 4 * * 7")).toBe("every Sunday at 04:30 UTC");
-    expect(cronText("15 22 * * FRI")).toBe("every Friday at 22:15 UTC");
-    expect(cronText("0 9 * * 1-5")).toBe("on weekdays at 09:00 UTC");
-    expect(cronText("0 2 1 * *")).toBe("monthly on day 1 at 02:00 UTC");
-    expect(cronText("*/15 * * * *")).toBe("every 15 minutes");
+  it("from cron read like words where they can, in their time zone", () => {
+    expect(cronText("0 3 * * *", "UTC")).toBe("daily at 03:00 UTC");
+    expect(cronText("30 4 * * 1", "UTC")).toBe("every Monday at 04:30 UTC");
+    expect(cronText("30 4 * * 0", "UTC")).toBe("every Sunday at 04:30 UTC");
+    expect(cronText("30 4 * * 7", "UTC")).toBe("every Sunday at 04:30 UTC");
+    expect(cronText("15 22 * * FRI", "UTC")).toBe("every Friday at 22:15 UTC");
+    expect(cronText("0 9 * * 1-5", "UTC")).toBe("on weekdays at 09:00 UTC");
+    expect(cronText("0 2 1 * *", "UTC")).toBe("monthly on day 1 at 02:00 UTC");
+    expect(cronText("*/15 * * * *", "UTC")).toBe("every 15 minutes");
     expect(cronText("0 * * * *")).toBe("every hour");
     expect(cronText("5 * * * *")).toBe("every hour at :05");
     expect(cronText("0 */6 * * *")).toBe("every 6 hours");
     expect(cronText("10 */6 * * *")).toBe("every 6 hours at :10");
   });
 
-  it("from cron fall back to the expression, saying it's UTC", () => {
-    expect(cronText("0 3 * 1 *")).toBe("on schedule 0 3 * 1 * (UTC)");
-    expect(cronText("0 3,15 * * *")).toBe("on schedule 0 3,15 * * * (UTC)");
-    expect(cronText("@daily")).toBe("on schedule @daily (UTC)");
-    expect(cronText("0 25 * * *")).toBe("on schedule 0 25 * * * (UTC)");
+  it("from cron name the zone they run in, or say it's the service's own", () => {
+    expect(cronText("0 3 * * *", "Europe/Vilnius")).toBe("daily at 03:00 (Europe/Vilnius)");
+    expect(cronText("CRON_TZ=Asia/Tokyo 0 3 * * *")).toBe("daily at 03:00 (Asia/Tokyo)");
+    expect(cronText("TZ=UTC 30 4 * * 1")).toBe("every Monday at 04:30 UTC");
+    expect(cronText("CRON_TZ=Asia/Tokyo 0 3 * * *", "Asia/Tokyo")).toBe("daily at 03:00 (Asia/Tokyo)");
+    expect(cronText("0 3 * * *")).toBe("daily at 03:00 (the service's time zone)");
+  });
+
+  it("from cron fall back to the expression, with its zone", () => {
+    expect(cronText("0 3 * 1 *", "UTC")).toBe("on schedule 0 3 * 1 * (UTC)");
+    expect(cronText("0 3,15 * * *", "UTC")).toBe("on schedule 0 3,15 * * * (UTC)");
+    expect(cronText("@daily", "UTC")).toBe("on schedule @daily (UTC)");
+    expect(cronText("0 25 * * *")).toBe("on schedule 0 25 * * * (the service's time zone)");
   });
 
   it("show a cron schedule, on or off, never as by hand only", () => {
-    expect(scheduleText({ enabled: true, cron: "0 3 * * *" })).toBe("Runs daily at 03:00 UTC");
-    expect(scheduleText({ enabled: false, cron: "30 4 * * 1" })).toBe("Schedule off (every Monday at 04:30 UTC)");
+    expect(scheduleText({ enabled: true, cron: "0 3 * * *", time_zone: "UTC" })).toBe("Runs daily at 03:00 UTC");
+    expect(scheduleText({ enabled: false, cron: "30 4 * * 1", time_zone: "UTC" })).toBe(
+      "Schedule off (every Monday at 04:30 UTC)",
+    );
+    expect(scheduleText({ enabled: true, cron: "0 3 * * *" })).toBe("Runs daily at 03:00 (the service's time zone)");
   });
 });
 

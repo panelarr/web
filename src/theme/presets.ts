@@ -60,7 +60,8 @@ const light: ThemePreset = {
     "accent-foreground": "oklch(0.205 0 0)",
     destructive: "oklch(0.577 0.245 27.325)",
     success: "oklch(0.52 0.14 150)",
-    warning: "oklch(0.6 0.15 70)",
+    // Dark enough for small text on white (5:1).
+    warning: "oklch(0.55 0.13 65)",
     info: "oklch(0.55 0.15 250)",
     border: "oklch(0.922 0 0)",
     input: "oklch(0.88 0 0)",

@@ -88,7 +88,17 @@ describe("a plugin's sources and their health checks", () => {
     const ja = await waitFor(() => sourceRow("ja"));
     expect(within(ja).getByText("Failing")).toBeInTheDocument();
     expect(within(ja).getByText("The site answered 503 (SOURCE_DOWN)")).toBeInTheDocument();
-    expect(screen.getByText(/1 of 3 sources · 1 failing · 1 with scheduled checks off/)).toBeInTheDocument();
+    expect(screen.getByText("1 source · 1 failing")).toBeInTheDocument();
+  });
+
+  it("show the sources that are there, with the others behind Show hidden", async () => {
+    const { router } = await renderApp("/admin/plugins/stores?tab=sources");
+    await waitFor(() => sourceRow("ja"));
+    expect(screen.queryByRole("switch", { name: /Polyglot Comics \(es\)/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show hidden (2)" }));
+    expect(await screen.findByRole("switch", { name: /Polyglot Comics \(es\)/ })).toBeInTheDocument();
+    expect(router.state.location.search).toMatchObject({ tab: "sources", hidden: true });
+    expect(screen.getByText(/3 sources · 1 failing · 1 with scheduled checks off/)).toBeInTheDocument();
   });
 
   it("check one now through the plugin's health job, and show the outcome", async () => {
@@ -106,7 +116,7 @@ describe("a plugin's sources and their health checks", () => {
   });
 
   it("turn a source's scheduled checks on and off", async () => {
-    await renderApp("/admin/plugins/stores?tab=sources");
+    await renderApp("/admin/plugins/stores?tab=sources&hidden=true");
     const es = await waitFor(() => sourceRow("es"));
     const toggle = within(es).getByRole("switch", { name: "Scheduled checks for Polyglot Comics (es)" });
     expect(toggle).not.toBeChecked();

@@ -60,13 +60,23 @@ function weekday(field: string): string | undefined {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/** After a time: " UTC", " (Europe/Vilnius)", or, when the service doesn't say, its own zone. */
+function zoneText(timeZone: string | undefined): string {
+  if (timeZone === "UTC" || timeZone === "Etc/UTC") return " UTC";
+  return timeZone ? ` (${timeZone})` : " (the service's time zone)";
+}
+
 /**
  * A cron schedule in words where it's a common one ("daily at 03:00 UTC", "every Monday at
- * 04:30 UTC", "every 15 minutes"), else as written. The services read cron in UTC.
+ * 04:30 UTC", "every 15 minutes"), else as written, with the time zone it runs in: the
+ * schedule's `time_zone`, else one the expression names (CRON_TZ=…), else the service's own.
  */
-export function cronText(cron: string): string {
-  const fields = cron.trim().split(/\s+/);
-  const fallback = `on schedule ${cron.trim()} (UTC)`;
+export function cronText(cron: string, timeZone?: string): string {
+  const named = /^(?:CRON_TZ|TZ)=(\S+)\s+(.*)$/.exec(cron.trim());
+  const expression = named ? (named[2] ?? "") : cron.trim();
+  const zone = timeZone ?? named?.[1];
+  const fields = expression.split(/\s+/);
+  const fallback = `on schedule ${expression}${zone ? ` (${zone})` : " (the service's time zone)"}`;
   if (fields.length !== 5) return fallback;
   const [minute = "", hour = "", dom = "", month = "", dow = ""] = fields;
   const m = number(minute, 59);
@@ -83,7 +93,7 @@ export function cronText(cron: string): string {
     return m === 0 ? text : `${text} at :${pad(m)}`;
   }
   if (m === undefined || h === undefined || month !== "*") return fallback;
-  const at = `at ${pad(h)}:${pad(m)} UTC`;
+  const at = `at ${pad(h)}:${pad(m)}${zoneText(zone)}`;
   if (dom === "*" && dow === "*") return `daily ${at}`;
   if (dom === "*" && weekday(dow)) return `every ${weekday(dow)} ${at}`;
   if (dom === "*" && (dow === "1-5" || dow.toUpperCase() === "MON-FRI")) return `on weekdays ${at}`;
@@ -95,7 +105,7 @@ export function cronText(cron: string): string {
 /** How a job runs on its own, in a few words. */
 export function scheduleText(schedule: Job["schedule"]): string {
   const text = schedule.cron
-    ? cronText(schedule.cron)
+    ? cronText(schedule.cron, schedule.time_zone)
     : schedule.interval_seconds
       ? every(schedule.interval_seconds)
       : undefined;
@@ -154,4 +164,15 @@ export function perSourceJobs(jobs: readonly Job[]): Job[] {
   );
   const health = candidates.filter((job) => /health/i.test(job.group) || /health/i.test(job.name));
   return health.length > 0 ? health : candidates;
+}
+
+/** How long something ran ("1 min 4 s"), up to now while it runs. */
+export function duration(from: string, to: string | undefined): string {
+  const ms = (to ? Date.parse(to) : Date.now()) - Date.parse(from);
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s < 60
+    ? `${s} s`
+    : s < 3600
+      ? `${Math.floor(s / 60)} min ${s % 60} s`
+      : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
 }

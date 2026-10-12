@@ -35,12 +35,15 @@ export interface SourcesHealthSearch {
   q?: string;
   /** Only failing sources, or only those with scheduled checks off. */
   health?: "failing" | "off";
+  /** Also the sources that aren't there now (language off, or gone from the plugin). */
+  hidden?: true;
 }
 
 export function sourcesHealthSearch(search: Record<string, unknown>): SourcesHealthSearch {
   const out: SourcesHealthSearch = {};
   if (typeof search.q === "string" && search.q) out.q = search.q;
   if (search.health === "failing" || search.health === "off") out.health = search.health;
+  if (search.hidden === true || search.hidden === "true") out.hidden = true;
   return out;
 }
 
@@ -65,7 +68,14 @@ export function SourcesHealthPanel({
   onSearch: (change: Partial<SourcesHealthSearch>) => void;
 }) {
   const list = useQuery(sourcesOptions(pluginId));
-  const all = list.data?.sources ?? [];
+  const everything = list.data?.sources ?? [];
+  // As in Admin → Sources: sources that aren't there now (a language turned off, gone from the
+  // plugin) are kept for their works' history, but hidden unless asked for.
+  const hidden = everything.filter((s) => !s.present).length;
+  const all = useMemo(
+    () => (search.hidden ? everything : everything.filter((s) => s.present)),
+    [everything, search.hidden],
+  );
   const failing = all.filter((s) => s.health.status === "failing").length;
   const off = all.filter((s) => s.health.checks_disabled).length;
   const shown = useMemo(() => {
@@ -101,16 +111,27 @@ export function SourcesHealthPanel({
         </NativeSelect>
       </div>
       {list.data ? (
-        <p className="text-sm text-muted-foreground">
-          {shown.length === all.length ? `${all.length} sources` : `${shown.length} of ${all.length} sources`}
-          {failing ? ` · ${failing} failing` : ""}
-          {off ? ` · ${off} with scheduled checks off` : ""}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p className="text-sm text-muted-foreground">
+            {shown.length === all.length
+              ? `${all.length} ${all.length === 1 ? "source" : "sources"}`
+              : `${shown.length} of ${all.length} sources`}
+            {failing ? ` · ${failing} failing` : ""}
+            {off ? ` · ${off} with scheduled checks off` : ""}
+          </p>
+          {hidden > 0 ? (
+            <Button variant="outline" size="sm" onClick={() => onSearch({ hidden: search.hidden ? undefined : true })}>
+              {search.hidden ? "Hide" : "Show"} hidden ({hidden})
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       {list.error ? <ErrorAlert error={list.error} onRetry={() => void list.refetch()} /> : null}
       {list.isPending ? <Loading /> : null}
       {list.data && shown.length === 0 ? (
-        <EmptyState icon={<Stethoscope />} title={all.length === 0 ? "No sources" : "No source matches"} />
+        <EmptyState icon={<Stethoscope />} title={all.length === 0 ? "No sources" : "No source matches"}>
+          {hidden > 0 && !search.hidden ? `${hidden} hidden: they aren't there now.` : null}
+        </EmptyState>
       ) : null}
       {shown.length > 0 ? (
         <VirtualList

@@ -3382,6 +3382,8 @@ export interface components {
             interval_seconds?: number;
             /** @description A cron schedule (the connected services' jobs); absent otherwise. */
             cron?: string;
+            /** @description The IANA time zone a cron schedule runs in (e.g. "UTC"); absent when the service doesn't say. */
+            time_zone?: string;
             enabled: boolean;
             /** @description Where the schedule is configured (read-only here). */
             source?: string;

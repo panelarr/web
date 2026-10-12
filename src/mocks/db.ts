@@ -27,6 +27,7 @@ import {
 } from "./data";
 import { initialStorages } from "./downloads";
 import { initialJobs, initialMetaJobs, initialPluginJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
+import { initialMetaSyncRuns } from "./meta";
 import { initialNetwork, type NetworkState } from "./network";
 import { initialOrigins, initialPackageSources, initialPackages, type MockPackage } from "./packages";
 
@@ -56,6 +57,8 @@ export interface MockDb extends JobsState, NetworkState {
   meta: S["MetaConnection"];
   /** Providers being synced: each check adds entries until ready. */
   syncing: string[];
+  /** meta's provider sync runs, newest first. */
+  metaSyncRuns: S["MetaSyncRun"][];
   plugins: S["Plugin"][];
   pluginConfigs: Record<string, S["PluginConfig"]>;
   sources: S["SourceInfo"][];
@@ -110,6 +113,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     apiKeys: [clone(apiKey)],
     meta: clone(metaConnection),
     syncing: [],
+    metaSyncRuns: initialMetaSyncRuns(),
     plugins: [clone(plugin), clone(storePlugin)],
     pluginConfigs: { [plugin.id]: clone(pluginConfig) },
     sourceSettings: { "example:1001": clone(sourceSettings), "stores:3101": clone(sourceSettings) },
@@ -169,6 +173,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
         sources: [],
         packages: {},
         origins: {},
+        metaSyncRuns: [],
         invites: [],
       };
     case "slow-pages":

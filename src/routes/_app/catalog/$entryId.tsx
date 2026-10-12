@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Cover } from "@/features/catalog/cover";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
 import { LIBRARY_INDEX_KEY } from "@/features/catalog/library-index";
+import { RefreshEntryButton } from "@/features/meta/refresh-entry";
 import { descriptionParagraphs, pickDescription } from "@/lib/description";
 
 type Entry = components["schemas"]["CatalogEntry"];
@@ -29,10 +30,13 @@ function EntryPage() {
   const entry = $api.useQuery("get", "/catalog/entries/{entry_id}", { params: { path: { entry_id: entryId } } });
   return (
     <>
-      <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={() => router.history.back()}>
-        <ArrowLeft aria-hidden />
-        Back
-      </Button>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <Button variant="ghost" size="sm" className="-ml-2" onClick={() => router.history.back()}>
+          <ArrowLeft aria-hidden />
+          Back
+        </Button>
+        {entry.data ? <RefreshEntryButton entryId={entry.data.id} /> : null}
+      </div>
       {isApiError(entry.error, "not_found") ? (
         <EmptyState title="Not in the catalogue">This entry doesn't exist, or you can't see it.</EmptyState>
       ) : entry.error ? (

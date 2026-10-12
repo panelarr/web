@@ -8,14 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type JobsSearch, JobsSection, jobsSearch } from "@/features/jobs/jobs-views";
 import { metaJobs } from "@/features/jobs/service";
 import { JobsContext, type JobsHost } from "@/features/jobs/use-jobs";
+import { MetaHealthCard } from "@/features/meta/meta-health";
+import { ProvidersPanel, type ProvidersSearch, providersSearch } from "@/features/meta/providers-panel";
 import { MetaNetwork } from "@/features/network/meta-network";
 import { MetaConnectionPanel } from "@/features/setup/meta-connection";
 
 /** The metadata service's sections beyond its overview. */
-const TABS = ["jobs", "network"] as const;
+const TABS = ["providers", "jobs", "network"] as const;
 type MetaTab = (typeof TABS)[number];
 
-interface MetadataSearch extends JobsSearch {
+interface MetadataSearch extends JobsSearch, ProvidersSearch {
   tab?: MetaTab;
 }
 
@@ -23,7 +25,9 @@ export const Route = createFileRoute("/_app/admin/metadata")({
   validateSearch: (search: Record<string, unknown>): MetadataSearch => {
     const tab = TABS.includes(search.tab as MetaTab) ? (search.tab as MetaTab) : undefined;
     if (!tab) return {};
-    return tab === "jobs" ? { tab, ...jobsSearch(search) } : { tab };
+    if (tab === "jobs") return { tab, ...jobsSearch(search) };
+    if (tab === "providers") return { tab, ...providersSearch(search) };
+    return { tab };
   },
   component: MetadataPage,
 });
@@ -60,12 +64,13 @@ function MetadataPage() {
         <ScrollStrip>
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
             <TabsTrigger value="network">Network</TabsTrigger>
           </TabsList>
         </ScrollStrip>
-        <TabsContent value="overview" className="mt-4">
-          <Card className="max-w-3xl">
+        <TabsContent value="overview" className="mt-4 grid gap-6 lg:grid-cols-2">
+          <Card className="self-start">
             <CardHeader>
               <CardTitle>Connection</CardTitle>
               <CardDescription>Where the service is, the key Panelarr uses, and whether it's ready.</CardDescription>
@@ -74,6 +79,10 @@ function MetadataPage() {
               <MetaConnectionPanel />
             </CardContent>
           </Card>
+          <MetaHealthCard />
+        </TabsContent>
+        <TabsContent value="providers" className="mt-4">
+          <ProvidersPanel search={search} />
         </TabsContent>
         <TabsContent value="jobs" className="mt-4">
           <JobsContext value={META_JOBS}>

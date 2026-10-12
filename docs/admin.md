@@ -10,7 +10,8 @@ admin key, and reaches plugins through the source contract.
 | Page | What | Shown when |
 |---|---|---|
 | Admin → Jobs | The server's own jobs | always |
-| Admin → Metadata | The metadata service: connection, jobs, network | always |
+| Admin → Metadata | The metadata service: connection and health, providers and their sync runs, jobs, network | always |
+| A catalogue entry | Refresh from providers (admins) | always |
 | Admin → Plugins → a plugin → Extensions | Its stores (refresh) and packages (install, update, reload) | the plugin has `packages` |
 | Admin → Plugins → a plugin → Sources | Its sources' health checks: results, scheduled checks on or off, Check now | the plugin has `health_checks` (Check now also needs `jobs`) |
 | Admin → Plugins → a plugin → Jobs | Its jobs | the plugin has `jobs` |
@@ -48,9 +49,19 @@ Starting a job that is already running answers `409 already_running` with the ru
 going. The server and the metadata service name it in `current_run_id`; a plugin in
 `current_run`, with its own ID. Either way the app offers to watch that run.
 
-Schedules are an interval or, for the connected services, cron. Cron is read in UTC and shown in
-words where it's a common form ("daily at 03:00 UTC", "every Monday at 04:30 UTC", "every 15
-minutes"), otherwise as written ("on schedule 0 3,15 * * * (UTC)").
+Schedules are an interval or, for the connected services, cron, which runs in the schedule's
+`time_zone` (an IANA name; the metadata service's is UTC). Cron is shown in words where it's a
+common form ("daily at 03:00 UTC", "every Monday at 04:30 UTC", "every 15 minutes"), otherwise as
+written ("on schedule 0 3,15 * * * (UTC)"). A zone named in the expression (`CRON_TZ=…`) counts
+too; without either, the text says it's the service's own time zone rather than guess.
+
+## The metadata service's providers
+
+Each provider shows its plugin, health, record count, its sync schedules (from the service's
+configuration, read-only) and its last runs. "Start a full sync" and "Sync changes" start one
+kind; the card, a provider's runs (`?tab=providers&provider=…`) and a run in full (`&sync=…`)
+poll while a sync runs, like the jobs. Provider syncs also appear as jobs
+(`sync.<provider>.<kind>`) on the Jobs tab; the sync runs have the richer counts and notices.
 
 ## Checking one source now
 
@@ -63,5 +74,6 @@ that source's ID. Nothing depends on a plugin's job IDs:
 - health checks come first: a job whose group or name says "health";
 - one left gives a plain "Check now", several a small menu.
 
-The row then follows the run (by polling, as above) and shows the source's new health when it
+Sources that aren't there now (a language turned off, gone from the plugin) are hidden, as on
+Admin → Sources, behind "Show hidden". The row then follows the run (by polling, as above) and shows the source's new health when it
 ends, with a link to watch the run on the Jobs tab.

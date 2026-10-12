@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { defaultsText, type Job, RUN_STATUS, type RunStatus, scheduleText, triggerText } from "./jobs";
+import { defaultsText, duration, type Job, RUN_STATUS, type RunStatus, scheduleText, triggerText } from "./jobs";
 import { CancelRunButton, RunJobButton } from "./run-job";
 import { ProgressLine, RunStatusBadge } from "./run-status";
 import { useJob, useJobList, useJobRuns, useJobsHost, useRun } from "./use-jobs";
@@ -226,16 +226,6 @@ export function JobView({
       ) : null}
     </>
   );
-}
-
-function duration(from: string, to: string | undefined): string {
-  const ms = (to ? Date.parse(to) : Date.now()) - Date.parse(from);
-  const s = Math.max(0, Math.round(ms / 1000));
-  return s < 60
-    ? `${s} s`
-    : s < 3600
-      ? `${Math.floor(s / 60)} min ${s % 60} s`
-      : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
 }
 
 /** One run in full: outcome, counts, parameters, notes, and progress while it runs. */

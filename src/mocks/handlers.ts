@@ -10,6 +10,7 @@ import { commit, currentUser, db, type MockInvite, newId, syncSessionCookie } fr
 import { downloadItem, queueDownload } from "./downloads";
 import { emit, onMockEvent } from "./events";
 import { finishRun, type JobStore, queueState, startRun, taskEvent } from "./jobs";
+import { metaHealth, providerDetails, startMetaSync } from "./meta";
 import { applied, filterOwned, metaNetwork, networkTest, pluginNetwork, profileView, sourceNetwork } from "./network";
 import { type MockOperation, mockUrl, op, problem } from "./op";
 import { type MockPackage, packageIconSvg, packageView, queuePackageTask, syncPackageSources } from "./packages";
@@ -640,14 +641,60 @@ export const operations: MockOperation[] = [
     return user instanceof Response ? user : json(recheckMeta());
   }),
 
-  op("post", "/system/meta/providers/{provider}/sync", ({ params }) => {
+  op("post", "/system/meta/providers/{provider}/sync", async ({ params, request }) => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
     const provider = String(params.provider);
     if (!db().meta.check.providers.some((p) => p.id === provider)) return problem(404, "not_found", "Not found");
-    db().syncing.push(provider);
+    const d = db();
+    d.syncing.push(provider);
+    const text = await request.text();
+    const kind = (text ? (JSON.parse(text) as S["RunMetaSyncRequest"]).kind : undefined) ?? "dump";
+    const run = startMetaSync(d, provider, kind, `sr-${200 + d.metaSyncRuns.length + 1}`);
     commit();
-    return json<S["MetaSyncStarted"]>({ run_id: newId() }, 202);
+    return json<S["MetaSyncStarted"]>({ run_id: run.id }, 202);
+  }),
+
+  op("get", "/system/meta/providers", () => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    return json<S["MetaProviderList"]>({ providers: providerDetails(db()) });
+  }),
+
+  op("get", "/system/meta/sync-runs", ({ request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const url = new URL(request.url);
+    const provider = url.searchParams.get("provider");
+    const { items, next } = paginate(
+      db().metaSyncRuns.filter((r) => !provider || r.provider === provider),
+      url,
+    );
+    return json<S["MetaSyncRunList"]>({ runs: items, next_page_token: next });
+  }),
+
+  op("get", "/system/meta/sync-runs/{sync_run_id}", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const run = db().metaSyncRuns.find((r) => r.id === params.sync_run_id);
+    return run ? json(run) : problem(404, "not_found", "Not found", "No such sync run.");
+  }),
+
+  op("get", "/system/meta/health", () => {
+    const user = requireAdmin();
+    return user instanceof Response ? user : json(metaHealth(db()));
+  }),
+
+  op("post", "/system/meta/entries/{entry_id}/refresh", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    if (!CATALOG.some((e) => e.id === params.entry_id)) return problem(404, "not_found", "Not found");
+    // The second entry's other provider is down, to show a partial refresh.
+    return json<S["MetaEntryRefresh"]>(
+      params.entry_id === "ent_1002"
+        ? { refreshed: ["example-provider"], failed: { "other-provider": "The provider answered 503" } }
+        : { refreshed: ["example-provider"], failed: {} },
+    );
   }),
 
   // Plugins (the wizard's optional step; the full admin comes later)
