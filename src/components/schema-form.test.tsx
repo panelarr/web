@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/errors";
 import { pluginConfig } from "@/mocks/data";
-import { initialValues, type JsonSchema, SchemaForm } from "./schema-form";
+import { initialValues, type JsonSchema, orderedProperties, SchemaForm } from "./schema-form";
 
 const schema = pluginConfig.schema as JsonSchema;
 
@@ -98,5 +98,72 @@ describe("SchemaForm", () => {
     render(<SchemaForm schema={schema} values={pluginConfig.values} onSubmit={() => {}} error={error} />);
     expect(screen.getByText("The plugin rejected the settings.")).toBeInTheDocument();
     expect(screen.getByLabelText("Proxy URL")).toHaveAccessibleDescription(/must be an http\(s\) URL/);
+  });
+});
+
+describe("orderedProperties", () => {
+  const names = (schema: JsonSchema) => orderedProperties(schema).map(([name]) => name);
+  const prop = (extra: Partial<JsonSchema> = {}): JsonSchema => ({ type: "string", ...extra });
+
+  it("keeps the order the schema was written in", () => {
+    expect(names({ properties: { url: prop(), api_key: prop(), stores: prop() } })).toEqual([
+      "url",
+      "api_key",
+      "stores",
+    ]);
+  });
+
+  it("puts required fields first when the keys arrive sorted (their order was lost)", () => {
+    expect(names({ required: ["url"], properties: { fingerprint: prop(), note: prop(), url: prop() } })).toEqual([
+      "url",
+      "fingerprint",
+      "note",
+    ]);
+  });
+
+  it("follows x-order or propertyOrder hints, unhinted ones last", () => {
+    expect(
+      names({
+        properties: { a: prop(), b: prop({ "x-order": 2 }), c: prop({ propertyOrder: 1 }), d: prop() },
+      }),
+    ).toEqual(["c", "b", "a", "d"]);
+  });
+
+  it("shows a plugin's settings in a sensible order after its keys were sorted", () => {
+    // How a store-list schema arrives once a map has sorted its keys.
+    const arrived: JsonSchema = {
+      type: "object",
+      required: ["service_url"],
+      properties: {
+        api_key: { type: "string", title: "API key", writeOnly: true },
+        packages: { type: "array", title: "Extensions", items: { type: "string" } },
+        service_url: { type: "string", title: "Service URL" },
+        stores: {
+          type: "array",
+          title: "Extension stores",
+          items: {
+            type: "object",
+            title: "Store",
+            required: ["url"],
+            properties: {
+              fingerprint: { type: "string", title: "Signing key fingerprint" },
+              url: { type: "string", title: "Store URL" },
+            },
+          },
+        },
+      },
+    };
+    render(
+      <SchemaForm schema={arrived} values={{ stores: [{ url: "https://store.example.com/" }] }} onSubmit={() => {}} />,
+    );
+    const labels = [...document.querySelectorAll("label, legend")].map((el) => el.textContent);
+    expect(labels).toEqual([
+      "Service URL",
+      "API key",
+      "Extensions",
+      "Extension stores",
+      "Store URL",
+      "Signing key fingerprint",
+    ]);
   });
 });

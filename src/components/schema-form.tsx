@@ -30,6 +30,9 @@ export interface JsonSchema {
   items?: JsonSchema;
   properties?: Record<string, JsonSchema>;
   required?: string[];
+  /** Where a property goes among its siblings (lowest first); either spelling. */
+  "x-order"?: number;
+  propertyOrder?: number;
 }
 
 type Values = Record<string, unknown>;
@@ -50,6 +53,27 @@ export function initialValues(schema: JsonSchema, saved: Values | undefined): Va
     }
   }
   return out;
+}
+
+/**
+ * An object's properties in display order. A schema can travel through maps that sort its
+ * keys (protobuf Struct, Go's JSON encoder), so the order it arrives in may not be the one it
+ * was written in. An `x-order` or `propertyOrder` hint wins; keys in alphabetical order most
+ * likely lost theirs, so required ones go first; any other order is the author's, and kept.
+ */
+export function orderedProperties(schema: JsonSchema): [string, JsonSchema][] {
+  const entries = Object.entries(schema.properties ?? {});
+  const hint = (prop: JsonSchema) => prop["x-order"] ?? prop.propertyOrder;
+  if (entries.some(([, prop]) => typeof hint(prop) === "number")) {
+    // Hinted ones first, by hint; the rest after, as they came. sort() is stable.
+    const rank = (prop: JsonSchema) => hint(prop) ?? Number.MAX_SAFE_INTEGER;
+    return entries.sort(([, a], [, b]) => rank(a) - rank(b));
+  }
+  const names = entries.map(([name]) => name);
+  const sorted = names.every((name, i) => i === 0 || (names[i - 1] as string) <= name);
+  if (!sorted) return entries;
+  const required = new Set(schema.required ?? []);
+  return entries.sort(([a], [b]) => Number(required.has(b)) - Number(required.has(a)));
 }
 
 function label(name: string, schema: JsonSchema): string {
@@ -131,7 +155,7 @@ function ObjectFields({
 }) {
   return (
     <>
-      {Object.entries(schema.properties ?? {}).map(([name, prop]) => (
+      {orderedProperties(schema).map(([name, prop]) => (
         <SchemaField
           key={name}
           name={name}
