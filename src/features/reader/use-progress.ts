@@ -64,7 +64,6 @@ export function useProgressSaver(chapterId: string, pages: number) {
   }, []);
 
   // Moving on to another chapter: what's waiting for the one left behind is saved now.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the chapter changes
   useEffect(() => {
     if (pending.current && pending.current.chapterId !== chapterId) sendRef.current(pending.current);
   }, [chapterId]);

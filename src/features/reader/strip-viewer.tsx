@@ -105,7 +105,7 @@ export function StripViewer({
     getItemKey: (i) => items[i]?.key ?? i,
     estimateSize: (i) => {
       const item = items[i];
-      if (!item || item.kind !== "page") return BAND;
+      if (item?.kind !== "page") return BAND;
       const size = sizes.current.get(item.key);
       return (size ? (width * size.height) / size.width : (width || 360) * 1.45) + gap;
     },

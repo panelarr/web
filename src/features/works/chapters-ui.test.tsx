@@ -134,6 +134,28 @@ describe("a work's chapters", () => {
     expect(router.state.location.search).toMatchObject({ order: "desc" });
   });
 
+  it("bookmarks chapters one by one or in batch, and filters to them", async () => {
+    const { router } = await renderApp(`/works/${workId}`);
+    await userEvent.click(
+      await within(await waitFor(() => chapterRow("Vol. 1 · Chapter 3"))).findByRole("button", { name: /More for/ }),
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Bookmark" }));
+    expect(await within(chapterRow("Vol. 1 · Chapter 3")).findByLabelText("Bookmarked")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Select chapters" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Vol. 1 · Chapter 4" }));
+    await userEvent.click(
+      within(screen.getByRole("toolbar", { name: "Selected chapters" })).getByRole("button", { name: "Actions" }),
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Bookmark" }));
+    expect(await within(chapterRow("Vol. 1 · Chapter 4")).findByLabelText("Bookmarked")).toBeInTheDocument();
+
+    await router.navigate({ to: "/works/$workId", params: { workId }, search: { bookmarked: true } });
+    await waitFor(() =>
+      expect(within(screen.getByRole("list", { name: "Chapters" })).getAllByRole("link")).toHaveLength(2),
+    );
+  });
+
   it("checks for new chapters from the menu", async () => {
     await renderApp(`/works/${workId}`);
     await userEvent.click(await screen.findByRole("button", { name: "More" }));

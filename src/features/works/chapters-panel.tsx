@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+  Bookmark,
   BookOpen,
   CheckCheck,
   CircleCheck,
@@ -44,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { type ChapterView, chapterName, filtersOn, nextToDownload, scanlators, viewChapters } from "./chapter-view";
 import { ChapterViewSheet } from "./chapter-view-sheet";
 import { type Chapter, chapterLabel, chaptersAfter, chaptersBefore, type Progress, reasonText } from "./chapters";
+import { useBookmarks } from "./use-bookmarks";
 
 type Work = components["schemas"]["Work"];
 
@@ -129,6 +131,7 @@ export function ChaptersPanel({
     onError,
   });
   const deleteFile = $api.useMutation("delete", "/chapters/{chapter_id}/file", { onSuccess: invalidate, onError });
+  const bookmarks = useBookmarks(work.id);
   const queue = (body: { chapter_ids: string[] } | { scope: "all" | "unread" }) => {
     if ("chapter_ids" in body && body.chapter_ids.length === 0) return toast.info("Nothing to download.");
     download.mutate({ ...path, body });
@@ -315,6 +318,7 @@ export function ChaptersPanel({
                 })
               }
               onRead={(value) => setRead([chapter.id], value)}
+              onBookmark={(value) => bookmarks.set([chapter.id], value)}
               onReadBefore={() => setRead(chaptersBefore(all, chapter.id), true)}
               download={downloads.get(chapter.id)}
               onDownload={
@@ -344,6 +348,8 @@ export function ChaptersPanel({
             ...(canDownload ? [{ label: "Download", run: () => queue({ chapter_ids: [...selected] }) }] : []),
             { label: "Mark as read", run: () => setRead([...selected], true) },
             { label: "Mark as unread", run: () => setRead([...selected], false) },
+            { label: "Bookmark", run: () => bookmarks.set([...selected], true) },
+            { label: "Remove bookmarks", run: () => bookmarks.set([...selected], false) },
             ...(user.role === "admin"
               ? [
                   {
@@ -372,7 +378,7 @@ export function ChaptersPanel({
         view={view}
         onChange={onViewChange}
         scanlators={scanlators(all)}
-        bookmarks={false}
+        bookmarks
       />
     </div>
   );
@@ -444,6 +450,7 @@ function ChapterRow({
   selected,
   onSelect,
   onRead,
+  onBookmark,
   onReadBefore,
   download,
   onDownload,
@@ -457,6 +464,7 @@ function ChapterRow({
   selected: boolean;
   onSelect: (on: boolean) => void;
   onRead: (read: boolean) => void;
+  onBookmark: (bookmarked: boolean) => void;
   onReadBefore: () => void;
   /** Its download, while queued or running. */
   download?: components["schemas"]["Task"] | undefined;
@@ -516,6 +524,9 @@ function ChapterRow({
               </span>
             ) : null}
             {chapter.available ? null : <span className="text-destructive">· No longer listed</span>}
+            {chapter.bookmarked ? (
+              <Bookmark className="size-3 fill-current text-primary" aria-label="Bookmarked" />
+            ) : null}
             {chapter.pinned ? <Pin className="size-3 text-muted-foreground" aria-label="Copy chosen by hand" /> : null}
             {chapter.downloaded ? <HardDriveDownload className="size-3 text-success" aria-hidden /> : null}
           </p>
@@ -546,6 +557,9 @@ function ChapterRow({
                   {read ? "Mark as unread" : "Mark as read"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onReadBefore}>Mark earlier chapters as read</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onBookmark(!chapter.bookmarked)}>
+                  {chapter.bookmarked ? "Remove bookmark" : "Bookmark"}
+                </DropdownMenuItem>
                 {onDownload && !chapter.downloaded && !download ? (
                   <>
                     <DropdownMenuSeparator />

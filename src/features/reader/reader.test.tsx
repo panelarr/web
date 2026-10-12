@@ -51,6 +51,15 @@ describe("the reader", () => {
     expect(pageText()).toHaveTextContent("Page 1 of 11");
   });
 
+  it("bookmarks the chapter from the top bar", async () => {
+    const first = ctx.chapters[0];
+    await renderApp(`/read/${first?.id}`);
+    await userEvent.click(await screen.findByRole("button", { name: "Bookmark this chapter" }));
+    expect(screen.getByRole("button", { name: "Remove the bookmark" })).toHaveAttribute("aria-pressed", "true");
+    const user = db().users[0]?.id ?? "";
+    await waitFor(() => expect(db().bookmarks[user]?.[ctx.work?.id ?? ""]).toEqual([first?.id]));
+  });
+
   it("resumes where the user left off", async () => {
     const first = ctx.chapters[0];
     db().progress[ctx.user.id] = {

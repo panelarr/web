@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { $api, api } from "@/api/client";
 import { useEvent } from "@/api/events-context";
 import type { components } from "@/api/schema.gen";
+import { useBookmarks } from "@/features/works/use-bookmarks";
 import { serverUrl } from "@/lib/server-url";
 import { cn } from "@/lib/utils";
 import { ChapterEdge, PageNumber, ReaderOverlay } from "./chrome";
@@ -100,6 +101,21 @@ export function ReaderScreen({
   const [turn, setTurn] = useState<{ direction: "next" | "prev"; id: number }>();
   const [scroll, setScroll] = useState<{ to: number | "forward" | "back"; id: number }>();
   const save = useProgressSaver(data.chapter.id, total);
+  // The chapter's bookmark, shown at once and saved in the background.
+  const bookmarks = useBookmarks(data.work_id);
+  const [bookmarked, setBookmarked] = useState(data.chapter.bookmarked);
+  useEffect(() => setBookmarked(data.chapter.bookmarked), [data.chapter.bookmarked]);
+  useEvent("bookmarks.changed", (event) => {
+    if (event.work_id !== data.work_id) return;
+    void api
+      .GET("/works/{work_id}/bookmarks", { params: { path: { work_id: data.work_id } } })
+      .then(({ data: list }) => list && setBookmarked(list.chapter_ids.includes(data.chapter.id)));
+  });
+  const toggleBookmark = () => {
+    const next = !bookmarked;
+    setBookmarked(next);
+    bookmarks.set([data.chapter.id], next);
+  };
 
   const chapters = $api.useQuery("get", "/works/{work_id}/chapters", {
     params: { path: { work_id: data.work_id }, query: { order: "asc" } },
@@ -385,6 +401,8 @@ export function ReaderScreen({
         onSettings={() => setSheet(true)}
         fullscreen={fullscreen}
         onFullscreen={toggleFullscreen}
+        bookmarked={bookmarked}
+        onBookmark={toggleBookmark}
       />
       <ReaderSettingsSheet
         open={sheet}

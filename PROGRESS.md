@@ -29,7 +29,7 @@ Sources become an admin concern; plugins that host many sites get an Extensions 
 
 - [x] **Quick fix:** long strips load pages in order and read on from chapter to chapter (both ways), with small bands between chapters; chapters newest first by default, remembered per user.
 - [x] **R1. Series page:** "N chapters · M unread"; icon buttons with menus (mark all read or unread; download the next 1, 5, 10 or 25, unread, all, or new ones automatically; one filter / sort / display sheet; select; more); plain rows, unread bright and read dimmed, no "New" badges, the state (page, queued, downloaded) on the second line; select mode with a floating bar for batch actions. The view is in the URL; sort, order and display are remembered per user.
-- [ ] **R2. Bookmarks:** from the reader and the list, in batch, with a filter.
+- [x] **R2. Bookmarks:** per user, from the reader's top bar and a chapter's menu, in batch from select mode, a "Bookmarked" filter and a mark on the row; other devices follow (`bookmarks.changed`).
 - [ ] **R3. Reader chrome:** thin bars that hide while reading; one tabbed settings sheet with a scope switch.
 - [ ] **R4. Library:** unread badges, a continue button, one filter / sort / display sheet.
 
