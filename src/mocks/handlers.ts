@@ -673,6 +673,14 @@ export const operations: MockOperation[] = [
     const d = db();
     d.plugins = d.plugins.filter((p) => p.id !== params.plugin_id);
     d.sources = d.sources.filter((source) => source.plugin_id !== params.plugin_id);
+    // Its own network items go with it.
+    const mine = (item: { owner?: S["NetworkProfile"]["owner"] }) =>
+      item.owner !== undefined &&
+      item.owner.kind !== "provider" &&
+      (item.owner.kind === "plugin" ? item.owner.id : item.owner.id.split(":")[0]) === params.plugin_id;
+    d.solvers = d.solvers.filter((x) => !mine(x));
+    d.proxies = d.proxies.filter((x) => !mine(x));
+    d.profiles = d.profiles.filter((x) => !mine(x));
     commit();
     return new HttpResponse(null, { status: 204 });
   }),
@@ -819,7 +827,7 @@ export const operations: MockOperation[] = [
     const d = db();
     const body = (await request.json()) as S["NewNetworkProfile"];
     if (d.profiles.some((p) => p.id === body.id)) return problem(409, "id_taken", "ID taken", "Pick another ID.");
-    const bad = checkProfile(body);
+    const bad = checkProfile(body, body.owner);
     if (bad) return bad;
     const profile = {
       headers: {},
@@ -841,7 +849,7 @@ export const operations: MockOperation[] = [
     const profile = d.profiles.find((p) => p.id === params.profile_id);
     if (!profile) return problem(404, "not_found", "Not found");
     const body = (await request.json()) as S["NetworkProfileSettings"];
-    const bad = checkProfile(body);
+    const bad = checkProfile(body, profile.owner);
     if (bad) return bad;
     // A PUT replaces every setting: anything left out goes back to the plugin's own.
     const next = {
@@ -2195,14 +2203,23 @@ function pluginPackage(pluginId: string, packageId: string): { plugin: S["Plugin
   return pkg ? { plugin, pkg } : problem(404, "not_found", "Not found", "No such package.");
 }
 
-/** A profile's proxy and solver must exist; a fixed user agent needs a value. */
-function checkProfile(body: S["NetworkProfileSettings"]): Response | undefined {
+/**
+ * A profile's proxy and solver must exist, and be shared or in its own scope (a plugin's own
+ * serve it, its extensions and its sources; a provider's, that provider); a fixed user agent
+ * needs a value.
+ */
+function checkProfile(body: S["NetworkProfileSettings"], owner?: S["NetworkProfile"]["owner"]): Response | undefined {
   const d = db();
-  if (body.proxy_id && !d.proxies.some((p) => p.id === body.proxy_id)) {
-    return problem(400, "invalid_request", "Unknown proxy", "proxy_id: no such proxy.");
+  const scope = (o: S["NetworkProfile"]["owner"]) =>
+    !o ? "" : o.kind === "provider" ? `provider:${o.id}` : `plugin:${o.kind === "plugin" ? o.id : o.id.split(":")[0]}`;
+  const fits = (item: { owner?: S["NetworkProfile"]["owner"] }) => !item.owner || scope(item.owner) === scope(owner);
+  const proxy = d.proxies.find((p) => p.id === body.proxy_id);
+  if (body.proxy_id && (!proxy || !fits(proxy))) {
+    return problem(400, "invalid_request", "Unknown proxy", "proxy_id: no such proxy here.");
   }
-  if (body.solver_id && !d.solvers.some((s) => s.id === body.solver_id)) {
-    return problem(400, "invalid_request", "Unknown solver", "solver_id: no such solver.");
+  const solver = d.solvers.find((s) => s.id === body.solver_id);
+  if (body.solver_id && (!solver || !fits(solver))) {
+    return problem(400, "invalid_request", "Unknown solver", "solver_id: no such solver here.");
   }
   if (body.user_agent?.mode === "fixed" && !body.user_agent.value) {
     return problem(400, "invalid_request", "No user agent", "user_agent: a fixed user agent needs a value.");

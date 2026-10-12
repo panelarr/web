@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { Link } from "@tanstack/react-router";
 import { $api } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 import { EmptyState, ErrorAlert, Loading } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
+import { ProfilesPanel, ProxiesPanel, SolversPanel } from "./network-panels";
 import { ProfilePicker } from "./profile-picker";
 
 type SourceNetwork = components["schemas"]["SourceNetwork"];
@@ -100,6 +102,24 @@ export function PluginNetwork({ pluginId, pluginName }: { pluginId: string; plug
           ),
         )
       )}
+      {accepted ? (
+        <section className="grid gap-4 border-t pt-6" aria-label="Only for this plugin">
+          <div>
+            <h3 className="text-base font-semibold">Only for {pluginName}</h3>
+            <p className="text-sm text-muted-foreground">
+              Its own proxies, solvers and profiles, as in its own admin: offered to it, its extensions and its sources,
+              and nowhere else. Shared ones are on{" "}
+              <Link to="/admin/network" className="underline underline-offset-4">
+                Admin → Network
+              </Link>
+              .
+            </p>
+          </div>
+          <ProfilesPanel scope={{ owner: { kind: "plugin", id: pluginId } }} />
+          <ProxiesPanel scope={{ owner: { kind: "plugin", id: pluginId } }} />
+          {data.accepts_solver ? <SolversPanel scope={{ owner: { kind: "plugin", id: pluginId } }} /> : null}
+        </section>
+      ) : null}
     </div>
   );
 }

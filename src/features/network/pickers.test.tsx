@@ -81,4 +81,30 @@ describe("choosing network profiles", () => {
     ).toBeInTheDocument();
     expect(within(providers).getByText(/It uses: Through the VPN\./)).toBeInTheDocument();
   });
+
+  it("keeps a plugin's own proxy to it, its extensions and its sources", async () => {
+    await renderApp("/admin/plugins/example?tab=network");
+    const own = await screen.findByRole("region", { name: "Only for this plugin" });
+    await userEvent.click(within(own).getByRole("button", { name: "Add a proxy" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add a proxy" });
+    await userEvent.type(within(dialog).getByLabelText("ID"), "example-own");
+    await userEvent.type(within(dialog).getByLabelText("Name"), "The plugin's own proxy");
+    await userEvent.type(within(dialog).getByLabelText("URL"), "http://own-proxy:3128");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+    expect(await within(own).findByText("The plugin's own proxy")).toBeInTheDocument();
+    expect(db().proxies.find((p) => p.id === "example-own")?.owner).toEqual({ kind: "plugin", id: "example" });
+
+    // A source's custom profile may use it.
+    await userEvent.click(screen.getByRole("button", { name: "New custom profile for Example Source" }));
+    const profile = await screen.findByRole("dialog", { name: "New custom profile" });
+    expect(within(profile).getByRole("option", { name: "The plugin's own proxy (custom)" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+  });
+
+  it("offers a plugin's own solvers only when it can use one", async () => {
+    await renderApp("/admin/plugins/stores?tab=network");
+    const own = await screen.findByRole("region", { name: "Only for this plugin" });
+    expect(within(own).getByRole("region", { name: "Proxies" })).toBeInTheDocument();
+    expect(within(own).queryByRole("region", { name: "Solvers" })).not.toBeInTheDocument();
+  });
 });
