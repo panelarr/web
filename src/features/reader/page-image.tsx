@@ -20,6 +20,8 @@ export function PageImage({
   placeholderWidth,
   hold = false,
   known = false,
+  exactWidth,
+  size,
   onSettled,
 }: {
   url: string;
@@ -42,6 +44,13 @@ export function PageImage({
   hold?: boolean;
   /** Seen before (its size is known): shown at once when it comes back, without the loading fade. */
   known?: boolean;
+  /**
+   * For a long strip: the width it's shown at, in CSS pixels, and its natural size once known.
+   * The page then gets an exact whole-pixel height, before its image decodes: no hairline gaps
+   * between stacked pages, and nothing changes size when it scrolls back into view.
+   */
+  exactWidth?: number;
+  size?: { width: number; height: number } | undefined;
   /** Called once it has loaded or failed. */
   onSettled?: () => void;
 }) {
@@ -50,6 +59,11 @@ export function PageImage({
   // Held until it may load, then never held again (see `hold`).
   const [released, setReleased] = useState(!hold);
   if (!hold && !released) setReleased(true);
+  const [natural, setNatural] = useState(size);
+  const box =
+    exactWidth && natural
+      ? { width: exactWidth, height: Math.round((exactWidth * natural.height) / natural.width) }
+      : undefined;
   return (
     <div
       className={cn(
@@ -58,12 +72,14 @@ export function PageImage({
         className,
       )}
       style={
-        state === "loaded"
-          ? undefined
-          : {
-              ...(placeholderHeight ? { minHeight: placeholderHeight } : {}),
-              ...(placeholderWidth ? { minWidth: placeholderWidth } : {}),
-            }
+        box
+          ? { height: box.height, minHeight: 0 }
+          : state === "loaded"
+            ? undefined
+            : {
+                ...(placeholderHeight ? { minHeight: placeholderHeight } : {}),
+                ...(placeholderWidth ? { minWidth: placeholderWidth } : {}),
+              }
       }
     >
       {!released ? null : state !== "failed" ? (
@@ -74,9 +90,12 @@ export function PageImage({
           draggable={false}
           loading={eager ? "eager" : "lazy"}
           decoding="async"
+          style={box}
           onLoad={(event) => {
             setState("loaded");
-            onSize?.({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
+            const loaded = { width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight };
+            if (loaded.width > 0 && loaded.height > 0) setNatural(loaded);
+            onSize?.(loaded);
             onSettled?.();
           }}
           onError={() => {

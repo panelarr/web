@@ -29,6 +29,16 @@ describe("a page in a long strip", () => {
     expect(screen.queryByLabelText("Loading page 13")).not.toBeInTheDocument();
   });
 
+  it("gets a whole-pixel height from its size, so stacked pages leave no hairline gaps", () => {
+    // 402 wide, 800 × 1149 natural: 577.37 px, rounded to 577 (IN-0077).
+    render(
+      <PageImage url="/x.png" index={12} fit="width" stretch exactWidth={402} size={{ width: 800, height: 1149 }} />,
+    );
+    const image = screen.getByRole("img", { name: "Page 13" });
+    expect(image.style.height).toBe("577px");
+    expect(image.parentElement?.style.height).toBe("577px");
+  });
+
   it("fades a new page in once it has loaded", () => {
     render(page({}));
     const image = screen.getByRole("img", { name: "Page 13" });

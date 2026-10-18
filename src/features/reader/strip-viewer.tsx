@@ -24,6 +24,8 @@ const AHEAD = 2;
 /** Load the next chapter this many pages before the end. */
 const NEXT_AT = 3;
 const BAND = 112;
+/** How long the strip must be still before a deferred correction becomes a scroll position. */
+const SETTLE_MS = 150;
 
 /** The query the reader route uses for a chapter's pages, so a chapter read on is cached. */
 export const chapterPagesOptions = (chapterId: string) =>
@@ -133,7 +135,8 @@ export function StripViewer({
       const item = items[i];
       if (item?.kind !== "page") return BAND;
       const chapterId = segments[item.seg]?.chapter.id ?? "";
-      return (width || 360) * ratioOf(item.key, chapterId) + gap;
+      // Whole pixels, as each page is sized (see PageImage), so estimates and measures agree.
+      return Math.round((width || 360) * ratioOf(item.key, chapterId)) + gap;
     },
     overscan: Math.max(2, settings.preload),
   });
@@ -182,6 +185,33 @@ export function StripViewer({
     anchor.current = { key: page.dataset.key, top: page.getBoundingClientRect().top - box.top };
     seen.current = element.scrollTop;
   }, []);
+  // While the reader touches the strip or it still moves on its own (a fling), setting the
+  // scroll position from script stops the fling on iOS. Corrections are made with a transform
+  // of the content meanwhile, and folded into the scroll position once the strip has settled,
+  // in one step that moves nothing on screen.
+  const deferred = useRef({ shift: 0, touching: false, last: 0, timer: undefined as number | undefined });
+  const busy = useCallback(() => {
+    const d = deferred.current;
+    return d.touching || performance.now() - d.last < SETTLE_MS;
+  }, []);
+  const settleLater = useCallback(() => {
+    const d = deferred.current;
+    window.clearTimeout(d.timer);
+    const check = () => {
+      const element = container.current;
+      const content = element?.firstElementChild as HTMLElement | null | undefined;
+      if (!element || !content || d.shift === 0) return;
+      if (busy()) {
+        d.timer = window.setTimeout(check, SETTLE_MS);
+        return;
+      }
+      content.style.transform = "";
+      element.scrollTop += d.shift;
+      d.shift = 0;
+      seen.current = element.scrollTop;
+    };
+    d.timer = window.setTimeout(check, SETTLE_MS);
+  }, [busy]);
   const holdAnchor = useCallback(() => {
     const element = container.current;
     account();
@@ -196,16 +226,29 @@ export function StripViewer({
       const index = itemsRef.current.findIndex((item) => item.key === kept.key);
       const start = index >= 0 ? virtualizerRef.current.getOffsetForIndex(index, "start")?.[0] : undefined;
       if (start === undefined) return;
+      // Placed from the layout: a pending transform no longer applies.
+      const d = deferred.current;
+      if (d.shift !== 0) {
+        (element.firstElementChild as HTMLElement | null)?.style.removeProperty("transform");
+        d.shift = 0;
+      }
       element.scrollTop = start + kept.top * -1;
       seen.current = element.scrollTop;
       return;
     }
     const moved = page.getBoundingClientRect().top - element.getBoundingClientRect().top - kept.top;
     if (Math.abs(moved) < 0.5) return;
+    if (busy()) {
+      const d = deferred.current;
+      d.shift += moved;
+      (element.firstElementChild as HTMLElement | null)?.style.setProperty("transform", `translateY(${-d.shift}px)`);
+      settleLater();
+      return;
+    }
     element.scrollTop += moved;
     // The strip's own correction: what's on screen didn't move.
     seen.current = element.scrollTop;
-  }, [account, pickAnchor]);
+  }, [account, pickAnchor, busy, settleLater]);
   useLayoutEffect(holdAnchor);
   useEffect(() => {
     const element = container.current;
@@ -252,6 +295,8 @@ export function StripViewer({
     let frame = 0;
     let lastTop = element.scrollTop;
     const onScroll = () => {
+      deferred.current.last = performance.now();
+      if (deferred.current.shift !== 0) settleLater();
       // The reader's scrolling, not the strip's own corrections (already taken into account).
       const byReader = element.scrollTop !== seen.current;
       account();
@@ -286,7 +331,7 @@ export function StripViewer({
       element.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(frame);
     };
-  }, [virtualizer, items, segments, onPosition, account, pickAnchor]);
+  }, [virtualizer, items, segments, onPosition, account, pickAnchor, settleLater]);
 
   // At the very top there's nothing to scroll: a wheel or a pull down asks for the chapter before.
   useEffect(() => {
@@ -300,6 +345,12 @@ export function StripViewer({
     };
     const onTouchStart = (event: TouchEvent) => {
       startY = event.touches[0]?.clientY;
+      deferred.current.touching = true;
+    };
+    const onTouchEnd = () => {
+      deferred.current.touching = false;
+      deferred.current.last = performance.now();
+      settleLater();
     };
     const onTouchMove = (event: TouchEvent) => {
       const y = event.touches[0]?.clientY;
@@ -308,12 +359,16 @@ export function StripViewer({
     element.addEventListener("wheel", onWheel, { passive: true });
     element.addEventListener("touchstart", onTouchStart, { passive: true });
     element.addEventListener("touchmove", onTouchMove, { passive: true });
+    element.addEventListener("touchend", onTouchEnd, { passive: true });
+    element.addEventListener("touchcancel", onTouchEnd, { passive: true });
     return () => {
       element.removeEventListener("wheel", onWheel);
       element.removeEventListener("touchstart", onTouchStart);
       element.removeEventListener("touchmove", onTouchMove);
+      element.removeEventListener("touchend", onTouchEnd);
+      element.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, []);
+  }, [settleLater]);
 
   // Near the end of the last chapter, the next one is loaded below (nothing on screen moves).
   const { seg: currentSeg, page: currentPage } = position;
@@ -395,6 +450,8 @@ export function StripViewer({
                   eager
                   hold={!mayLoad(item.ordinal)}
                   known={sizes.current.has(item.key)}
+                  exactWidth={width || undefined}
+                  size={sizes.current.get(item.key)}
                   className="items-start"
                   placeholderHeight={`${Math.round((width || 360) * ratioOf(item.key, segment.chapter.id))}px`}
                   onSize={(size) => {
