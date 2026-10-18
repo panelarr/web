@@ -52,6 +52,7 @@ Checked on Mobile Safari in the iOS Simulator with real chapters, driven by real
 ## Browse and the reader (FEAT-0012 R5)
 
 - [x] **Browse opens your works in the library:** a card for a work already in your library opens its library page, not its catalogue entry; Add to library moves on to the new library page (in place of the entry, so Back returns to Browse). The entry stays reachable as the series' Details.
+- [x] **The chapter before, ready above:** near the start of the first chapter in a long strip (its first five pages), the previous chapter is fetched and added above while the strip is still (between flings: adding it moves everything by its height, and doing that mid-fling would stop the fling on iOS), so scrolling up runs on into it instead of stopping at the top and waiting.
 
 ## Network admin and plugin settings (GOAL-0017)
 

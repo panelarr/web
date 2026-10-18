@@ -23,6 +23,8 @@ type Item =
 const AHEAD = 2;
 /** Load the next chapter this many pages before the end. */
 const NEXT_AT = 3;
+/** Load the previous chapter this many pages after the first one's start: flings up cover pages fast. */
+const PREV_AT = 5;
 const BAND = 112;
 /** How long the strip must be still before a deferred correction becomes a scroll position. */
 const SETTLE_MS = 150;
@@ -39,8 +41,9 @@ export const chapterPagesOptions = (chapterId: string) =>
 /**
  * A long strip: vertical (pages with gaps) or webtoon (no gaps), scrolled natively, so
  * scrolling, flinging and pinch-zoom feel like the platform's. Chapters follow one another:
- * nearing the end loads the next chapter below, scrolling up past the start loads the previous
- * one above, with a small band between them. Only pages near the screen are rendered, and pages
+ * nearing the end loads the next chapter below, nearing the start loads the previous one above
+ * (added while the strip is still, so it's there before the reader scrolls up to it), with a
+ * small band between them. Only pages near the screen are rendered, and pages
  * are fetched in reading order a few at a time, so the next page comes first even when the
  * source paces its requests.
  */
@@ -143,13 +146,14 @@ export function StripViewer({
   // The strip keeps the page being read in place itself (below), not the virtualizer.
   virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () => false;
 
-  // Open at the page asked for.
+  // Open at the page asked for (by its key: the previous chapter may be above it already).
   const started = useRef(false);
   useEffect(() => {
     if (started.current || width === 0) return;
     started.current = true;
-    if (startIndex > 0) virtualizer.scrollToIndex(startIndex + 1, { align: "start" });
-  }, [width, startIndex, virtualizer]);
+    const index = items.findIndex((item) => item.key === `${first.chapter.id}:${startIndex}`);
+    if (startIndex > 0 && index >= 0) virtualizer.scrollToIndex(index, { align: "start" });
+  }, [width, startIndex, virtualizer, items, first.chapter.id]);
 
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -263,19 +267,33 @@ export function StripViewer({
     return () => observer.disconnect();
   }, [holdAnchor]);
 
+  /** Resolves once the reader isn't touching the strip, it doesn't move and no correction is pending. */
+  const still = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        const check = () => (busy() || deferred.current.shift !== 0 ? window.setTimeout(check, SETTLE_MS) : resolve());
+        check();
+      }),
+    [busy],
+  );
+
   // Reading on: load the next chapter below, or the previous one above.
-  const loading = useRef(false);
+  const loading = useRef({ next: false, prev: false });
   const load = useCallback(
     async (direction: "next" | "prev") => {
       const edge = direction === "next" ? segments[segments.length - 1] : segments[0];
       const id = direction === "next" ? edge?.next_chapter_id : edge?.prev_chapter_id;
-      if (!id || loading.current) return;
-      loading.current = true;
+      if (!id || loading.current[direction]) return;
+      loading.current[direction] = true;
       try {
         const chapter = await queryClient.fetchQuery(chapterPagesOptions(id));
         if (direction === "next") {
           setSegments((prev) => (prev.some((s) => s.chapter.id === id) ? prev : [...prev, chapter]));
         } else {
+          // Added above, everything moves down by the chapter's height and the strip scrolls by as
+          // much: done mid-fling, that would stop the fling on iOS (or show the chapter late, as a
+          // transform), so it waits for the strip to be still, which it is between flings.
+          await still();
           // What's on screen stays where it is (see the anchor below).
           pickAnchor();
           setSegments((prev) => (prev.some((s) => s.chapter.id === id) ? prev : [chapter, ...prev]));
@@ -283,10 +301,10 @@ export function StripViewer({
       } catch {
         // Not loaded (offline, gone): the band's button still offers the way on.
       } finally {
-        loading.current = false;
+        loading.current[direction] = false;
       }
     },
-    [segments, queryClient, pickAnchor],
+    [segments, queryClient, pickAnchor, still],
   );
 
   // Report where the reader is, and read on near either end.
@@ -377,13 +395,15 @@ export function StripViewer({
     };
   }, [settleLater]);
 
-  // Near the end of the last chapter, the next one is loaded below (nothing on screen moves).
+  // Near the end of the last chapter, the next one is loaded below (nothing on screen moves); near
+  // the start of the first, the previous one above, before the reader gets there.
   const { seg: currentSeg, page: currentPage } = position;
   useEffect(() => {
     const segment = segments[currentSeg];
     if (segment && currentSeg === segments.length - 1 && currentPage >= segment.pages.length - NEXT_AT) {
       void load("next");
     }
+    if (currentSeg === 0 && currentPage < PREV_AT) void load("prev");
   }, [currentSeg, currentPage, segments, load]);
 
   // A scroll asked for from outside, read against the latest strip.

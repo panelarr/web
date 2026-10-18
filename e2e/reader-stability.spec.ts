@@ -70,7 +70,7 @@ test("and while the next chapter is added below", async ({ page }) => {
   expect(chapterOf(page.url())).toBe(first);
 });
 
-test("and while the previous chapter is added above", async ({ page }) => {
+test("and while the previous chapter is added above, before the reader scrolls up to it", async ({ page }) => {
   await openStrip(page);
   const first = chapterOf(page.url());
   for (let i = 0; i < 120 && chapterOf(page.url()) === first; i++) {
@@ -79,19 +79,55 @@ test("and while the previous chapter is added above", async ({ page }) => {
   }
   const second = chapterOf(page.url());
   expect(second).not.toBe(first);
-  // Open the second chapter on its own, at its start: nothing is loaded above it until the
-  // reader asks for it.
+  // From the first frame: the item in the middle of the screen, where it is, and whether the
+  // chapter before has been added above yet.
+  await page.addInitScript(() => {
+    const samples: Array<{ key: string; top: number; next: number | undefined; above: boolean }> = [];
+    Object.assign(window, { __samples: samples });
+    let last: string | undefined;
+    const frame = () => {
+      const strip = document.querySelector("[data-testid=strip-viewer]");
+      if (strip) {
+        const box = strip.getBoundingClientRect();
+        const at = (key: string | undefined) =>
+          key ? strip.querySelector(`[data-key="${CSS.escape(key)}"]`)?.getBoundingClientRect().top : undefined;
+        const prev = samples.at(-1);
+        // Gone in the next frame counts too (a blank frame): NaN fails the comparison below.
+        if (prev) prev.next = at(last) ?? Number.NaN;
+        const item = document
+          .elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+          ?.closest<HTMLElement>("[data-key]");
+        last = item?.dataset.key;
+        if (last)
+          samples.push({
+            key: last,
+            top: at(last) ?? Number.NaN,
+            next: undefined,
+            above: !!strip.querySelector("[data-key^='between:']"),
+          });
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+  // Open the second chapter on its own, at its start: the one before is added above by itself.
   await page.goto(`/read/${second}?page=0`);
-  await expect(page.getByTestId("strip-viewer")).toBeVisible();
-  await page.waitForTimeout(400);
-  expect(await page.locator("[data-key^='between:']").count()).toBe(0);
-  // A wheel up at the very top asks for the chapter before; what's on screen stays put. (The
-  // event alone, without the browser's own scrolling, which would move the page on purpose.)
-  const { key, top } = await middleItem(page);
-  await page
-    .getByTestId("strip-viewer")
-    .evaluate((strip) => strip.dispatchEvent(new WheelEvent("wheel", { deltaY: -120, bubbles: true })));
-  expect(await drift(page, key, top, 2500)).toBeLessThanOrEqual(3);
   await expect(page.locator(`[data-key="between:${first}"]`)).toBeAttached();
+  await page.waitForTimeout(1000);
+  const samples = await page.evaluate(
+    () => (window as unknown as { __samples: Array<{ top: number; next?: number; above: boolean }> }).__samples,
+  );
+  // Seen before and after it was added, and nothing under the middle of the screen moved from
+  // one frame to the next.
+  expect(samples.some((s) => !s.above)).toBe(true);
+  expect(samples.some((s) => s.above)).toBe(true);
+  const jumps = samples.slice(0, -1).map((s) => Math.abs((s.next ?? Number.NaN) - s.top));
+  expect(Math.max(...jumps)).toBeLessThanOrEqual(3);
   expect(chapterOf(page.url())).toBe(second);
+  // Scrolling up goes on into it.
+  for (let i = 0; i < 10 && chapterOf(page.url()) === second; i++) {
+    await scrollStrip(page, -400);
+    await page.waitForTimeout(120);
+  }
+  expect(chapterOf(page.url())).toBe(first);
 });
