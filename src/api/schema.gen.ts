@@ -791,6 +791,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plugins/{plugin_id}/packages/{package_id}/image-retries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How a package's sources retry failed page images
+         * @description The package's own setting (`own`, absent when it has none) and what
+         *     applies (`effective`, with `level` saying where it comes from). Its
+         *     sources use it unless one has its own. A package needn't be
+         *     installed to be set.
+         */
+        get: operations["getPackageImageRetries"];
+        /**
+         * Set how a package's sources retry failed page images
+         * @description `delays_ms` are the waits before each extra attempt. `[]` turns
+         *     retries off for the package's sources, which is not the same as no
+         *     setting (`DELETE`, the default applies).
+         */
+        put: operations["setPackageImageRetries"];
+        post?: never;
+        /**
+         * Remove a package's image retry setting
+         * @description Its sources use the default again (or their own setting). Nothing set is fine too.
+         */
+        delete: operations["clearPackageImageRetries"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/network/solvers": {
         parameters: {
             query?: never;
@@ -1526,6 +1563,40 @@ export interface paths {
          * @description Keys left out keep their value, and so does a secret left empty. The plugin checks the values (`400` with its reason).
          */
         patch: operations["setSourceSettings"];
+        trace?: never;
+    };
+    "/sources/{source_id}/image-retries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How a source retries failed page images
+         * @description The source's own setting (`own`, absent when it has none) and what
+         *     applies (`effective`): its own, else its package's (`level:
+         *     package`, `from_target_id` naming it), else the default.
+         */
+        get: operations["getSourceImageRetries"];
+        /**
+         * Set how a source retries failed page images
+         * @description Overrides its package's setting. `[]` turns retries off for the
+         *     source, which is not the same as no setting (`DELETE`, it inherits).
+         */
+        put: operations["setSourceImageRetries"];
+        post?: never;
+        /**
+         * Remove a source's own image retry setting
+         * @description It inherits its package's setting or the default again. Nothing set is fine too.
+         */
+        delete: operations["clearSourceImageRetries"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/sources/{source_id}/network": {
@@ -4057,6 +4128,40 @@ export interface components {
             /** @description Use the plugin's own settings here (instead of profile_id). */
             plugin_default?: boolean;
         };
+        ImageRetriesInput: {
+            /** @description The waits before each extra attempt at a failed page image, in milliseconds; `[]` means no retries at this level. */
+            delays_ms: number[];
+        };
+        ImageRetryDelays: {
+            delays_ms: number[];
+            /** @description Extra attempts after the first (the length of `delays_ms`). */
+            attempts: number;
+        };
+        /**
+         * @description How failed page images are retried at one level. `own` absent means
+         *     nothing is set here (it inherits); `own.delays_ms: []` means retries
+         *     are off here. A source uses its own setting, else its package's, else
+         *     the default (2 more attempts, after 1 s and then 3 s).
+         */
+        ImageRetries: {
+            /** @enum {string} */
+            target_kind: "package" | "source";
+            /** @description "plugin:package" for a package, the source's ID for a source. */
+            target_id: string;
+            own?: {
+                delays_ms: number[];
+                /** Format: date-time */
+                updated_at: string;
+            };
+            effective: components["schemas"]["ImageRetryDelays"];
+            /**
+             * @description Where `effective` comes from.
+             * @enum {string}
+             */
+            level: "source" | "package" | "default";
+            /** @description The target `effective` comes from ("plugin:package" or the source's ID); absent for the default. */
+            from_target_id?: string;
+        };
         NetworkAssignment: {
             target_kind: components["schemas"]["NetworkTargetKind"];
             target_id: string;
@@ -6268,6 +6373,83 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getPackageImageRetries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The package's image retries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageRetries"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setPackageImageRetries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageRetriesInput"];
+            };
+        };
+        responses: {
+            /** @description Set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageRetries"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    clearPackageImageRetries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: components["parameters"]["PluginId"];
+                /** @description The package's ID on its plugin. */
+                package_id: components["parameters"]["PackageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     listSolvers: {
         parameters: {
             query?: {
@@ -7468,6 +7650,80 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SourceSettings"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSourceImageRetries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The source's image retries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageRetries"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setSourceImageRetries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageRetriesInput"];
+            };
+        };
+        responses: {
+            /** @description Set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageRetries"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    clearSourceImageRetries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The source's ID, "plugin:source". */
+                source_id: components["parameters"]["SourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

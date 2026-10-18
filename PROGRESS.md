@@ -74,6 +74,10 @@ Everything in the metadata service's and source plugins' own admin pages, inside
 - [x] **S4. Duplicates** with the judge: the pairs to review, most alike first, filtered in the URL; a pair side by side with its signals and the model's verdict; merge (asking first, choosing which stays, a note), different works (a note), take back; the decision model's settings (write-only key), test without saving, reset to the configuration. Also `@every`/`@daily` schedules in words.
 - [x] **S5. Search engine:** what answers now, its abilities and the index's state (backlog polled while it drains); rebuild through the service's job; settings (engine, URL, write-only key, index prefix, browsing) tested without saving, saved over the configuration, reset. Journeys, layout, shell and axe over every new page; `docs/admin.md`.
 
+## Image retries (GOAL-0023)
+
+- [x] **Image retries in the extension admin:** on an extension's details, how failed page images are tried again for all its sources: the default, off, or waits of its own (up to 5, 0–30 s, starting from what's in effect); on a source's settings, its own, inheriting its extension's otherwise. Each says what's in effect and where it comes from; inheriting and off read differently. The reader keeps Try again for when the attempts run out (`docs/admin.md`).
+
 ## Working assumptions
 
 Settled for now, cheap to change:

@@ -27,6 +27,7 @@ import {
 } from "./data";
 import { initialStorages } from "./downloads";
 import { initialDuplicates } from "./duplicates";
+import type { OwnRetries } from "./image-retries";
 import { initialJobs, initialMetaJobs, initialPluginJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
 import { initialMetaSyncRuns, initialSearchEngine } from "./meta";
 import { initialNetwork, type NetworkState } from "./network";
@@ -100,6 +101,8 @@ export interface MockDb extends JobsState, NetworkState {
   packages: Record<string, MockPackage[]>;
   /** By plugin: where its packages come from. */
   origins: Record<string, S["PackageOrigin"][]>;
+  /** Image retry settings set on an extension ("package:plugin:package") or a source ("source:id"). */
+  imageRetries: Record<string, OwnRetries>;
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -135,6 +138,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     sources: [...clone(sources), ...initialPackageSources(packages)],
     packages: { [storePlugin.id]: packages },
     origins: initialOrigins(),
+    imageRetries: {},
     invites: [{ ...clone(invite), token: "open-invite-token" }],
     failedLogins: 0,
     works: [],

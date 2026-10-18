@@ -14,6 +14,8 @@ admin key, and reaches plugins through the source contract.
 | A catalogue entry | Refresh from providers (admins) | always |
 | Admin → Plugins → a plugin → Extensions | Its stores (refresh) and packages (install, update, reload) | the plugin has `packages` |
 | Admin → Plugins → a plugin → Sources | Its sources' health checks: results, scheduled checks on or off, Check now | the plugin has `health_checks` (Check now also needs `jobs`) |
+| Admin → Plugins → a plugin → Extensions → an extension | Image retries for all its sources | the plugin has `packages` |
+| A source's settings (Admin → Sources, a source's page, an extension's details) | Its own image retries, overriding its extension's | always |
 | Admin → Plugins → a plugin → Jobs | Its jobs | the plugin has `jobs` |
 | Admin → Plugins → a plugin → Network | Its network profiles, proxies and solvers | always |
 | Admin → System | The server's health, and the metadata service in a line | always |
@@ -115,3 +117,24 @@ Its settings (the engine, its URL, a write-only API key, an index prefix, who se
 work like the decision model's: they win over the service's configuration until reset, "Test"
 checks them without saving, and the service talks to the engine, never the browser. Changing
 the engine wants a rebuild.
+
+## Image retries
+
+A page image that fails for a reason worth retrying (a timeout, a 5xx, a dropped connection)
+is tried again by the server, before the reader shows Try again; downloads get the same. How
+many times, and after which waits, is set at two levels: an extension (for all its sources)
+and one source. A source uses its own setting, else its extension's, else the server's default
+(2 more attempts, after 1 s then 3 s).
+
+Each level has three states, and the control keeps them apart because they mean different
+things:
+
+- **Inherit:** nothing set here (`DELETE`); the option says what that gives ("As its
+  extension: …" or "Default: …").
+- **Off:** retries turned off at this level (`[]`), which a source can do even when its
+  extension retries.
+- **Waits of its own:** up to 5 waits of 0–30 s, one per extra attempt. Choosing it starts
+  from what's in effect, so a tweak starts there.
+
+Under the control, one line says what's in effect and where it comes from (set here, from its
+extension, the default). Saving an extension refreshes what its sources show as inherited.

@@ -10,6 +10,7 @@ import { commit, currentUser, db, type MockInvite, newId, syncSessionCookie } fr
 import { downloadItem, queueDownload } from "./downloads";
 import { initialDuplicates, judgeTest } from "./duplicates";
 import { emit, onMockEvent } from "./events";
+import { packageKey, packageRetries, sourceKey, sourceRetries, validDelays } from "./image-retries";
 import { finishRun, type JobStore, queueState, startRun, taskEvent } from "./jobs";
 import {
   initialSearchEngine,
@@ -1156,6 +1157,77 @@ export const operations: MockOperation[] = [
     if (!source) return problem(404, "not_found", "Not found");
     const view = sourceNetwork(d, source);
     return json<S["SourceNetwork"]>({ ...view, applied: applied(d, view) });
+  }),
+
+  // Image retries: an extension's setting for all its sources, and a source's own.
+  op("get", "/plugins/{plugin_id}/packages/{package_id}/image-retries", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    if (!d.plugins.some((p) => p.id === params.plugin_id)) return problem(404, "not_found", "Not found");
+    return json(packageRetries(d, String(params.plugin_id), String(params.package_id)));
+  }),
+
+  op("put", "/plugins/{plugin_id}/packages/{package_id}/image-retries", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    if (!d.plugins.some((p) => p.id === params.plugin_id)) return problem(404, "not_found", "Not found");
+    const body = (await request.json()) as S["ImageRetriesInput"];
+    if (!validDelays(body.delays_ms)) {
+      return problem(400, "invalid_request", "Invalid delays", "At most 5 waits, each 0 to 30000 ms.");
+    }
+    d.imageRetries[packageKey(String(params.plugin_id), String(params.package_id))] = {
+      delays_ms: body.delays_ms,
+      updated_at: now(),
+    };
+    commit();
+    return json(packageRetries(d, String(params.plugin_id), String(params.package_id)));
+  }),
+
+  op("delete", "/plugins/{plugin_id}/packages/{package_id}/image-retries", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    if (!d.plugins.some((p) => p.id === params.plugin_id)) return problem(404, "not_found", "Not found");
+    delete d.imageRetries[packageKey(String(params.plugin_id), String(params.package_id))];
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("get", "/sources/{source_id}/image-retries", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const source = d.sources.find((s) => s.id === params.source_id);
+    if (!source) return problem(404, "not_found", "Not found");
+    return json(sourceRetries(d, source));
+  }),
+
+  op("put", "/sources/{source_id}/image-retries", async ({ params, request }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const source = d.sources.find((s) => s.id === params.source_id);
+    if (!source) return problem(404, "not_found", "Not found");
+    const body = (await request.json()) as S["ImageRetriesInput"];
+    if (!validDelays(body.delays_ms)) {
+      return problem(400, "invalid_request", "Invalid delays", "At most 5 waits, each 0 to 30000 ms.");
+    }
+    d.imageRetries[sourceKey(source.id)] = { delays_ms: body.delays_ms, updated_at: now() };
+    commit();
+    return json(sourceRetries(d, source));
+  }),
+
+  op("delete", "/sources/{source_id}/image-retries", ({ params }) => {
+    const user = requireAdmin();
+    if (user instanceof Response) return user;
+    const d = db();
+    const source = d.sources.find((s) => s.id === params.source_id);
+    if (!source) return problem(404, "not_found", "Not found");
+    delete d.imageRetries[sourceKey(source.id)];
+    commit();
+    return new HttpResponse(null, { status: 204 });
   }),
 
   op("get", "/system/meta/network", () => {

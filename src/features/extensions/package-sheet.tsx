@@ -20,6 +20,7 @@ import { useIsDesktop } from "@/hooks/use-media-query";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { formatVersion } from "@/lib/version";
+import { ImageRetriesSetting } from "./image-retries";
 import { PackageActions, PackageFacts } from "./package-parts";
 import type { Package } from "./packages";
 import { type PackageTasks, patchPackage } from "./use-package-tasks";
@@ -115,6 +116,16 @@ function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tas
             <p className="text-xs text-muted-foreground">For its sources, unless a source has its own.</p>
           </section>
         ) : null}
+        <section className="grid gap-2" aria-label="Image retries">
+          <ImageRetriesSetting
+            target={{ kind: "package", pluginId, packageId: pkg.id }}
+            label="Image retries for this extension"
+          />
+          <p className="text-xs text-muted-foreground">
+            A page image that fails is tried again by itself, after these waits, before the reader offers Try again. For
+            its sources, unless a source has its own.
+          </p>
+        </section>
         <section className="grid gap-2" aria-label="Its sources">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-sm font-medium">Sources</h3>
@@ -136,7 +147,12 @@ function Details({ pluginId, pkg, tasks }: { pluginId: string; pkg: Package; tas
                   {source.lang}
                 </Badge>
                 {source.available ? null : <Badge variant="secondary">Not available</Badge>}
-                {pkg.installed ? <SourceSettingsButton source={source} settings={settable.has(source.id)} /> : null}
+                {pkg.installed ? (
+                  <SourceSettingsButton
+                    source={{ ...source, plugin_id: pluginId, package_id: pkg.id }}
+                    settings={settable.has(source.id)}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

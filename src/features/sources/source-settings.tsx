@@ -9,7 +9,11 @@ import { type JsonSchema, SchemaForm } from "@/components/schema-form";
 import { ErrorAlert, Loading } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ImageRetriesSetting } from "@/features/extensions/image-retries";
 import { ProfilePicker } from "@/features/network/profile-picker";
+
+/** A source, and its extension when it comes from one (for what its image retries inherit). */
+type SettingsSource = { id: string; name: string; plugin_id?: string | undefined; package_id?: string | undefined };
 
 /** Sources a plugin lets an admin set up (e.g. an extension's own preferences). */
 export const hasSettings = (source: { capabilities: readonly string[] }) => source.capabilities.includes("settings");
@@ -23,7 +27,7 @@ export function SourceSettingsButton({
   settings,
   variant = "icon",
 }: {
-  source: { id: string; name: string };
+  source: SettingsSource;
   /** The source has settings of its own (besides its network). */
   settings: boolean;
   variant?: "icon" | "button";
@@ -60,7 +64,7 @@ function SourceSettingsDialog({
   settings: own,
   onClose,
 }: {
-  source: { id: string; name: string };
+  source: SettingsSource;
   settings: boolean;
   onClose: () => void;
 }) {
@@ -86,9 +90,15 @@ function SourceSettingsDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{source.name}</DialogTitle>
-          <DialogDescription>Its network, and its own settings kept by its plugin.</DialogDescription>
+          <DialogDescription>Its network, image retries, and its own settings kept by its plugin.</DialogDescription>
         </DialogHeader>
         <SourceNetworkSection source={source} />
+        <section className="grid gap-2 border-t pt-4" aria-label="Image retries">
+          <ImageRetriesSetting
+            target={{ kind: "source", sourceId: source.id, pluginId: source.plugin_id, packageId: source.package_id }}
+            label="Image retries for this source"
+          />
+        </section>
         {own ? <h3 className="border-t pt-4 text-sm font-medium">Its own settings</h3> : null}
         {settings.error ? <ErrorAlert error={settings.error} onRetry={() => void settings.refetch()} /> : null}
         {own && settings.isPending ? <Loading /> : null}

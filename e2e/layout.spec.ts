@@ -127,6 +127,9 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
   await open("/admin/plugins/stores?tab=extensions&pkg=org.example.polyglot");
   await expect(dialog()).toBeVisible();
   await check(page, "an extension's details", found);
+  await dialog().getByLabel("Image retries for this extension").selectOption("custom");
+  await dialog().getByRole("button", { name: "Add attempt" }).click();
+  await check(page, "an extension's image retries, with waits of its own", found);
   await page.keyboard.press("Escape");
 
   for (const path of [
