@@ -17,6 +17,7 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppDownloadsRouteImport } from './routes/_app/downloads'
+import { Route as AppHistoryRouteImport } from './routes/_app/history'
 import { Route as AppMoreRouteImport } from './routes/_app/more'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
@@ -78,6 +79,11 @@ const AppAdminRoute = AppAdminRouteImport.update({
 const AppDownloadsRoute = AppDownloadsRouteImport.update({
   id: '/downloads',
   path: '/downloads',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHistoryRoute = AppHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMoreRoute = AppMoreRouteImport.update({
@@ -211,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/admin': typeof AppAdminRouteWithChildren
   '/downloads': typeof AppDownloadsRoute
+  '/history': typeof AppHistoryRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
   '/admin/metadata': typeof AppAdminMetadataRoute
@@ -242,6 +249,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/downloads': typeof AppDownloadsRoute
+  '/history': typeof AppHistoryRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
   '/admin/metadata': typeof AppAdminMetadataRoute
@@ -276,6 +284,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/_app/admin': typeof AppAdminRouteWithChildren
   '/_app/downloads': typeof AppDownloadsRoute
+  '/_app/history': typeof AppHistoryRoute
   '/_app/more': typeof AppMoreRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
@@ -311,6 +320,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/admin'
     | '/downloads'
+    | '/history'
     | '/more'
     | '/settings'
     | '/admin/metadata'
@@ -342,6 +352,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/downloads'
+    | '/history'
     | '/more'
     | '/settings'
     | '/admin/metadata'
@@ -375,6 +386,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/_app/admin'
     | '/_app/downloads'
+    | '/_app/history'
     | '/_app/more'
     | '/_app/settings'
     | '/_app/'
@@ -466,6 +478,13 @@ declare module '@tanstack/react-router' {
       path: '/downloads'
       fullPath: '/downloads'
       preLoaderRoute: typeof AppDownloadsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/history': {
+      id: '/_app/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AppHistoryRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/more': {
@@ -684,6 +703,7 @@ const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
 interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRouteWithChildren
   AppDownloadsRoute: typeof AppDownloadsRoute
+  AppHistoryRoute: typeof AppHistoryRoute
   AppMoreRoute: typeof AppMoreRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -697,6 +717,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRouteWithChildren,
   AppDownloadsRoute: AppDownloadsRoute,
+  AppHistoryRoute: AppHistoryRoute,
   AppMoreRoute: AppMoreRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,

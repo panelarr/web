@@ -33,6 +33,7 @@ test("never scrolls sideways", async ({ page }) => {
     "/downloads",
     "/settings",
     "/settings?tab=security",
+    "/history",
     "/more",
   ];
   const admin = [

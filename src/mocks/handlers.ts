@@ -2019,14 +2019,30 @@ export const operations: MockOperation[] = [
     return json(mine[id]);
   }),
 
-  op("get", "/me/history", () => {
+  op("get", "/me/history", ({ request }) => {
     const user = requireUser();
     if (user instanceof Response) return user;
-    const items: S["HistoryItem"][] = [];
-    for (const p of Object.values(db().progress[user.id] ?? {})) {
+    const url = new URL(request.url);
+    const perSeries = url.searchParams.get("per") === "series";
+    const onlyWork = url.searchParams.get("work_id");
+    const q = url.searchParams.get("q")?.toLowerCase();
+    const mine = db().progress[user.id] ?? {};
+    const hidden = db().historyHidden[user.id];
+    let items: S["HistoryItem"][] = [];
+    for (const p of Object.values(mine)) {
       const found = findChapter(user, p.chapter_id);
-      const chapter = found?.list[found.index]?.chapter;
+      const entry = found?.list[found.index];
+      const chapter = entry?.chapter;
       if (!found || !chapter) continue;
+      if (onlyWork && found.work.id !== onlyWork) continue;
+      if (q && !found.work.title.toLowerCase().includes(q)) continue;
+      // Taken out of view: what was read up to then.
+      const cutoff = [hidden?.all, hidden?.works[found.work.id]].filter(Boolean).sort().at(-1);
+      if (cutoff && p.updated_at <= cutoff) continue;
+      const resume = continueChapter(
+        found.list.map((c) => c.chapter),
+        mine,
+      );
       items.push({
         work_id: found.work.id,
         work_title: found.work.title,
@@ -2034,14 +2050,40 @@ export const operations: MockOperation[] = [
         chapter_id: chapter.id,
         ...(chapter.number !== undefined ? { chapter_number: chapter.number } : {}),
         chapter_title: chapter.title,
+        ...(chapter.display_title !== undefined ? { chapter_display_title: chapter.display_title } : {}),
+        ...(chapter.volume !== undefined ? { chapter_volume: chapter.volume } : {}),
         page: p.page,
         ...(p.pages ? { pages: p.pages } : {}),
         completed: p.completed,
         updated_at: p.updated_at,
+        ...(resume ? { continue_chapter_id: resume } : {}),
       });
     }
     items.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-    return json<S["HistoryPage"]>({ items, next_page_token: "" });
+    if (perSeries) items = items.filter((item, i) => items.findIndex((o) => o.work_id === item.work_id) === i);
+    const { items: page, next } = paginate(items, url);
+    return json<S["HistoryPage"]>({ items: page, next_page_token: next });
+  }),
+
+  op("delete", "/me/history", () => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const d = db();
+    d.historyHidden[user.id] = { all: now(), works: d.historyHidden[user.id]?.works ?? {} };
+    commit();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  op("delete", "/me/history/{work_id}", ({ params }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    if (!workView(user, String(params.work_id))) return problem(404, "not_found", "Not found");
+    const d = db();
+    const hidden = d.historyHidden[user.id] ?? { works: {} };
+    hidden.works[String(params.work_id)] = now();
+    d.historyHidden[user.id] = hidden;
+    commit();
+    return new HttpResponse(null, { status: 204 });
   }),
 
   op("get", "/me/reader-settings", ({ request }) => {

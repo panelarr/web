@@ -26,6 +26,7 @@ const PAGES = [
   "/admin/metadata?tab=duplicates",
   "/admin/metadata?tab=duplicates&pair=1",
   "/admin/metadata?tab=search",
+  "/history",
   "/admin/metadata?tab=jobs",
   "/admin/metadata?tab=jobs&job=duplicates-scan",
   "/admin/plugins/stores?tab=jobs",

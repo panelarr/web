@@ -80,6 +80,8 @@ export interface MockDb extends JobsState, NetworkState {
   matching: Record<string, S["WorkSourceState"][]>;
   pins: Record<string, Record<string, string>>;
   progress: Record<string, Record<string, S["ChapterProgress"]>>;
+  /** Per user: what was taken out of their history (read before these times); read marks stay. */
+  historyHidden: Record<string, { all?: string; works: Record<string, string> }>;
   fresh: Record<string, Record<string, string[]>>;
   bookmarks: Record<string, Record<string, string[]>>;
   downloaded: string[];
@@ -138,6 +140,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     matching: {},
     pins: {},
     progress: {},
+    historyHidden: {},
     fresh: {},
     bookmarks: {},
     downloaded: [],

@@ -44,6 +44,11 @@ Checked on Mobile Safari in the iOS Simulator with real chapters, driven by real
 - [x] **The series page on phones:** a top bar (back, the title once the page's own has scrolled away, a menu with Details and Sources), a smaller cover; chapter rows edge to edge, the name on one line and one meta line (source · scanlator · date, "Page 13/117" once started), why a copy was chosen only in the copies list, the copies as a small icon; a floating Continue above the bottom bar.
 - [x] **The library's search behind an icon** in its title row on phones (it opens the field there, ✕ closes and clears it, a query keeps it open and stays in the URL); desktops keep the field.
 
+## History and updates (FEAT-0014, FEAT-0015)
+
+- [x] **History:** a main tab (bottom bar and sidebar): what was read, newest first, by day (Today, Yesterday, dates), one line per series with the time, the page (until read) and the chapter, and Resume where the series is at; every chapter read as a toggle, or a series' own; search behind an icon; remove a series or clear everything, both asked first (read marks stay).
+- [ ] **Updates:** new chapters by day, read ones dimmed, "Last update" and a refresh; the bottom bar becomes Library, Updates, History, Browse, More.
+
 ## Network admin and plugin settings (GOAL-0017)
 
 Panelarr's own proxies, solvers and network profiles, offered to every plugin; chosen per plugin, extension, source or provider.

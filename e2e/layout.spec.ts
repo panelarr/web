@@ -151,6 +151,7 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
     "/admin/metadata?tab=duplicates",
     "/admin/metadata?tab=duplicates&pair=1",
     "/admin/metadata?tab=search",
+    "/history",
   ]) {
     await open(path);
     await check(page, path, found);
