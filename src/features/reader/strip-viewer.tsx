@@ -394,6 +394,7 @@ export function StripViewer({
                   stretch
                   eager
                   hold={!mayLoad(item.ordinal)}
+                  known={sizes.current.has(item.key)}
                   className="items-start"
                   placeholderHeight={`${Math.round((width || 360) * ratioOf(item.key, segment.chapter.id))}px`}
                   onSize={(size) => {

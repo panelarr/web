@@ -19,6 +19,7 @@ export function PageImage({
   placeholderHeight,
   placeholderWidth,
   hold = false,
+  known = false,
   onSettled,
 }: {
   url: string;
@@ -33,13 +34,22 @@ export function PageImage({
   placeholderHeight?: string;
   /** Width kept while loading, for pages side by side. */
   placeholderWidth?: string;
-  /** Not to be fetched yet (pages load in order in a long strip): only its space is kept. */
+  /**
+   * Not to be fetched yet (pages load in order in a long strip): only its space is kept. Once a
+   * page has started loading it keeps its image even if this turns on again: taking it away
+   * would collapse its space and move everything after it.
+   */
   hold?: boolean;
+  /** Seen before (its size is known): shown at once when it comes back, without the loading fade. */
+  known?: boolean;
   /** Called once it has loaded or failed. */
   onSettled?: () => void;
 }) {
-  const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
+  const [state, setState] = useState<"loading" | "loaded" | "failed">(known ? "loaded" : "loading");
   const [attempt, setAttempt] = useState(0);
+  // Held until it may load, then never held again (see `hold`).
+  const [released, setReleased] = useState(!hold);
+  if (!hold && !released) setReleased(true);
   return (
     <div
       className={cn(
@@ -56,7 +66,7 @@ export function PageImage({
             }
       }
     >
-      {hold ? null : state !== "failed" ? (
+      {!released ? null : state !== "failed" ? (
         <img
           key={attempt}
           src={serverUrl(url)}

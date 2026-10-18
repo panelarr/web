@@ -33,6 +33,16 @@ Sources become an admin concern; plugins that host many sites get an Extensions 
 - [x] **R3. Reader chrome:** a thin top bar (series and chapter, bookmark, a menu with fullscreen, keep the screen on and the series page) and a bottom bar (the page slider between the chapter buttons, then icons for the chapters, the layout and the settings), hiding while reading; the chapters in a sheet to jump to; the layout switched in one tap for the series; one settings sheet with Layout and General tabs under the scope switch (this series, the source, everywhere), each setting set at that scope marked and reset on its own.
 - [x] **R4. Library:** unread (and, if wanted, downloaded) counts on each cover, a button that opens the reader at the chapter to read next, "N / M read"; one filter / sort / display sheet: unread, started, downloaded, bookmarked; title, recently added, recently read, latest chapter, unread or total chapters, reversible; compact grid, comfortable grid or list, which badges, the continue button. Filters in the URL, sort and display remembered per user.
 
+## On real phones (IN-0068 to IN-0071, IN-0075)
+
+Checked on Mobile Safari in the iOS Simulator with real chapters, driven by real touches.
+
+- [x] **The long strip no longer jumps or flickers:** a page that had started loading kept its image only while near the page being read; dropping it collapsed its space and moved everything below, which could flip the page being read and bring it back (a loop). Pages now keep their image, and a page seen before shows at once when it comes back.
+- [ ] **The reader never waits silently:** a source's failure shows at once with its reason, Retry and the way back; a slow opening says so.
+- [ ] **No app header on phones,** safe areas respected, no empty band above the page.
+- [ ] **The series page on phones:** a compact top bar, dense chapter rows, a floating Continue.
+- [ ] **The library's search behind an icon** in its top bar.
+
 ## Network admin and plugin settings (GOAL-0017)
 
 Panelarr's own proxies, solvers and network profiles, offered to every plugin; chosen per plugin, extension, source or provider.
