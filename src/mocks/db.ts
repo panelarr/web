@@ -82,6 +82,8 @@ export interface MockDb extends JobsState, NetworkState {
   progress: Record<string, Record<string, S["ChapterProgress"]>>;
   /** Per user: what was taken out of their history (read before these times); read marks stay. */
   historyHidden: Record<string, { all?: string; works: Record<string, string> }>;
+  /** The update check: when it last ran, and how many series are still being checked. */
+  updates: { last_checked_at: string; checking: number };
   fresh: Record<string, Record<string, string[]>>;
   bookmarks: Record<string, Record<string, string[]>>;
   downloaded: string[];
@@ -141,6 +143,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     pins: {},
     progress: {},
     historyHidden: {},
+    updates: { last_checked_at: new Date(Date.now() - 2 * 3_600_000).toISOString(), checking: 0 },
     fresh: {},
     bookmarks: {},
     downloaded: [],

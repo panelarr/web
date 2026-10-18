@@ -20,6 +20,7 @@ import { Route as AppDownloadsRouteImport } from './routes/_app/downloads'
 import { Route as AppHistoryRouteImport } from './routes/_app/history'
 import { Route as AppMoreRouteImport } from './routes/_app/more'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppUpdatesRouteImport } from './routes/_app/updates'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
 import { Route as AppAdminMetadataRouteImport } from './routes/_app/admin/metadata'
 import { Route as AppAdminNetworkRouteImport } from './routes/_app/admin/network'
@@ -94,6 +95,11 @@ const AppMoreRoute = AppMoreRouteImport.update({
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUpdatesRoute = AppUpdatesRouteImport.update({
+  id: '/updates',
+  path: '/updates',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
@@ -220,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof AppHistoryRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
+  '/updates': typeof AppUpdatesRoute
   '/admin/metadata': typeof AppAdminMetadataRoute
   '/admin/network': typeof AppAdminNetworkRoute
   '/admin/queue': typeof AppAdminQueueRoute
@@ -252,6 +259,7 @@ export interface FileRoutesByTo {
   '/history': typeof AppHistoryRoute
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
+  '/updates': typeof AppUpdatesRoute
   '/admin/metadata': typeof AppAdminMetadataRoute
   '/admin/network': typeof AppAdminNetworkRoute
   '/admin/queue': typeof AppAdminQueueRoute
@@ -287,6 +295,7 @@ export interface FileRoutesById {
   '/_app/history': typeof AppHistoryRoute
   '/_app/more': typeof AppMoreRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/updates': typeof AppUpdatesRoute
   '/_app/': typeof AppIndexRoute
   '/_app/admin/metadata': typeof AppAdminMetadataRoute
   '/_app/admin/network': typeof AppAdminNetworkRoute
@@ -323,6 +332,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/more'
     | '/settings'
+    | '/updates'
     | '/admin/metadata'
     | '/admin/network'
     | '/admin/queue'
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/more'
     | '/settings'
+    | '/updates'
     | '/admin/metadata'
     | '/admin/network'
     | '/admin/queue'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/_app/history'
     | '/_app/more'
     | '/_app/settings'
+    | '/_app/updates'
     | '/_app/'
     | '/_app/admin/metadata'
     | '/_app/admin/network'
@@ -499,6 +511,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/updates': {
+      id: '/_app/updates'
+      path: '/updates'
+      fullPath: '/updates'
+      preLoaderRoute: typeof AppUpdatesRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/': {
@@ -706,6 +725,7 @@ interface AppRouteChildren {
   AppHistoryRoute: typeof AppHistoryRoute
   AppMoreRoute: typeof AppMoreRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppUpdatesRoute: typeof AppUpdatesRoute
   AppIndexRoute: typeof AppIndexRoute
   AppCatalogEntryIdRoute: typeof AppCatalogEntryIdRoute
   AppWorksWorkIdRoute: typeof AppWorksWorkIdRoute
@@ -720,6 +740,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppHistoryRoute: AppHistoryRoute,
   AppMoreRoute: AppMoreRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppUpdatesRoute: AppUpdatesRoute,
   AppIndexRoute: AppIndexRoute,
   AppCatalogEntryIdRoute: AppCatalogEntryIdRoute,
   AppWorksWorkIdRoute: AppWorksWorkIdRoute,

@@ -2065,6 +2065,88 @@ export const operations: MockOperation[] = [
     return json<S["HistoryPage"]>({ items: page, next_page_token: next });
   }),
 
+  // The updates feed: the newest chapters of the works in the user's library, as an update
+  // check found them (here: the last few of each, spread over the past days).
+  op("get", "/me/updates", ({ request }) => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const d = db();
+    const mine = d.progress[user.id] ?? {};
+    const items: S["UpdateItem"][] = [];
+    d.library
+      .filter((entry) => entry.user_id === user.id)
+      .forEach((entry, w) => {
+        const work = d.works.find((x) => x.id === entry.work_id);
+        if (!work) return;
+        const list = unifiedChapters(d, work.id, user.id).filter((c) => c.chapter.number !== undefined);
+        list
+          .slice(-4)
+          .reverse()
+          .forEach(({ chapter }, i) => {
+            const progress = mine[chapter.id];
+            const download = d.tasks.find(
+              (t) =>
+                t.kind === "download.chapter" &&
+                t.payload.chapter_id === chapter.id &&
+                (t.state === "queued" || t.state === "running"),
+            );
+            items.push({
+              chapter_id: chapter.id,
+              work_id: work.id,
+              work_title: work.title,
+              ...(work.cover_url ? { work_cover_url: work.cover_url } : {}),
+              ...(chapter.number !== undefined ? { chapter_number: chapter.number } : {}),
+              ...(chapter.volume ? { chapter_volume: chapter.volume } : {}),
+              chapter_title: chapter.title,
+              chapter_display_title: chapter.display_title ?? "",
+              // Two a day per work, newest first.
+              appeared_at: new Date(Date.now() - (Math.floor(i / 2) * 24 + w * 3 + (i % 2)) * 3_600_000).toISOString(),
+              new: !progress,
+              read: progress?.completed ?? false,
+              ...(progress ? { page: progress.page, ...(progress.pages ? { pages: progress.pages } : {}) } : {}),
+              download_state: chapter.downloaded
+                ? "downloaded"
+                : download
+                  ? download.state === "running"
+                    ? "downloading"
+                    : "queued"
+                  : "none",
+            });
+          });
+      });
+    items.sort((a, b) => b.appeared_at.localeCompare(a.appeared_at));
+    const { items: page, next } = paginate(items, new URL(request.url));
+    return json<S["UpdatesPage"]>({ items: page, next_page_token: next });
+  }),
+
+  op("get", "/me/updates/status", () => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const d = db();
+    // Each look moves the check on by a series.
+    if (d.updates.checking > 0) {
+      d.updates.checking -= 1;
+      if (d.updates.checking === 0) d.updates.last_checked_at = now();
+      commit();
+    }
+    return json<S["UpdatesStatus"]>({
+      last_checked_at: d.updates.last_checked_at,
+      checking: d.updates.checking,
+      failing: 0,
+      next_check_at: new Date(Date.now() + 4 * 3_600_000).toISOString(),
+    });
+  }),
+
+  op("post", "/me/updates/refresh", () => {
+    const user = requireUser();
+    if (user instanceof Response) return user;
+    const d = db();
+    const queued = d.library.filter((entry) => entry.user_id === user.id).length;
+    d.updates.checking = Math.max(d.updates.checking, queued);
+    commit();
+    return json<S["RefreshQueued"]>({ queued }, 202);
+  }),
+
   op("delete", "/me/history", () => {
     const user = requireUser();
     if (user instanceof Response) return user;

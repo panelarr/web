@@ -47,7 +47,7 @@ Checked on Mobile Safari in the iOS Simulator with real chapters, driven by real
 ## History and updates (FEAT-0014, FEAT-0015)
 
 - [x] **History:** a main tab (bottom bar and sidebar): what was read, newest first, by day (Today, Yesterday, dates), one line per series with the time, the page (until read) and the chapter, and Resume where the series is at; every chapter read as a toggle, or a series' own; search behind an icon; remove a series or clear everything, both asked first (read marks stay).
-- [ ] **Updates:** new chapters by day, read ones dimmed, "Last update" and a refresh; the bottom bar becomes Library, Updates, History, Browse, More.
+- [x] **Updates:** a main tab (the bottom bar is Library, Updates, History, Browse, More): new chapters of the works in your library, by day, one row per series with its newest chapter and "Show N more chapters"; new ones marked, read ones dimmed; tap to read, download a row, mark it read; "Last update" with a refresh that runs the check and follows it to the end.
 
 ## Network admin and plugin settings (GOAL-0017)
 
