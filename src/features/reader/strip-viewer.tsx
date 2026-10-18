@@ -238,7 +238,11 @@ export function StripViewer({
     }
     const moved = page.getBoundingClientRect().top - element.getBoundingClientRect().top - kept.top;
     if (Math.abs(moved) < 0.5) return;
-    if (busy()) {
+    // Near either end the browser clamps the scroll position itself when the content's height
+    // changes, which a transform would then compensate a second time: correct directly there.
+    const room = element.scrollHeight - element.scrollTop - element.clientHeight;
+    const nearEnd = element.scrollTop < element.clientHeight || room < element.clientHeight + Math.abs(moved);
+    if (busy() && !nearEnd) {
       const d = deferred.current;
       d.shift += moved;
       (element.firstElementChild as HTMLElement | null)?.style.setProperty("transform", `translateY(${-d.shift}px)`);
@@ -306,8 +310,11 @@ export function StripViewer({
       lastTop = top;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const atBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 4;
-        const middle = element.scrollTop + element.clientHeight / 2;
+        // What's on screen, in the layout's terms: a deferred correction (a transform) shows the
+        // content that much further along.
+        const visibleTop = element.scrollTop + deferred.current.shift;
+        const atBottom = visibleTop + element.clientHeight >= element.scrollHeight - 4;
+        const middle = visibleTop + element.clientHeight / 2;
         // The new anchor: the page in the middle of the screen, where it now is.
         pickAnchor();
         const virtual = atBottom
