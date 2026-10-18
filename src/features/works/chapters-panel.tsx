@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   Bookmark,
-  BookOpen,
   CheckCheck,
   CircleCheck,
   Download,
@@ -13,6 +12,7 @@ import {
   Layers,
   ListFilter,
   Pin,
+  Play,
   RefreshCw,
   SquareCheckBig,
   X,
@@ -40,7 +40,7 @@ import { VirtualList } from "@/components/virtual-list";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { useLibrary } from "@/features/catalog/library-index";
 import { downloadLabel, useCanDownload, useOpenDownloads } from "@/features/downloads/use-downloads";
-import { formatDate, formatRelative } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { type ChapterView, chapterName, filtersOn, nextToDownload, scanlators, viewChapters } from "./chapter-view";
 import { ChapterViewSheet } from "./chapter-view-sheet";
@@ -167,11 +167,24 @@ export function ChaptersPanel({
 
   return (
     <div className="grid gap-3">
-      {continueChapter ? (
-        <Button asChild size="lg" className="w-full sm:w-auto sm:justify-self-start">
-          <Link to="/read/$chapterId" params={{ chapterId: continueChapter.id }}>
-            <BookOpen aria-hidden />
-            {started ? "Continue" : "Start reading"}: {chapterLabel(continueChapter)}
+      {continueChapter && !selecting ? (
+        <Button
+          asChild
+          size="lg"
+          className={cn(
+            // Phones: a floating button above the bottom bar, out of the list's way.
+            "fixed right-4 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+0.75rem)] z-20 rounded-full shadow-lg",
+            "sm:static sm:justify-self-start sm:rounded-md sm:shadow-none",
+          )}
+        >
+          <Link
+            to="/read/$chapterId"
+            params={{ chapterId: continueChapter.id }}
+            aria-label={`${started ? "Continue" : "Start reading"}: ${chapterLabel(continueChapter)}`}
+          >
+            <Play className="fill-current" aria-hidden />
+            {started ? "Continue" : "Start"}
+            <span className="hidden sm:inline">: {chapterLabel(continueChapter)}</span>
           </Link>
         </Button>
       ) : null}
@@ -298,7 +311,11 @@ export function ChaptersPanel({
       ) : (
         <VirtualList
           label="Chapters"
-          className={cn("overflow-hidden rounded-xl border bg-card", selecting && "mb-20")}
+          className={cn(
+            // Phones: rows edge to edge, as in a native list; a box from tablets up.
+            "sm:overflow-hidden sm:rounded-xl sm:border sm:bg-card",
+            selecting ? "mb-20" : continueChapter && "mb-16 sm:mb-0",
+          )}
           items={shown}
           getKey={(c) => c.id}
           renderItem={(chapter) => (
@@ -479,11 +496,11 @@ function ChapterRow({
     : chapter.downloaded
       ? "Downloaded"
       : progress && !read && progress.pages
-        ? `Page ${progress.page + 1} of ${progress.pages} · ${formatRelative(progress.updated_at)}`
+        ? `Page ${progress.page + 1}/${progress.pages}`
         : undefined;
   return (
     <div className={cn("border-b last:border-b-0", selected && "bg-primary/10")}>
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-2 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
         {selecting ? (
           <Checkbox checked={selected} onCheckedChange={(on) => onSelect(on === true)} aria-label={`Select ${name}`} />
         ) : null}
@@ -491,7 +508,7 @@ function ChapterRow({
           {selecting ? (
             <button
               type="button"
-              className="block w-full text-left font-medium [overflow-wrap:anywhere]"
+              className="block w-full truncate text-left font-medium"
               onClick={() => onSelect(!selected)}
             >
               {name}
@@ -501,34 +518,33 @@ function ChapterRow({
               to="/read/$chapterId"
               params={{ chapterId: chapter.id }}
               aria-label={read ? `${name} (read)` : name}
-              className="block font-medium underline-offset-4 [overflow-wrap:anywhere] hover:underline"
+              className="block truncate font-medium underline-offset-4 hover:underline"
             >
               {name}
             </Link>
           )}
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
-            <span>
+          {/* One line: what it is and where from; why this copy is shown is in the copies list. */}
+          <p className="mt-0.5 flex min-w-0 items-center gap-x-1.5 text-xs whitespace-nowrap text-muted-foreground">
+            {state ? (
+              <span className={cn("shrink-0", download ? "text-info" : progress && !read ? "text-primary" : undefined)}>
+                {state} ·
+              </span>
+            ) : null}
+            {chapter.available ? null : <span className="shrink-0 text-destructive">No longer listed ·</span>}
+            <span className="min-w-0 truncate">
               {[
                 chosen?.source_name,
                 chosen?.scanlator,
-                chosen?.lang?.toUpperCase(),
                 chosen?.uploaded_at ? formatDate(chosen.uploaded_at) : undefined,
-                chapter.variants > 1 ? reasonText(chapter.reason) : undefined,
               ]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
-            {state ? (
-              <span className={cn(download ? "text-info" : progress && !read ? "text-primary" : undefined)}>
-                · {state}
-              </span>
-            ) : null}
-            {chapter.available ? null : <span className="text-destructive">· No longer listed</span>}
             {chapter.bookmarked ? (
               <Bookmark className="size-3 fill-current text-primary" aria-label="Bookmarked" />
             ) : null}
             {chapter.pinned ? <Pin className="size-3 text-muted-foreground" aria-label="Copy chosen by hand" /> : null}
-            {chapter.downloaded ? <HardDriveDownload className="size-3 text-success" aria-hidden /> : null}
+            {chapter.downloaded ? <HardDriveDownload className="size-3 shrink-0 text-success" aria-hidden /> : null}
           </p>
         </div>
         {selecting ? null : (
@@ -536,19 +552,19 @@ function ChapterRow({
             {chapter.variants > 1 ? (
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 aria-expanded={open}
                 aria-label={`${chapter.variants} copies of ${chapterLabel(chapter)}`}
+                title={`${chapter.variants} copies`}
                 onClick={() => setOpen(!open)}
-                className="text-muted-foreground"
+                className="size-8 text-muted-foreground"
               >
-                <Layers aria-hidden />
-                {chapter.variants}
+                <Layers className="size-3.5" aria-hidden />
               </Button>
             ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label={`More for ${chapterLabel(chapter)}`}>
+                <Button variant="ghost" size="icon" className="size-8" aria-label={`More for ${chapterLabel(chapter)}`}>
                   <EllipsisVertical aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
@@ -611,7 +627,7 @@ function Variants({ work, chapter }: { work: Work; chapter: Chapter }) {
     pin.mutate({ params: { path: { work_id: work.id, chapter_id: chapter.id } }, body: { variant_id } });
 
   return (
-    <div className="border-t bg-muted/40 px-4 py-3">
+    <div className="mb-2 rounded-lg bg-muted/40 p-2 sm:mx-4 sm:mb-3">
       {detail.error ? <ErrorAlert error={detail.error} /> : null}
       {detail.isPending ? <Loading label="Loading copies…" /> : null}
       <ul className="grid gap-2" aria-label={`Copies of ${chapterLabel(chapter)}`}>
@@ -630,7 +646,9 @@ function Variants({ work, chapter }: { work: Work; chapter: Chapter }) {
                   {variant.source_name}
                   {variant.source_health !== "ok" ? <HealthBadge status={variant.source_health} /> : null}
                   {chosen ? (
-                    <Badge variant="secondary">{detail.data.chapter.pinned ? "Pinned" : "Chosen"}</Badge>
+                    <Badge variant="secondary">
+                      {detail.data.chapter.pinned ? "Chosen by hand" : `Chosen: ${reasonText(chapter.reason)}`}
+                    </Badge>
                   ) : null}
                 </p>
                 <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">

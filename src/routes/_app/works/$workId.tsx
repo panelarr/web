@@ -2,7 +2,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, Check, Plus } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, EllipsisVertical, Layers, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { $api } from "@/api/client";
 import { errorMessage, isApiError } from "@/api/errors";
@@ -22,6 +23,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cover } from "@/features/catalog/cover";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
@@ -31,6 +38,7 @@ import type { ChapterView } from "@/features/works/chapter-view";
 import { ChaptersPanel } from "@/features/works/chapters-panel";
 import { SeriesChaptersPanel } from "@/features/works/series-chapters";
 import { SourcesPanel } from "@/features/works/sources-panel";
+import { cn } from "@/lib/utils";
 
 type Work = components["schemas"]["Work"];
 
@@ -73,7 +81,13 @@ function WorkPage() {
   const work = $api.useQuery("get", "/works/{work_id}", { params: { path: { work_id: workId } } });
   return (
     <>
-      <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={() => router.history.back()}>
+      <PhoneTopBar title={work.data?.title} entryId={work.data?.entry_id} onBack={() => router.history.back()} />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-2 mb-2 hidden sm:inline-flex"
+        onClick={() => router.history.back()}
+      >
         <ArrowLeft aria-hidden />
         Back
       </Button>
@@ -110,16 +124,22 @@ function WorkDetails({ work }: { work: Work }) {
   };
   return (
     <>
-      <header className="mb-6 flex gap-4 sm:gap-6">
-        <Cover url={work.cover_url} title={work.title} eager className="w-24 shrink-0 shadow-md sm:w-36" />
-        <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="text-xl font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-3xl">{work.title}</h1>
+      <header className="mb-4 flex gap-3 sm:mb-6 sm:gap-6">
+        <Cover url={work.cover_url} title={work.title} eager className="w-20 shrink-0 shadow-md sm:w-36" />
+        <div className="flex min-w-0 flex-col gap-1.5 sm:gap-2">
+          <h1
+            id="series-title"
+            className="text-lg leading-snug font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-3xl"
+          >
+            {work.title}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {[label(TYPE_LABELS, work.type), work.year, label(STATUS_LABELS, work.status)].filter(Boolean).join(" · ")}
           </p>
           <div className="mt-auto flex flex-wrap gap-2">
             <LibraryButton work={work} />
-            <Button variant="ghost" size="sm" asChild>
+            {/* On phones, Details is in the top bar's menu. */}
+            <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
               <Link to="/catalog/$entryId" params={{ entryId: work.entry_id }}>
                 <BookOpen aria-hidden />
                 Details
@@ -184,6 +204,77 @@ function WorkDetails({ work }: { work: Work }) {
         </TabsContent>
       </Tabs>
     </>
+  );
+}
+
+/**
+ * Phones: back, the series' title (once its heading has scrolled away) and a menu, in a bar
+ * that stays under the status bar, as in native apps.
+ */
+function PhoneTopBar({
+  title,
+  entryId,
+  onBack,
+}: {
+  title: string | undefined;
+  entryId: string | undefined;
+  onBack: () => void;
+}) {
+  const navigate = useNavigate({ from: Route.fullPath });
+  const [titled, setTitled] = useState(false);
+  const bar = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the heading is there once the title is
+  useEffect(() => {
+    const heading = document.getElementById("series-title");
+    if (!heading) return;
+    // The title shows in the bar once the page's own heading has gone under it.
+    const update = () =>
+      setTitled(heading.getBoundingClientRect().bottom <= (bar.current?.getBoundingClientRect().bottom ?? 0));
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, [title]);
+  return (
+    <div
+      ref={bar}
+      className="sticky top-[var(--safe-top)] z-30 -mx-4 -mt-4 mb-2 flex h-12 items-center gap-1 bg-background/90 px-2 backdrop-blur sm:hidden"
+    >
+      <Button variant="ghost" size="icon" aria-label="Back" onClick={onBack}>
+        <ArrowLeft aria-hidden />
+      </Button>
+      <p
+        aria-hidden
+        className={cn(
+          "min-w-0 flex-1 truncate text-base font-semibold transition-opacity",
+          titled ? "opacity-100" : "opacity-0",
+        )}
+      >
+        {title}
+      </p>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Series menu">
+            <EllipsisVertical aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {entryId ? (
+            <DropdownMenuItem asChild>
+              <Link to="/catalog/$entryId" params={{ entryId }}>
+                <BookOpen aria-hidden />
+                Details
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem
+            onSelect={() => void navigate({ search: (prev) => ({ ...prev, tab: "sources" }), replace: true })}
+          >
+            <Layers aria-hidden />
+            Sources
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 

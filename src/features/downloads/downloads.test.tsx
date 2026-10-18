@@ -32,18 +32,18 @@ describe("downloading from a work", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Download" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Unread chapters" }));
     expect(await screen.findByText(/^Downloads: \d+ queued\.$/)).toBeInTheDocument();
-    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/· Queued/)).toBeInTheDocument();
+    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/^Queued ·/)).toBeInTheDocument();
 
     act(() => {
       tickDownloads(db()); // starts two
       tickDownloads(db()); // 4 of 12 pages
     });
-    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/· Downloading 33%/)).toBeInTheDocument();
+    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/^Downloading 33% ·/)).toBeInTheDocument();
     act(() => {
       tickDownloads(db());
       tickDownloads(db());
     });
-    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/· Downloaded/)).toBeInTheDocument();
+    expect(await within(chapterRow("Vol. 1 · Chapter 1")).findByText(/^Downloaded ·/)).toBeInTheDocument();
   });
 
   it("queues a chapter and the ones after it, never twice", async () => {

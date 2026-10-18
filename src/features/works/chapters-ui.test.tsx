@@ -67,7 +67,9 @@ describe("a work's chapters", () => {
     // Plain rows: no "New" badges.
     expect(screen.queryByText("New")).not.toBeInTheDocument();
     const one = chapterRow("Vol. 1 · Chapter 1");
-    expect(within(one).getByText(/Example Source · Official · EN · .* · first source/)).toBeInTheDocument();
+    // One meta line: source, scanlator, date; why this copy is shown is in the copies list.
+    expect(within(one).getByText(/^Example Source · Official · /)).toBeInTheDocument();
+    expect(within(one).queryByText(/first source/)).not.toBeInTheDocument();
     expect(within(one).getByRole("button", { name: /2 copies/ })).toBeInTheDocument();
     // Only on one source: no choice, so no reason shown.
     expect(within(chapterRow("Vol. 2 · Chapter 12")).queryByRole("button", { name: /copies/ })).not.toBeInTheDocument();
@@ -81,10 +83,11 @@ describe("a work's chapters", () => {
       await within(await waitFor(() => chapterRow("Vol. 1 · Chapter 3"))).findByRole("button", { name: /2 copies/ }),
     );
     const copies = await screen.findByRole("list", { name: "Copies of Vol. 1 · Chapter 3" });
-    expect(within(copies).getByText("Chosen")).toBeInTheDocument();
+    expect(within(copies).getByText("Chosen: first source")).toBeInTheDocument();
     await userEvent.click(within(copies).getByRole("button", { name: "Use this copy" }));
+    expect(await within(chapterRow("Vol. 1 · Chapter 3")).findByText(/^Sample Scans · /)).toBeInTheDocument();
     expect(
-      await within(chapterRow("Vol. 1 · Chapter 3")).findByText(/Sample Scans · .* · chosen by hand/),
+      within(await screen.findByRole("list", { name: "Copies of Vol. 1 · Chapter 3" })).getByText("Chosen by hand"),
     ).toBeInTheDocument();
     expect(within(chapterRow("Vol. 1 · Chapter 3")).getByLabelText("Copy chosen by hand")).toBeInTheDocument();
     await userEvent.click(
@@ -92,9 +95,7 @@ describe("a work's chapters", () => {
         name: "Unpin",
       }),
     );
-    expect(
-      await within(chapterRow("Vol. 1 · Chapter 3")).findByText(/Example Source · .* · first source/),
-    ).toBeInTheDocument();
+    expect(await within(chapterRow("Vol. 1 · Chapter 3")).findByText(/^Example Source · /)).toBeInTheDocument();
   });
 
   it("marks chapters read, and everything before one", async () => {
