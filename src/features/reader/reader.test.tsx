@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { http } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { unifiedChapters } from "@/mocks/chapters";
 import { db } from "@/mocks/db";
 import { emit } from "@/mocks/events";
 import { addToLibrary } from "@/mocks/handlers";
+import { mockUrl, problem } from "@/mocks/op";
 import { tickMatching } from "@/mocks/works";
 import { renderApp } from "@/test/render";
 import { server } from "@/test/server";
@@ -178,6 +180,43 @@ describe("the reader", () => {
   it("explains a chapter no source has", async () => {
     await renderApp("/read/00000000-0000-4000-8000-000000000000");
     expect(await screen.findByText("The chapter didn't open")).toBeInTheDocument();
+  });
+
+  it("says at once why a source failed, and leads back to the series", async () => {
+    const chapter = ctx.chapters[0]?.id ?? "";
+    let asked = 0;
+    server.use(
+      http.get(mockUrl("/chapters/{chapter_id}/pages"), () => {
+        asked++;
+        return problem(502, "source_failed", "The source failed", "The site answered 503.");
+      }),
+    );
+    // Opened from the series page, which listed the chapter.
+    const { router } = await renderApp(`/works/${ctx.work?.id}`);
+    await screen.findAllByText(/Chapter/);
+    await router.navigate({ to: "/read/$chapterId", params: { chapterId: chapter } });
+    expect(await screen.findByText("The site answered 503.")).toBeInTheDocument();
+    // Not retried: the same answer would only keep the reader waiting (IN-0068).
+    expect(asked).toBe(1);
+    await userEvent.click(screen.getByRole("link", { name: "Back to the series" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/works/${ctx.work?.id}`));
+  });
+
+  it("says when opening takes long, with the way back", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      server.use(http.get(mockUrl("/chapters/{chapter_id}/pages"), () => new Promise<never>(() => {})));
+      await renderApp(`/read/${ctx.chapters[0]?.id}`);
+      expect(await screen.findByText("Opening the chapter…")).toBeInTheDocument();
+      expect(screen.queryByText(/Still waiting for the source/)).not.toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(8_500);
+      });
+      expect(screen.getByText(/Still waiting for the source/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Library" })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

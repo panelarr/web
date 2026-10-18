@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
 import { MANUAL } from "@/api/events";
@@ -56,21 +57,86 @@ function ReadPage() {
 
   if (pages.error) {
     return (
-      <div className="mx-auto grid max-w-md gap-4 px-gutter py-16">
+      <div className="mx-auto grid max-w-md gap-4 px-gutter py-16 pt-safe">
         <ErrorAlert
           error={pages.error}
           title={isApiError(pages.error, "no_copy") ? "No source has this chapter now" : "The chapter didn't open"}
           onRetry={() => void pages.refetch()}
         />
-        <Button variant="ghost" asChild>
-          <Link to="/">
-            <ArrowLeft aria-hidden />
-            Back to the library
-          </Link>
-        </Button>
+        <WayBack chapterId={chapterId} />
       </div>
     );
   }
-  if (!pages.data) return <Loading label="Opening the chapter…" />;
+  if (!pages.data) return <Opening chapterId={chapterId} />;
   return <ReaderScreen key={session.current} data={pages.data} work={work.data} asked={page} />;
+}
+
+/** How long opening may take before the reader says it's slow and offers the way back. */
+const SLOW_MS = 8_000;
+
+function Opening({ chapterId }: { chapterId: string }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), SLOW_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div className="grid justify-items-center gap-2 px-gutter pt-safe">
+      <Loading label="Opening the chapter…" />
+      {slow ? (
+        <>
+          <p className="-mt-12 text-center text-sm text-muted-foreground">
+            Still waiting for the source. It may be slow or down.
+          </p>
+          <WayBack chapterId={chapterId} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The series the chapter belongs to, if a page already listed it (its chapters, or the library's
+ * "continue" chapter): the page list that failed is what would have said.
+ */
+function useSeriesOf(chapterId: string): string | undefined {
+  const queryClient = useQueryClient();
+  for (const [key, data] of queryClient.getQueriesData<{ chapters?: Array<{ id: string }> }>({
+    queryKey: ["get", "/works/{work_id}/chapters"],
+  })) {
+    const workId = (key[2] as { params?: { path?: { work_id?: string } } } | undefined)?.params?.path?.work_id;
+    if (workId && data?.chapters?.some((chapter) => chapter.id === chapterId)) return workId;
+  }
+  for (const [, data] of queryClient.getQueriesData<{
+    entries?: Array<{ work: { id: string }; continue_chapter_id?: string }>;
+  }>({ queryKey: ["get", "/library"] })) {
+    const entry = data?.entries?.find((e) => e.continue_chapter_id === chapterId);
+    if (entry) return entry.work.id;
+  }
+  return undefined;
+}
+
+function WayBack({ chapterId }: { chapterId: string }) {
+  const router = useRouter();
+  const workId = useSeriesOf(chapterId);
+  return (
+    <div className="flex flex-wrap justify-center gap-2">
+      {workId ? (
+        <Button variant="outline" asChild>
+          <Link to="/works/$workId" params={{ workId }}>
+            <ArrowLeft aria-hidden />
+            Back to the series
+          </Link>
+        </Button>
+      ) : window.history.length > 1 ? (
+        <Button variant="outline" onClick={() => router.history.back()}>
+          <ArrowLeft aria-hidden />
+          Back
+        </Button>
+      ) : null}
+      <Button variant="ghost" asChild>
+        <Link to="/">Library</Link>
+      </Button>
+    </div>
+  );
 }

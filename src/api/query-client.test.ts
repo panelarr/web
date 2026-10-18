@@ -13,6 +13,13 @@ describe("shouldRetry", () => {
     expect(shouldRetry(2, err(502))).toBe(false);
   });
 
+  it("doesn't retry server errors that won't fix themselves", () => {
+    const failed = (code: string) => new ApiError({ status: 502, code, title: "x" });
+    expect(shouldRetry(0, failed("source_failed"))).toBe(false);
+    expect(shouldRetry(0, failed("meta_key_rejected"))).toBe(false);
+    expect(shouldRetry(0, failed("http_502"))).toBe(true);
+  });
+
   it("never retries client errors or unknown failures", () => {
     expect(shouldRetry(0, err(400))).toBe(false);
     expect(shouldRetry(0, err(401))).toBe(false);

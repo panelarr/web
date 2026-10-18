@@ -3,10 +3,18 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { ApiError, NETWORK_ERROR } from "./errors";
 
+/**
+ * Server errors that won't fix themselves in the next few seconds: retrying only keeps people
+ * waiting for the same answer (a source that failed, a key the metadata service rejected).
+ * They're shown at once, with Retry.
+ */
+const FINAL = new Set(["source_failed", "meta_key_rejected"]);
+
 /** Retries only what may succeed on its own: network failures and 5xx, at most twice. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
   if (failureCount >= 2) return false;
   if (!(error instanceof ApiError)) return false;
+  if (FINAL.has(error.code)) return false;
   return error.status === NETWORK_ERROR || error.status >= 500;
 }
 
