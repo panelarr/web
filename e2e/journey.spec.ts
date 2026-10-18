@@ -30,7 +30,7 @@ test("set up, add, read, download", async ({ page }) => {
   await page.getByRole("searchbox", { name: "Search the catalogue" }).fill("lantern");
   await page.getByRole("link", { name: /The Lantern Keeper/ }).click();
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/works\//);
 
   // The work page.
   await page.goto("/");

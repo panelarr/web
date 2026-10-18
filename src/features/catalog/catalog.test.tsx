@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { db, resetDb } from "@/mocks/db";
+import { addToLibrary } from "@/mocks/handlers";
 import { mockUrl, problem } from "@/mocks/op";
 import { renderApp } from "@/test/render";
 import { server } from "@/test/server";
@@ -125,17 +126,30 @@ describe("a catalogue entry", () => {
     expect(screen.getByText("Twist Ending")).toBeInTheDocument();
   });
 
-  it("adds the work to the library, then marks it while browsing", async () => {
+  it("adds the work to the library and moves on to it, then browsing opens it there", async () => {
     const { router } = await renderApp("/catalog/ent_1000");
     const [add] = await screen.findAllByRole("button", { name: "Add to library" });
     await userEvent.click(add as HTMLElement);
-    expect((await screen.findAllByText("In your library")).length).toBeGreaterThan(0);
-    expect(db().library).toHaveLength(1);
     expect(db().works[0]?.entry_id).toBe("ent_1000");
+    const workPath = `/works/${db().works[0]?.id}`;
+    await waitFor(() => expect(router.state.location.pathname).toBe(workPath));
+    expect(db().library).toHaveLength(1);
 
     await router.navigate({ to: "/browse" });
     const card = (await screen.findByText("The Lantern Keeper")).closest("a") as HTMLElement;
     expect(within(card).getByText("In library")).toBeInTheDocument();
+    expect(card).toHaveAttribute("href", workPath);
+    const other = (await screen.findByText("Moonlit Bakery")).closest("a") as HTMLElement;
+    expect(other).toHaveAttribute("href", "/catalog/ent_1001");
+  });
+
+  it("links an entry already in your library to its library page", async () => {
+    const user = db().users[0];
+    if (!user) throw new Error("no user");
+    addToLibrary(user, "ent_1001");
+    await renderApp("/catalog/ent_1001");
+    const [link] = await screen.findAllByRole("link", { name: "In your library" });
+    expect(link).toHaveAttribute("href", `/works/${db().works.find((w) => w.entry_id === "ent_1001")?.id}`);
   });
 
   it("can't be added without the right", async () => {

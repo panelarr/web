@@ -227,7 +227,7 @@ function CardItem({
 }) {
   return (
     <li>
-      <EntryCard entry={entry} matched={matched} inLibrary={!!entry.library_work_id} />
+      <EntryCard entry={entry} matched={matched} />
     </li>
   );
 }

@@ -49,6 +49,10 @@ Checked on Mobile Safari in the iOS Simulator with real chapters, driven by real
 - [x] **History:** a main tab (bottom bar and sidebar): what was read, newest first, by day (Today, Yesterday, dates), one line per series with the time, the page (until read) and the chapter, and Resume where the series is at; every chapter read as a toggle, or a series' own; search behind an icon; remove a series or clear everything, both asked first (read marks stay).
 - [x] **Updates:** a main tab (the bottom bar is Library, Updates, History, Browse, More): new chapters of the works in your library, by day, one row per series with its newest chapter and "Show N more chapters"; new ones marked, read ones dimmed; tap to read, download a row, mark it read; "Last update" with a refresh that runs the check and follows it to the end.
 
+## Browse and the reader (FEAT-0012 R5)
+
+- [x] **Browse opens your works in the library:** a card for a work already in your library opens its library page, not its catalogue entry; Add to library moves on to the new library page (in place of the entry, so Back returns to Browse). The entry stays reachable as the series' Details.
+
 ## Network admin and plugin settings (GOAL-0017)
 
 Panelarr's own proxies, solvers and network profiles, offered to every plugin; chosen per plugin, extension, source or provider.

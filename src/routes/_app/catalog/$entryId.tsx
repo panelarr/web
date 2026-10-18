@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { ArrowLeft, Check, ExternalLink, Loader2, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -146,13 +146,16 @@ function EntryDetails({ entry }: { entry: Entry }) {
 function AddButton({ entry }: { entry: Entry }) {
   const { user } = useMe();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const add = $api.useMutation("post", "/library", {
-    onSuccess: () => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: LIBRARY_INDEX_KEY });
       // The catalogue now marks the entry as in the library.
       void queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[1]).startsWith("/catalog") });
       void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/library").queryKey.slice(0, 2) });
       toast.success(`Added ${entry.title}. Looking for it on your sources…`);
+      // On to the work in the library, in place of this page: back leads to where you browsed.
+      void navigate({ to: "/works/$workId", params: { workId: result.work.id }, replace: true });
     },
   });
   const workId = entry.library_work_id ?? add.data?.work.id;

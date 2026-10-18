@@ -57,7 +57,7 @@ test("finds a work in the catalogue and adds it", async ({ page }) => {
   await page.getByRole("link", { name: /The Lantern Keeper/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: "The Lantern Keeper" })).toBeVisible();
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/works\//);
 });
 
 test("runs a job and watches it finish over the live event stream", async ({ page }) => {
@@ -92,7 +92,7 @@ test("adds a series from a source, then fixes its match on another source", asyn
 test("reads a chapter: swipe and tap through pages, right to left", async ({ page }) => {
   await page.goto("/catalog/ent_1000?mock=ready");
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/works\//);
   await page.goto("/");
   await page.getByText("The Lantern Keeper").click();
   await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 10_000 });
@@ -119,7 +119,7 @@ test("double page shows a spread on its own", async ({ page, isMobile }) => {
   test.skip(isMobile, "double page is for wide screens");
   await page.goto("/catalog/ent_1000?mock=ready");
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/works\//);
   await page.goto("/");
   await page.getByText("The Lantern Keeper").click();
   await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 10_000 });
@@ -140,7 +140,7 @@ test("double page shows a spread on its own", async ({ page, isMobile }) => {
 test("downloads chapters and follows them to the end", async ({ page }) => {
   await page.goto("/catalog/ent_1000?mock=ready");
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/works\//);
   await page.goto("/");
   await page.getByText("The Lantern Keeper").click();
   await expect(page.getByRole("link", { name: /Start reading/ })).toBeVisible({ timeout: 10_000 });

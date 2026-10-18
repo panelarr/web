@@ -8,7 +8,7 @@ import { scrollStrip } from "./strip";
 test("reading shows in History, and Resume goes back to it", async ({ page }) => {
   await page.goto("/catalog/ent_1001?mock=ready");
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  await expect(page.getByText("In your library").filter({ visible: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/works\//);
   await page.goto("/");
   await page.locator("main a[href^='/works/']").first().click();
   await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 15_000 });

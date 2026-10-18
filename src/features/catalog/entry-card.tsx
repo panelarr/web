@@ -8,20 +8,15 @@ import { label, TYPE_LABELS } from "./labels";
 
 type Summary = components["schemas"]["CatalogEntrySummary"];
 
-/** A catalogue entry in a grid: cover, title, year and type. */
-export function EntryCard({
-  entry,
-  matched,
-  inLibrary,
-}: {
-  entry: Summary;
-  matched?: string | undefined;
-  inLibrary: boolean;
-}) {
+/** A catalogue entry in a grid: cover, title, year and type. One in your library opens its library page. */
+export function EntryCard({ entry, matched }: { entry: Summary; matched?: string | undefined }) {
+  const inLibrary = !!entry.library_work_id;
+  const target = entry.library_work_id
+    ? ({ to: "/works/$workId", params: { workId: entry.library_work_id } } as const)
+    : ({ to: "/catalog/$entryId", params: { entryId: entry.id } } as const);
   return (
     <Link
-      to="/catalog/$entryId"
-      params={{ entryId: entry.id }}
+      {...target}
       className="group flex min-w-0 flex-col gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="relative">
