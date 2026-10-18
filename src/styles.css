@@ -54,14 +54,34 @@
 :root {
   --radius: 0.625rem;
   --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
-  /* Heights of the mobile bars, for content that must clear them. */
-  --app-bar-h: 3.5rem;
+  /* Height of the mobile bottom bar, for content that must clear it. */
   --bottom-nav-h: 4rem;
+  /*
+   * The top safe area (status bar, notch or Dynamic Island), capped at what one can be, so a
+   * wrong inset can never open a band above the page (one was reported in the installed app).
+   */
+  --safe-top: min(env(safe-area-inset-top), 4.5rem);
+}
+
+/*
+ * Installed on iOS (status bar black-translucent), the page starts under the status bar, but
+ * at launch the layout viewport can end the status bar's height above the screen's bottom
+ * (iOS 26: 812 of 874 points on an iPhone 16 Pro): bars at bottom: 0 float over an empty band
+ * WebKit doesn't paint. It measures again once the document is taller than that short viewport,
+ * so the page is at least as tall as the whole screen (100lvh). Measured in the iOS Simulator.
+ */
+@media (display-mode: standalone) {
+  body {
+    min-height: 100lvh;
+  }
+}
+:root.ios-standalone body {
+  min-height: 100lvh;
 }
 
 /* Safe-area insets for notched phones and the installed app. */
 @utility pt-safe {
-  padding-top: env(safe-area-inset-top);
+  padding-top: var(--safe-top);
 }
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);

@@ -20,8 +20,8 @@ export function useNavItems(): readonly NavItem[] {
 }
 
 /**
- * The frame around every signed-in page. Desktop and tablets get a sidebar; phones get a top
- * bar and a bottom navigation bar, like a native app.
+ * The frame around every signed-in page. Desktop and tablets get a sidebar; phones get a bottom
+ * navigation bar, like a native app.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const isAdmin = useIsAdmin();
@@ -35,13 +35,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <Sidebar />
-      <MobileTopBar />
+      <StatusBarScrim />
       <main
         id="main"
         tabIndex={-1}
         className={cn(
           "outline-none",
-          "mx-auto w-full max-w-7xl px-gutter pt-4 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)]",
+          "mx-auto w-full max-w-7xl px-gutter pt-[calc(var(--safe-top)+1rem)] pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1rem)]",
           "md:px-8 md:pt-8 md:pb-8",
         )}
       >
@@ -82,15 +82,16 @@ function Sidebar() {
   );
 }
 
-function MobileTopBar() {
+/**
+ * Phones have no app bar (pages start with their own title or back row): only a strip behind
+ * the status bar, so what scrolls under it stays readable, as in native apps.
+ */
+function StatusBarScrim() {
   return (
-    <header className="sticky top-0 z-30 border-b bg-background/90 pt-safe backdrop-blur md:hidden">
-      <div className="flex h-[var(--app-bar-h)] items-center px-gutter">
-        <Link to="/" aria-label="Panelarr home">
-          <Logo size={24} />
-        </Link>
-      </div>
-    </header>
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[var(--safe-top)] bg-background/85 backdrop-blur md:hidden"
+    />
   );
 }
 

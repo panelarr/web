@@ -47,7 +47,7 @@ function BrowsePage() {
   return (
     <>
       <PageHeader title="Browse" description="Find works in the catalogue and add them to your library." />
-      <div className="sticky top-[calc(var(--app-bar-h)+env(safe-area-inset-top))] z-20 -mx-4 mb-4 bg-background/95 px-4 py-2 backdrop-blur md:static md:mx-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
+      <div className="sticky top-[var(--safe-top)] z-20 -mx-4 mb-4 bg-background/95 px-4 py-2 backdrop-blur md:static md:mx-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
         <search>
           <form
             className="flex gap-2"

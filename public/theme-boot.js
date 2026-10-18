@@ -4,6 +4,9 @@
 // writes what this reads; keep the two in step.
 (function () {
   var root = document.documentElement;
+  // Opened from the Home Screen on iOS (with or without the manifest's display mode): the CSS
+  // works around the short viewport iOS can start it with (see src/styles.css).
+  if (window.navigator.standalone === true) root.classList.add("ios-standalone");
   var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   try {
     var cache = JSON.parse(localStorage.getItem("panelarr.theme") || "null");

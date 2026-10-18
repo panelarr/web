@@ -39,7 +39,7 @@ Checked on Mobile Safari in the iOS Simulator with real chapters, driven by real
 
 - [x] **The long strip no longer jumps or flickers:** a page that had started loading kept its image only while near the page being read; dropping it collapsed its space and moved everything below, which could flip the page being read and bring it back (a loop). Pages now keep their image, and a page seen before shows at once when it comes back.
 - [x] **The reader never waits silently:** a source's failure shows at once with its reason, Retry and the way back; a slow opening says so.
-- [ ] **No app header on phones,** safe areas respected, no empty band above the page.
+- [x] **No app header on phones,** safe areas respected (a blurred strip behind the status bar, the top inset capped), and no band under the bottom bar in the installed app: iOS starts it with a viewport the status bar's height short, and measures again once the page is at least screen-tall.
 - [ ] **The series page on phones:** a compact top bar, dense chapter rows, a floating Continue.
 - [ ] **The library's search behind an icon** in its top bar.
 
