@@ -19,6 +19,19 @@ configure({ asyncUtilTimeout: 5_000 });
 let validator: SpecValidator;
 let responseProblems: string[] = [];
 
+// Markup the browser would fix up on its own (a list item inside a list item, a div in a <p>):
+// React says so on the console, and a test that renders it fails.
+let nestingProblems: string[] = [];
+const consoleError = console.error;
+console.error = (...args: unknown[]) => {
+  const [message] = args;
+  if (typeof message === "string" && /cannot (be a descendant of|be a child of|contain a nested)/.test(message)) {
+    let i = 1;
+    nestingProblems.push(message.replace(/%s/g, () => String(args[i++] ?? "")).split("\n")[0] ?? message);
+  }
+  consoleError(...args);
+};
+
 beforeAll(async () => {
   validator = await SpecValidator.load();
   server.listen({ onUnhandledRequest: "error" });
@@ -40,6 +53,8 @@ afterEach(() => {
   server.resetHandlers();
   const problems = responseProblems;
   responseProblems = [];
+  const nesting = nestingProblems;
+  nestingProblems = [];
   if (typeof window !== "undefined") {
     toast.dismiss(); // the toast list is global
     cleanup();
@@ -51,6 +66,7 @@ afterEach(() => {
     }
   }
   if (problems.length > 0) throw new Error(`Mock responses don't match the spec:\n  ${problems.join("\n  ")}`);
+  if (nesting.length > 0) throw new Error(`Invalid HTML nesting:\n  ${[...new Set(nesting)].join("\n  ")}`);
 });
 
 afterAll(() => server.close());

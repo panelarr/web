@@ -233,7 +233,7 @@ function AttachedSeries({
     m.priority.mutate({ ...m.path(series.id), body: { priority: Math.max(-1000, Math.min(1000, value)) } });
   };
   return (
-    <SeriesRow series={series} attached>
+    <SeriesRow series={series} attached as="div">
       {canFix ? (
         <>
           <div className="flex items-center gap-1.5">
@@ -270,9 +270,20 @@ function AttachedSeries({
   );
 }
 
-function SeriesRow({ series, attached, children }: { series: Series; attached?: boolean; children?: React.ReactNode }) {
+/** A series on a source: an item of a list of candidates, or the attached one on its own (`div`). */
+function SeriesRow({
+  series,
+  attached,
+  as: Row = "li",
+  children,
+}: {
+  series: Series;
+  attached?: boolean;
+  as?: "li" | "div";
+  children?: React.ReactNode;
+}) {
   return (
-    <li
+    <Row
       className={cn(
         "flex flex-wrap items-center gap-3 rounded-lg border p-2.5",
         attached ? "border-success/40 bg-success/5" : "bg-background",
@@ -305,7 +316,7 @@ function SeriesRow({ series, attached, children }: { series: Series; attached?: 
         ) : null}
       </div>
       {children ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null}
-    </li>
+    </Row>
   );
 }
 
