@@ -3,9 +3,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { LibraryBig, ListFilter, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { EmptyState, ErrorAlert, Loading, PageHeader } from "@/components/states";
+import { HeaderSearch } from "@/components/header-search";
+import { EmptyState, ErrorAlert, Loading } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { VirtualGrid } from "@/components/virtual-grid";
 import { VirtualList } from "@/components/virtual-list";
 import { useLibrary } from "@/features/catalog/library-index";
@@ -67,6 +67,7 @@ function LibraryPage() {
   const library = useLibrary();
   const remembered = usePreference("library", parse);
   const [sheet, setSheet] = useState(false);
+  const [searching, setSearching] = useState(false);
   const view: LibraryView = {
     ...remembered.value,
     q: search.q,
@@ -97,38 +98,37 @@ function LibraryPage() {
 
   return (
     <>
-      <PageHeader
-        title="Library"
-        description={library.data ? `${all.length} ${all.length === 1 ? "work" : "works"}` : undefined}
-      />
-      {all.length > 0 ? (
-        <div className="mb-4 flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              type="search"
-              aria-label="Search your library"
-              placeholder="Search your library"
-              className="pl-9"
-              value={search.q ?? ""}
-              onChange={(e) => change({ q: e.target.value })}
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={label}
-            title={label}
-            className={cn(view.filters.length > 0 && "border-primary text-primary")}
-            onClick={() => setSheet(true)}
-          >
-            <ListFilter aria-hidden />
-          </Button>
+      {/* One row: the title and count, the search (an icon on phones) and the sheet's button. */}
+      <header className="mb-4 flex min-h-10 items-center gap-1 md:mb-6 md:gap-2">
+        <div className={cn("mr-auto flex min-w-0 items-baseline gap-2", searching && "hidden md:flex")}>
+          <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
+          {library.data ? (
+            <span className="text-sm text-muted-foreground tabular-nums">
+              {all.length} {all.length === 1 ? "work" : "works"}
+            </span>
+          ) : null}
         </div>
-      ) : null}
+        {all.length > 0 ? (
+          <>
+            <HeaderSearch
+              label="Search your library"
+              value={search.q ?? ""}
+              onChange={(q) => change({ q })}
+              onOpenChange={setSearching}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={label}
+              title={label}
+              className={cn(view.filters.length > 0 && "text-primary")}
+              onClick={() => setSheet(true)}
+            >
+              <ListFilter aria-hidden />
+            </Button>
+          </>
+        ) : null}
+      </header>
       {library.error ? <ErrorAlert error={library.error} onRetry={() => void library.refetch()} /> : null}
       {library.isPending ? <Loading /> : null}
       {library.data?.length === 0 ? (

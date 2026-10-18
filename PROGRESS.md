@@ -41,7 +41,7 @@ Checked on Mobile Safari in the iOS Simulator with real chapters, driven by real
 - [x] **The reader never waits silently:** a source's failure shows at once with its reason, Retry and the way back; a slow opening says so.
 - [x] **No app header on phones,** safe areas respected (a blurred strip behind the status bar, the top inset capped), and no band under the bottom bar in the installed app: iOS starts it with a viewport the status bar's height short, and measures again once the page is at least screen-tall.
 - [x] **The series page on phones:** a top bar (back, the title once the page's own has scrolled away, a menu with Details and Sources), a smaller cover; chapter rows edge to edge, the name on one line and one meta line (source · scanlator · date, "Page 13/117" once started), why a copy was chosen only in the copies list, the copies as a small icon; a floating Continue above the bottom bar.
-- [ ] **The library's search behind an icon** in its top bar.
+- [x] **The library's search behind an icon** in its title row on phones (it opens the field there, ✕ closes and clears it, a query keeps it open and stays in the URL); desktops keep the field.
 
 ## Network admin and plugin settings (GOAL-0017)
 

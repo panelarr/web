@@ -73,8 +73,25 @@ describe("the library", () => {
     await userEvent.click(await screen.findByRole("checkbox", { name: "Started (1)" }));
     await userEvent.keyboard("{Escape}");
 
-    await userEvent.type(screen.getByRole("searchbox", { name: "Search your library" }), "moon");
+    // On a phone the search is an icon in the title row; it opens a field there, ready to type.
+    await userEvent.click(screen.getByRole("button", { name: "Search your library" }));
+    const field = screen.getByRole("searchbox", { name: "Search your library" });
+    expect(field).toHaveFocus();
+    // The field takes the title's place (styles aren't applied here: the class says so).
+    expect(screen.getByRole("heading", { name: "Library" }).parentElement).toHaveClass("hidden");
+    await userEvent.type(field, "moon");
     await waitFor(() => expect(titles()).toEqual(["Moonlit Bakery"]));
+    expect(router.state.location.search).toMatchObject({ q: "moon" });
+    // ✕ closes it and clears the search.
+    await userEvent.click(screen.getByRole("button", { name: "Close the search" }));
+    await waitFor(() => expect(titles()).toHaveLength(3));
+    expect(screen.getByRole("button", { name: "Search your library" })).toBeInTheDocument();
+  });
+
+  it("keeps a search from the URL open", async () => {
+    await renderApp("/?q=iron");
+    expect(await screen.findByRole("searchbox", { name: "Search your library" })).toHaveValue("iron");
+    await waitFor(() => expect(titles()).toEqual(["Iron Garden"]));
   });
 
   it("sorts, reverses, and remembers it", async () => {
