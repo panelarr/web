@@ -63,7 +63,7 @@ function ReadPage() {
           title={isApiError(pages.error, "no_copy") ? "No source has this chapter now" : "The chapter didn't open"}
           onRetry={() => void pages.refetch()}
         />
-        <WayBack chapterId={chapterId} />
+        <WayBack chapterId={chapterId} error={pages.error} />
       </div>
     );
   }
@@ -116,9 +116,11 @@ function useSeriesOf(chapterId: string): string | undefined {
   return undefined;
 }
 
-function WayBack({ chapterId }: { chapterId: string }) {
+function WayBack({ chapterId, error }: { chapterId: string; error?: unknown }) {
   const router = useRouter();
-  const workId = useSeriesOf(chapterId);
+  const cached = useSeriesOf(chapterId);
+  // The server names the chapter's series when the page list fails, if the reader may see it.
+  const workId = (isApiError(error) ? error.problem?.work_id : undefined) ?? cached;
   return (
     <div className="flex flex-wrap justify-center gap-2">
       {workId ? (

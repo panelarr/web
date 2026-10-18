@@ -2577,6 +2577,10 @@ export interface paths {
          *     the previous and next chapters in reading order and your progress.
          *     When the chosen copy is on a source you may not use, another copy
          *     is used; `404` with code `no_copy` when none is left.
+         *     When the pages can't be loaded (e.g. `source_failed`, `no_copy`)
+         *     but you may see the chapter, the problem carries `work_id`,
+         *     `work_title` and `chapter_label`, so the reader can offer to go
+         *     back to the series.
          */
         get: operations["getChapterPages"];
         put?: never;
@@ -2675,10 +2679,110 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Chapters you read, newest first */
+        /**
+         * Chapters you read, newest first
+         * @description Yours only. Each entry has when you read it (`updated_at`), so a
+         *     client can group by day. `per=series` gives one entry per series
+         *     (the latest chapter read) with where to resume; the default lists
+         *     every chapter read. Entries taken out of view (`DELETE`) don't
+         *     show; read marks are never changed here.
+         */
         get: operations["getMyHistory"];
         put?: never;
         post?: never;
+        /**
+         * Clear your history
+         * @description Everything read up to now leaves your history; read marks stay. What you read next shows again.
+         */
+        delete: operations["clearMyHistory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/history/{work_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take a series out of your history
+         * @description Its entries up to now leave your history; read marks stay. Reading it again brings it back.
+         */
+        delete: operations["removeFromMyHistory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chapters that appeared in your library, newest first
+         * @description Yours only. A chapter is listed when a check of a series found it
+         *     after the series' first listing (`appeared_at`, not the source's
+         *     upload date) and after you added the work. A work's first chapters,
+         *     and those a newly attached source brings, aren't listed. Works you
+         *     may no longer see are left out. Group by day or series client-side.
+         */
+        get: operations["getMyUpdates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/updates/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the chapter checks of your library stand
+         * @description Poll it after `POST /me/updates/refresh`: `checking` drops to 0 once
+         *     every queued check has run.
+         */
+        get: operations["getMyUpdatesStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/updates/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check your library for new chapters now
+         * @description Queues a chapter check of every attached series of the works in your
+         *     library you may see, ahead of scheduled ones. Checks already queued
+         *     are brought forward, not doubled. `queued` counts series. Follow it
+         *     with `GET /me/updates/status`. Admins check everyone's library by
+         *     running the `updates.check` job.
+         */
+        post: operations["refreshMyUpdates"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3060,15 +3164,70 @@ export interface components {
             chapter_id: string;
             chapter_number?: number;
             chapter_title: string;
+            /** @description The chapter's own name without number, volume or release noise (empty when there's nothing else). */
+            chapter_display_title?: string;
+            chapter_volume?: string;
             page: number;
             pages?: number;
             completed: boolean;
             /** Format: date-time */
             updated_at: string;
+            /**
+             * Format: uuid
+             * @description Where "Resume" opens for the series (as GET /works/{work_id}/progress says); absent when everything is read.
+             */
+            continue_chapter_id?: string;
         };
         HistoryPage: {
             items: components["schemas"]["HistoryItem"][];
             next_page_token: string;
+        };
+        UpdateItem: {
+            /** Format: uuid */
+            chapter_id: string;
+            /** Format: uuid */
+            work_id: string;
+            work_title: string;
+            work_cover_url?: string;
+            /** @description Absent for extras. */
+            chapter_number?: number;
+            chapter_volume?: string;
+            chapter_title: string;
+            /** @description The chapter's own name without number, volume or release noise (empty when there's nothing else). */
+            chapter_display_title: string;
+            /**
+             * Format: date-time
+             * @description When a check first found the chapter.
+             */
+            appeared_at: string;
+            /** @description Found after you last opened the work's chapters (as the library's new count). */
+            new: boolean;
+            read: boolean;
+            /** @description Where you are in it; absent when you haven't opened it. */
+            page?: number;
+            pages?: number;
+            /** @enum {string} */
+            download_state: "none" | "queued" | "downloading" | "downloaded";
+        };
+        UpdatesPage: {
+            items: components["schemas"]["UpdateItem"][];
+            next_page_token: string;
+        };
+        UpdatesStatus: {
+            /**
+             * Format: date-time
+             * @description The latest check of any series in your library; absent when none was checked yet.
+             */
+            last_checked_at?: string;
+            /** @description Checks of your library's series running or due now. */
+            checking: number;
+            /** @description Series whose last check failed. */
+            failing: number;
+            /**
+             * Format: date-time
+             * @description When the scheduled check of everyone's library runs next; absent when it isn't scheduled.
+             */
+            next_check_at?: string;
         };
         ReaderSettings: {
             global?: {
@@ -4615,6 +4774,15 @@ export interface components {
             current_run_id?: string;
             /** @description With code `already_running` from a plugin's jobs, the run that is going on (the plugin's own ID). */
             current_run?: string;
+            /**
+             * Format: uuid
+             * @description From `GET /chapters/{chapter_id}/pages`, the work of the chapter that couldn't be loaded, so the reader can go back to the series. Only when you may see the work.
+             */
+            work_id?: string;
+            /** @description With `work_id`, the work's title. */
+            work_title?: string;
+            /** @description With `work_id`, the chapter's name for showing (English), e.g. `Vol. 2 Chapter 15: Rain`, `Chapter 3` or an extra's own name. */
+            chapter_label?: string;
             /** @description Per-field validation errors. */
             errors?: components["schemas"]["FieldError"][];
         };
@@ -8792,6 +8960,12 @@ export interface operations {
                 page_size?: components["parameters"]["PageSize"];
                 /** @description The `next_page_token` of the previous page. */
                 page_token?: components["parameters"]["PageToken"];
+                /** @description `series` for one entry per series; `chapter` (the default) for every chapter read. */
+                per?: "chapter" | "series";
+                /** @description Only this series (e.g. every chapter read of it). */
+                work_id?: string;
+                /** @description Only series whose title has this. */
+                q?: string;
             };
             header?: never;
             path?: never;
@@ -8806,6 +8980,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    clearMyHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeFromMyHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: components["parameters"]["WorkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMyUpdates: {
+        parameters: {
+            query?: {
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of updates. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatesPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMyUpdatesStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The checks' state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatesStatus"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    refreshMyUpdates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Checks queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefreshQueued"];
                 };
             };
             default: components["responses"]["Problem"];

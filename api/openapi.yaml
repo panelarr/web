@@ -3437,6 +3437,10 @@ paths:
         the previous and next chapters in reading order and your progress.
         When the chosen copy is on a source you may not use, another copy
         is used; `404` with code `no_copy` when none is left.
+        When the pages can't be loaded (e.g. `source_failed`, `no_copy`)
+        but you may see the chapter, the problem carries `work_id`,
+        `work_title` and `chapter_label`, so the reader can offer to go
+        back to the series.
       x-panelarr-access: user
       parameters:
         - $ref: "#/components/parameters/ChapterId"
@@ -3588,10 +3592,34 @@ paths:
       operationId: getMyHistory
       tags: [reader]
       summary: Chapters you read, newest first
+      description: |
+        Yours only. Each entry has when you read it (`updated_at`), so a
+        client can group by day. `per=series` gives one entry per series
+        (the latest chapter read) with where to resume; the default lists
+        every chapter read. Entries taken out of view (`DELETE`) don't
+        show; read marks are never changed here.
       x-panelarr-access: user
       parameters:
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/PageToken"
+        - name: per
+          in: query
+          description: "`series` for one entry per series; `chapter` (the default) for every chapter read."
+          schema:
+            type: string
+            enum: [chapter, series]
+        - name: work_id
+          in: query
+          description: Only this series (e.g. every chapter read of it).
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          description: Only series whose title has this.
+          schema:
+            type: string
+            maxLength: 200
       responses:
         "200":
           description: A page of history.
@@ -3599,6 +3627,98 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HistoryPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: clearMyHistory
+      tags: [reader]
+      summary: Clear your history
+      description: Everything read up to now leaves your history; read marks stay. What you read next shows again.
+      x-panelarr-access: user
+      responses:
+        "204":
+          description: Cleared.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/history/{work_id}:
+    delete:
+      operationId: removeFromMyHistory
+      tags: [reader]
+      summary: Take a series out of your history
+      description: Its entries up to now leave your history; read marks stay. Reading it again brings it back.
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/WorkId"
+      responses:
+        "204":
+          description: Removed.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/updates:
+    get:
+      operationId: getMyUpdates
+      tags: [library]
+      summary: Chapters that appeared in your library, newest first
+      description: |
+        Yours only. A chapter is listed when a check of a series found it
+        after the series' first listing (`appeared_at`, not the source's
+        upload date) and after you added the work. A work's first chapters,
+        and those a newly attached source brings, aren't listed. Works you
+        may no longer see are left out. Group by day or series client-side.
+      x-panelarr-access: user
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: A page of updates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatesPage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/updates/status:
+    get:
+      operationId: getMyUpdatesStatus
+      tags: [library]
+      summary: How the chapter checks of your library stand
+      description: |
+        Poll it after `POST /me/updates/refresh`: `checking` drops to 0 once
+        every queued check has run.
+      x-panelarr-access: user
+      responses:
+        "200":
+          description: The checks' state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatesStatus"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /me/updates/refresh:
+    post:
+      operationId: refreshMyUpdates
+      tags: [library]
+      summary: Check your library for new chapters now
+      description: |
+        Queues a chapter check of every attached series of the works in your
+        library you may see, ahead of scheduled ones. Checks already queued
+        are brought forward, not doubled. `queued` counts series. Follow it
+        with `GET /me/updates/status`. Admins check everyone's library by
+        running the `updates.check` job.
+      x-panelarr-access: user
+      responses:
+        "202":
+          description: Checks queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshQueued"
         default:
           $ref: "#/components/responses/Problem"
 
@@ -4452,6 +4572,11 @@ components:
           type: number
         chapter_title:
           type: string
+        chapter_display_title:
+          type: string
+          description: The chapter's own name without number, volume or release noise (empty when there's nothing else).
+        chapter_volume:
+          type: string
         page:
           type: integer
         pages:
@@ -4461,6 +4586,10 @@ components:
         updated_at:
           type: string
           format: date-time
+        continue_chapter_id:
+          type: string
+          format: uuid
+          description: Where "Resume" opens for the series (as GET /works/{work_id}/progress says); absent when everything is read.
     HistoryPage:
       type: object
       required: [items, next_page_token]
@@ -4471,6 +4600,75 @@ components:
             $ref: "#/components/schemas/HistoryItem"
         next_page_token:
           type: string
+    UpdateItem:
+      type: object
+      required: [chapter_id, work_id, work_title, chapter_title, chapter_display_title, appeared_at, new, read, download_state]
+      properties:
+        chapter_id:
+          type: string
+          format: uuid
+        work_id:
+          type: string
+          format: uuid
+        work_title:
+          type: string
+        work_cover_url:
+          type: string
+        chapter_number:
+          type: number
+          description: Absent for extras.
+        chapter_volume:
+          type: string
+        chapter_title:
+          type: string
+        chapter_display_title:
+          type: string
+          description: The chapter's own name without number, volume or release noise (empty when there's nothing else).
+        appeared_at:
+          type: string
+          format: date-time
+          description: When a check first found the chapter.
+        new:
+          type: boolean
+          description: Found after you last opened the work's chapters (as the library's new count).
+        read:
+          type: boolean
+        page:
+          type: integer
+          description: Where you are in it; absent when you haven't opened it.
+        pages:
+          type: integer
+        download_state:
+          type: string
+          enum: [none, queued, downloading, downloaded]
+    UpdatesPage:
+      type: object
+      required: [items, next_page_token]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpdateItem"
+        next_page_token:
+          type: string
+    UpdatesStatus:
+      type: object
+      required: [checking, failing]
+      properties:
+        last_checked_at:
+          type: string
+          format: date-time
+          description: The latest check of any series in your library; absent when none was checked yet.
+        checking:
+          type: integer
+          description: Checks of your library's series running or due now.
+        failing:
+          type: integer
+          description: Series whose last check failed.
+        next_check_at:
+          type: string
+          format: date-time
+          description: When the scheduled check of everyone's library runs next; absent when it isn't scheduled.
     ReaderSettings:
       type: object
       required: [effective]
@@ -7285,6 +7483,16 @@ components:
         current_run:
           type: string
           description: With code `already_running` from a plugin's jobs, the run that is going on (the plugin's own ID).
+        work_id:
+          type: string
+          format: uuid
+          description: From `GET /chapters/{chapter_id}/pages`, the work of the chapter that couldn't be loaded, so the reader can go back to the series. Only when you may see the work.
+        work_title:
+          type: string
+          description: With `work_id`, the work's title.
+        chapter_label:
+          type: string
+          description: "With `work_id`, the chapter's name for showing (English), e.g. `Vol. 2 Chapter 15: Rain`, `Chapter 3` or an extra's own name."
         errors:
           type: array
           description: Per-field validation errors.

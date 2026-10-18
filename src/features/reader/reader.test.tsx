@@ -2,7 +2,7 @@
 
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http } from "msw";
+import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { unifiedChapters } from "@/mocks/chapters";
 import { db } from "@/mocks/db";
@@ -199,6 +199,29 @@ describe("the reader", () => {
     // Not retried: the same answer would only keep the reader waiting (IN-0068).
     expect(asked).toBe(1);
     await userEvent.click(screen.getByRole("link", { name: "Back to the series" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/works/${ctx.work?.id}`));
+  });
+
+  it("leads back to the series the server names, even with nothing cached", async () => {
+    server.use(
+      http.get(mockUrl("/chapters/{chapter_id}/pages"), () =>
+        HttpResponse.json(
+          {
+            type: "about:blank",
+            title: "The source failed",
+            status: 502,
+            code: "source_failed",
+            detail: "The site answered 503.",
+            work_id: ctx.work?.id,
+            work_title: "Moonlit Bakery",
+            chapter_label: "Chapter 1",
+          },
+          { status: 502, headers: { "Content-Type": "application/problem+json" } },
+        ),
+      ),
+    );
+    const { router } = await renderApp(`/read/${ctx.chapters[0]?.id}`);
+    await userEvent.click(await screen.findByRole("link", { name: "Back to the series" }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/works/${ctx.work?.id}`));
   });
 
