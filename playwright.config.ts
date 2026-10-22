@@ -37,7 +37,7 @@ export default defineConfig({
       ? [
           {
             name: "phone-webkit",
-            testMatch: /reader(-stability)?\.spec/,
+            testMatch: /(reader(-stability)?|strip-preload)\.spec/,
             use: { ...devices["iPhone 13"], viewport: { width: 375, height: 740 } },
           },
         ]

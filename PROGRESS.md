@@ -53,6 +53,7 @@ Checked on Mobile Safari in the iOS Simulator with real chapters, driven by real
 
 - [x] **Browse opens your works in the library:** a card for a work already in your library opens its library page, not its catalogue entry; Add to library moves on to the new library page (in place of the entry, so Back returns to Browse). The entry stays reachable as the series' Details.
 - [x] **The chapter before, ready above:** near the start of the first chapter in a long strip (its first five pages), the previous chapter is fetched and added above while the strip is still (between flings: adding it moves everything by its height, and doing that mid-fling would stop the fling on iOS), so scrolling up runs on into it instead of stopping at the top and waiting.
+- [x] **Pages to load ahead, in a long strip:** the pages on screen and as many past them as the setting says (0: only those on screen), then two just above, are loaded in reading order, three at a time (the server fetches two per source at once), whether or not they're rendered yet, and on into the next chapter when this one ends sooner. Their sizes are known before they're reached, so they show at once with their exact height; each page is fetched once (its own image reuses what was loaded). The strip renders a fixed few pages past the screen, and the reader shows no viewer until its settings are known, so a wrong mode doesn't load pages first.
 
 ## Network admin and plugin settings (GOAL-0017)
 

@@ -202,9 +202,10 @@ export function ReaderScreen({
   });
 
   // Load the pages ahead (and the one behind) so turning is instant. A long strip loads its own,
-  // in order.
+  // in order; until the settings are known, it may be one.
+  const settingsLoading = reader.loading;
   useEffect(() => {
-    if (continuous) return;
+    if (continuous || settingsLoading) return;
     for (let i = Math.max(0, index - 1); i <= Math.min(total - 1, index + settings.preload); i++) {
       const image = new Image();
       const page = i;
@@ -212,7 +213,7 @@ export function ReaderScreen({
       image.onload = () => recordSize(page, { width: image.naturalWidth, height: image.naturalHeight });
       image.src = serverUrl(urls[i]) ?? "";
     }
-  }, [continuous, index, settings.preload, total, urls, recordSize]);
+  }, [continuous, settingsLoading, index, settings.preload, total, urls, recordSize]);
 
   // Near the end, fetch the next chapter's page list so it opens at once.
   useEffect(() => {
@@ -356,7 +357,8 @@ export function ReaderScreen({
             ? "End of the chapter"
             : "Start of the chapter"}
       </p>
-      {settings.mode === "horizontal" ? (
+      {/* Until the settings are known, no viewer: one for the wrong mode would load pages for nothing. */}
+      {settingsLoading ? null : settings.mode === "horizontal" ? (
         <HorizontalViewer
           key={`${data.chapter.id}-${settings.mode}-${settings.direction}`}
           urls={urls}

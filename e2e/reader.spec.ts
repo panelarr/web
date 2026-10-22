@@ -7,9 +7,8 @@ import { scrollStrip } from "./strip";
 async function openStrip(page: Page) {
   await page.goto("/catalog/ent_1001?mock=ready");
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
+  // Adding it moves on to the series in the library.
   await expect(page).toHaveURL(/\/works\//);
-  await page.goto("/");
-  await page.locator("main a[href^='/works/']").first().click();
   await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 15_000 });
   await expect(page.getByTestId("strip-viewer")).toBeVisible();
 }
@@ -25,7 +24,7 @@ test("a long strip reads on into the next chapter, without a click", async ({ pa
   // The chapter's start is a small band, not a screen: the first page is right there.
   const band = await page.locator("[data-reader-edge=start]").boundingBox();
   expect(band?.height ?? 999).toBeLessThan(200);
-  await expect(page.getByRole("img", { name: "Page 1" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Page 1", exact: true })).toBeVisible();
 
   // Scroll on: the pages follow one another, then the next chapter's.
   for (let i = 0; i < 80 && chapterOf(page.url()) === first; i++) {

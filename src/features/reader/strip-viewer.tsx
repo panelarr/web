@@ -6,7 +6,9 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { $api } from "@/api/client";
 import { MANUAL } from "@/api/events";
 import type { components } from "@/api/schema.gen";
+import { serverUrl } from "@/lib/server-url";
 import { PageImage } from "./page-image";
+import { PageLoader, type WantedPage } from "./page-loader";
 import type { ReaderSettings } from "./settings";
 
 type ChapterPages = components["schemas"]["ChapterPages"];
@@ -15,12 +17,13 @@ type Size = { width: number; height: number };
 /** Bands between chapters, at the very top and at the very bottom. */
 export type EdgeKind = "start" | "between" | "end";
 
-type Item =
-  | { key: string; kind: "page"; seg: number; page: number; ordinal: number }
-  | { key: string; kind: EdgeKind; seg: number };
+type PageItem = { key: string; kind: "page"; seg: number; page: number; ordinal: number };
+type Item = PageItem | { key: string; kind: EdgeKind; seg: number };
 
-/** Pages fetched past the first one still loading: pages load in order, a few at a time. */
-const AHEAD = 2;
+/** Pages loaded just above the screen (when any are loaded ahead). */
+const BEHIND = 2;
+/** Items rendered past either edge of the screen; pages further ahead are loaded, not rendered. */
+const OVERSCAN = 4;
 /** Load the next chapter this many pages before the end. */
 const NEXT_AT = 3;
 /** Load the previous chapter this many pages after the first one's start: flings up cover pages fast. */
@@ -43,9 +46,9 @@ export const chapterPagesOptions = (chapterId: string) =>
  * scrolling, flinging and pinch-zoom feel like the platform's. Chapters follow one another:
  * nearing the end loads the next chapter below, nearing the start loads the previous one above
  * (added while the strip is still, so it's there before the reader scrolls up to it), with a
- * small band between them. Only pages near the screen are rendered, and pages
- * are fetched in reading order a few at a time, so the next page comes first even when the
- * source paces its requests.
+ * small band between them. Only pages near the screen are rendered; the pages on screen and as
+ * many past them as the reader asks for (into the next chapter too) are loaded in reading order,
+ * a few at a time (see PageLoader), rendered or not.
  */
 export function StripViewer({
   first,
@@ -75,7 +78,8 @@ export function StripViewer({
   const gap = settings.mode === "webtoon" ? 0 : settings.pageGap;
   const [segments, setSegments] = useState<ChapterPages[]>([first]);
   const sizes = useRef(new Map<string, Size>());
-  const [settled, setSettled] = useState<ReadonlySet<string>>(() => new Set());
+  /** Pages loaded ahead: true once loaded, false if they failed. */
+  const [loaded, setLoaded] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   // Where the reader is, as the key of the page in the middle of the screen: keys don't move when
   // a chapter is added above (positions in the list would).
   const [current, setCurrent] = useState(() => `${first.chapter.id}:${Math.max(0, startIndex)}`);
@@ -95,7 +99,8 @@ export function StripViewer({
     });
     return list;
   }, [segments]);
-  const pageKeys = useMemo(() => items.filter((i) => i.kind === "page").map((i) => i.key), [items]);
+  const pageItems = useMemo(() => items.filter((i): i is PageItem => i.kind === "page"), [items]);
+  const pageKeys = useMemo(() => pageItems.map((i) => i.key), [pageItems]);
   const here = items.find((item) => item.key === current);
   const position =
     here?.kind === "page"
@@ -117,6 +122,15 @@ export function StripViewer({
       guesses.current.set(key, guess);
     }
     return guess;
+  };
+  /** A page's natural size, once known: it's then given exactly its space. */
+  const record = (item: PageItem, size: Size) => {
+    const chapterId = segments[item.seg]?.chapter.id ?? "";
+    if (!sizes.current.has(item.key)) sizes.current.set(item.key, size);
+    const ratio = size.height / size.width;
+    if (!ratios.current.has(chapterId)) ratios.current.set(chapterId, ratio);
+    lastRatio.current = ratio;
+    onPageSize?.(chapterId, item.page, size);
   };
 
   useLayoutEffect(() => {
@@ -141,7 +155,7 @@ export function StripViewer({
       // Whole pixels, as each page is sized (see PageImage), so estimates and measures agree.
       return Math.round((width || 360) * ratioOf(item.key, chapterId)) + gap;
     },
-    overscan: Math.max(2, settings.preload),
+    overscan: OVERSCAN,
   });
   // The strip keeps the page being read in place itself (below), not the virtualizer.
   virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () => false;
@@ -398,13 +412,60 @@ export function StripViewer({
   // Near the end of the last chapter, the next one is loaded below (nothing on screen moves); near
   // the start of the first, the previous one above, before the reader gets there.
   const { seg: currentSeg, page: currentPage } = position;
+  // The pages on screen, in reading order (a deferred correction shows the content further along).
+  const viewTop = virtualizer.scrollOffset ?? 0;
+  const onScreen = virtualizer
+    .getVirtualItems()
+    .filter(
+      (v) =>
+        v.end > viewTop + deferred.current.shift &&
+        v.start < viewTop + deferred.current.shift + (virtualizer.scrollRect?.height ?? 0),
+    )
+    .map((v) => items[v.index])
+    .filter((item): item is PageItem => item?.kind === "page");
+  const firstShown = onScreen[0]?.ordinal ?? position.ordinal;
+  const lastShown = onScreen.at(-1)?.ordinal ?? position.ordinal;
+  const preload = settings.preload;
+  const aheadTo = Math.min(pageItems.length - 1, lastShown + preload);
   useEffect(() => {
     const segment = segments[currentSeg];
-    if (segment && currentSeg === segments.length - 1 && currentPage >= segment.pages.length - NEXT_AT) {
-      void load("next");
-    }
+    // Near the end of the last chapter, or pages to load ahead run past it.
+    const nearEnd = segment && currentSeg === segments.length - 1 && currentPage >= segment.pages.length - NEXT_AT;
+    if (nearEnd || lastShown + preload > pageItems.length - 1) void load("next");
     if (currentSeg === 0 && currentPage < PREV_AT) void load("prev");
-  }, [currentSeg, currentPage, segments, load]);
+  }, [currentSeg, currentPage, segments, load, lastShown, preload, pageItems.length]);
+
+  // Load the pages on screen, then those ahead of them, then the ones just above.
+  const loaderRef = useRef<PageLoader | undefined>(undefined);
+  const onLoadedRef = useRef<(key: string, size: Size | undefined) => void>(() => {});
+  onLoadedRef.current = (key, size) => {
+    const index = items.findIndex((item) => item.key === key);
+    const item = items[index];
+    if (item?.kind !== "page") return;
+    const ok = !!size && size.width > 0 && size.height > 0;
+    if (ok) {
+      record(item, size);
+      // Its space is exact before it's rendered: it shows at once when the reader gets there.
+      if (width > 0) virtualizer.resizeItem(index, Math.round((width * size.height) / size.width) + gap);
+    }
+    setLoaded((prev) => new Map(prev).set(key, ok));
+  };
+  useEffect(() => {
+    const loader = new PageLoader((key, size) => onLoadedRef.current(key, size));
+    loaderRef.current = loader;
+    return () => loader.dispose();
+  }, []);
+  const wanted = useMemo(() => {
+    const order: number[] = [];
+    for (let o = firstShown; o <= aheadTo; o++) order.push(o);
+    if (preload > 0) for (let o = firstShown - 1; o >= Math.max(0, firstShown - BEHIND); o--) order.push(o);
+    return order.flatMap((o): WantedPage[] => {
+      const item = pageItems[o];
+      const url = item && segments[item.seg]?.pages[item.page]?.url;
+      return item && url ? [{ key: item.key, url: serverUrl(url) ?? url }] : [];
+    });
+  }, [firstShown, aheadTo, preload, pageItems, segments]);
+  useEffect(() => loaderRef.current?.want(wanted), [wanted]);
 
   // A scroll asked for from outside, read against the latest strip.
   const latest = useRef({ items, segments, position });
@@ -421,12 +482,6 @@ export function StripViewer({
       element.scrollBy({ top: (scroll.to === "forward" ? 1 : -1) * element.clientHeight * 0.8, behavior: "smooth" });
     }
   }, [scroll, virtualizer]);
-
-  // Pages are fetched in reading order: those just behind, then up to AHEAD past the first one
-  // ahead that hasn't loaded yet.
-  let frontier = position.ordinal;
-  while (frontier < pageKeys.length && settled.has(pageKeys[frontier] as string)) frontier++;
-  const mayLoad = (ordinal: number) => ordinal >= position.ordinal - 2 && ordinal <= frontier + AHEAD;
 
   const virtualItems = virtualizer.getVirtualItems();
   const shown =
@@ -475,20 +530,14 @@ export function StripViewer({
                   fit="width"
                   stretch
                   eager
-                  hold={!mayLoad(item.ordinal)}
+                  hold={!loaded.has(item.key)}
+                  failed={loaded.get(item.key) === false}
                   known={sizes.current.has(item.key)}
                   exactWidth={width || undefined}
                   size={sizes.current.get(item.key)}
                   className="items-start"
                   placeholderHeight={`${Math.round((width || 360) * ratioOf(item.key, segment.chapter.id))}px`}
-                  onSize={(size) => {
-                    if (!sizes.current.has(item.key)) sizes.current.set(item.key, size);
-                    const ratio = size.height / size.width;
-                    if (!ratios.current.has(segment.chapter.id)) ratios.current.set(segment.chapter.id, ratio);
-                    lastRatio.current = ratio;
-                    onPageSize?.(segment.chapter.id, item.page, size);
-                  }}
-                  onSettled={() => setSettled((prev) => (prev.has(item.key) ? prev : new Set(prev).add(item.key)))}
+                  onSize={(size) => record(item, size)}
                 />
               ) : (
                 renderEdge(item.kind, segment, segments[item.seg + 1])

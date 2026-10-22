@@ -22,6 +22,7 @@ export function PageImage({
   known = false,
   exactWidth,
   size,
+  failed = false,
   onSettled,
 }: {
   url: string;
@@ -51,15 +52,25 @@ export function PageImage({
    */
   exactWidth?: number;
   size?: { width: number; height: number } | undefined;
+  /** Its image already failed to load (a long strip loads pages ahead): it offers to try again. */
+  failed?: boolean;
   /** Called once it has loaded or failed. */
   onSettled?: () => void;
 }) {
-  const [state, setState] = useState<"loading" | "loaded" | "failed">(known ? "loaded" : "loading");
+  const [state, setState] = useState<"loading" | "loaded" | "failed">(known ? "loaded" : failed ? "failed" : "loading");
   const [attempt, setAttempt] = useState(0);
   // Held until it may load, then never held again (see `hold`).
-  const [released, setReleased] = useState(!hold);
-  if (!hold && !released) setReleased(true);
+  const [released, setReleased] = useState(!hold && !failed);
+  if (!hold && !failed && !released) setReleased(true);
+  // Failed while held: shown as failed, without loading it again.
+  const [sawFailure, setSawFailure] = useState(failed);
+  if (failed && !sawFailure) {
+    setSawFailure(true);
+    setState("failed");
+  }
+  // Its size can be known before it loads here (loaded ahead): its space is exact at once.
   const [natural, setNatural] = useState(size);
+  if (size && !natural) setNatural(size);
   const box =
     exactWidth && natural
       ? { width: exactWidth, height: Math.round((exactWidth * natural.height) / natural.width) }
@@ -82,7 +93,24 @@ export function PageImage({
               }
       }
     >
-      {!released ? null : state !== "failed" ? (
+      {state === "failed" ? (
+        <div className="flex flex-col items-center gap-3 p-8 text-center text-sm text-muted-foreground">
+          <ImageOff className="size-8" aria-hidden />
+          <p>Page {index + 1} didn't load.</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setState("loading");
+              setReleased(true);
+              setAttempt((n) => n + 1);
+            }}
+          >
+            <RotateCcw aria-hidden />
+            Try again
+          </Button>
+        </div>
+      ) : released ? (
         <img
           key={attempt}
           src={serverUrl(url)}
@@ -111,23 +139,7 @@ export function PageImage({
             state === "loading" && "opacity-0",
           )}
         />
-      ) : (
-        <div className="flex flex-col items-center gap-3 p-8 text-center text-sm text-muted-foreground">
-          <ImageOff className="size-8" aria-hidden />
-          <p>Page {index + 1} didn't load.</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setState("loading");
-              setAttempt((n) => n + 1);
-            }}
-          >
-            <RotateCcw aria-hidden />
-            Try again
-          </Button>
-        </div>
-      )}
+      ) : null}
       {state === "loading" ? (
         <Loader2
           className="absolute size-6 animate-spin text-muted-foreground"

@@ -9,9 +9,8 @@ import { scrollStrip } from "./strip";
 async function openStrip(page: Page) {
   await page.goto("/catalog/ent_1001?mock=slow-pages");
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
+  // Adding it moves on to the series in the library.
   await expect(page).toHaveURL(/\/works\//);
-  await page.goto("/");
-  await page.locator("main a[href^='/works/']").first().click();
   await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 15_000 });
   await expect(page.getByTestId("strip-viewer")).toBeVisible();
 }
