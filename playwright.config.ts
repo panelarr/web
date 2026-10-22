@@ -1,9 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { defineConfig, devices } from "@playwright/test";
+import { existsSync } from "node:fs";
+import { defineConfig, devices, webkit as webkitBrowser } from "@playwright/test";
 
 const port = Number(process.env.E2E_PORT || 5174);
 const previewPort = Number(process.env.E2E_PREVIEW_PORT || 4174);
+
+/**
+ * The reader's specs also run on iOS Safari's engine whenever WebKit is installed
+ * (`pnpm exec playwright install webkit`); `E2E_WEBKIT=0` leaves it out, `E2E_WEBKIT=1` insists on it.
+ */
+function webkitInstalled(): boolean {
+  try {
+    return existsSync(webkitBrowser.executablePath());
+  } catch {
+    return false;
+  }
+}
+const webkit = process.env.E2E_WEBKIT ? process.env.E2E_WEBKIT !== "0" : webkitInstalled();
+// Said once (not again in each worker), so a run without it doesn't pass for one with it.
+if (!webkit && !process.env.E2E_WEBKIT && process.env.TEST_WORKER_INDEX === undefined) {
+  console.log("Not on WebKit: the reader's iOS Safari specs are skipped (`pnpm exec playwright install webkit`).");
+}
 
 /**
  * Smoke tests against the dev server in full mock mode (no Panelarr server needed), on a
@@ -32,8 +50,8 @@ export default defineConfig({
       testIgnore: /csp\.spec/,
       use: { ...devices["Pixel 7"], viewport: { width: 360, height: 740 } },
     },
-    // The reader on iOS Safari's engine, when WebKit is installed (`make e2e-webkit`).
-    ...(process.env.E2E_WEBKIT
+    // The reader on iOS Safari's engine, when WebKit is installed (see above).
+    ...(webkit
       ? [
           {
             name: "phone-webkit",

@@ -107,7 +107,9 @@ reloads. "Install the app" uses the browser's prompt, or shows the steps on iOS.
   mock answer checked against the spec).
 - `make e2e`: Playwright on a desktop and a 360 px phone: the main flows, no sideways
   scrolling, axe accessibility checks (light and dark), a full journey (set up, add, read,
-  download), and the production build under the real CSP.
+  download), and the production build under the real CSP. Once WebKit is installed
+  (`pnpm exec playwright install webkit`), the reader's specs also run on iOS Safari's engine;
+  without it, the run says they were skipped. `E2E_WEBKIT=0` leaves them out.
 
 ## Lessons kept from Panelarr's other admin UIs
 

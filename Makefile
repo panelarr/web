@@ -21,10 +21,10 @@ build: ## Build the app into dist/ and check it is safe under a strict CSP
 test: ## Run the unit and component tests
 	$(PNPM) test
 
-e2e: ## Run the Playwright smoke tests (desktop and phone) against the mock server
+e2e: ## Run the Playwright smoke tests (desktop, phone, and the reader on WebKit when installed) against the mock server
 	$(PNPM) e2e
 
-e2e-webkit: ## The reader's tests on iOS Safari's engine too (needs `pnpm exec playwright install webkit`)
+e2e-webkit: ## Only the reader's tests on iOS Safari's engine (needs `pnpm exec playwright install webkit`)
 	E2E_WEBKIT=1 $(PNPM) e2e --project phone-webkit
 
 lint: ## Lint and check formatting (Biome)

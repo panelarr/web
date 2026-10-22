@@ -12,6 +12,7 @@ make setup      # dependencies and the Playwright browser
 make run-mock   # run against the mock server
 make check      # lint, generated types, build (with the CSP check), types and tests: run before every PR
 make e2e        # Playwright smoke tests on a desktop and a 360 px phone, plus the CSP check in a browser
+make e2e-webkit # only the reader on iOS Safari's engine (make e2e runs it too once WebKit is installed)
 make help       # every target
 ```
 
