@@ -65,6 +65,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
+          # The check needs no dependencies. Without this, setup-node caches for the
+          # package.json `packageManager` (pnpm), which isn't installed in this job.
+          package-manager-cache: false
 
       - name: Compare with the server's main
         env:
