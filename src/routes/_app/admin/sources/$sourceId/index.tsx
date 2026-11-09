@@ -7,11 +7,11 @@ import { useMemo, useState } from "react";
 import { $api, api } from "@/api/client";
 import { isApiError } from "@/api/errors";
 import type { components } from "@/api/schema.gen";
+import { SearchInput } from "@/components/search-input";
 import { SourceIcon } from "@/components/source-icon";
 import { EmptyState, ErrorAlert, Loading } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { Cover } from "@/features/catalog/cover";
 import { EntryGrid } from "@/features/catalog/entry-card";
@@ -188,13 +188,14 @@ function SourcePage() {
             });
           }}
         >
-          <Input
-            type="search"
+          <SearchInput
             aria-label={`Search ${source.name}`}
             placeholder={`Search ${source.name}`}
             enterKeyHint="search"
+            className="flex-1"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={setText}
+            onClear={() => setSearch({ list: "search", ...(search.filters ? { filters: search.filters } : {}) })}
           />
           <Button type="submit" variant="outline" aria-label="Search">
             <Search aria-hidden />

@@ -13,17 +13,33 @@ export interface PackageFilter {
 }
 
 /**
- * The packages that match. The tab filters the full list it already has (as Admin → Sources
- * does): every change is instant, and the same list gives the languages and the counts.
+ * The packages that match, in display order. The tab filters the full list it already has (as
+ * Admin → Sources does): every change is instant, and the same list gives the languages and the
+ * counts.
  */
 export function filterPackages(packages: readonly Package[], filter: PackageFilter): Package[] {
   const q = filter.q?.trim().toLowerCase();
-  return packages.filter(
-    (p) =>
-      (!q || [p.name, p.id, ...p.sources.map((s) => s.name)].some((name) => name.toLowerCase().includes(q))) &&
-      (!filter.lang || p.langs.includes(filter.lang) || p.sources.some((s) => s.lang === filter.lang)) &&
-      (filter.show !== "installed" || p.installed) &&
-      (filter.show !== "updates" || p.update_available),
+  return sortPackages(
+    packages.filter(
+      (p) =>
+        (!q || [p.name, p.id, ...p.sources.map((s) => s.name)].some((name) => name.toLowerCase().includes(q))) &&
+        (!filter.lang || p.langs.includes(filter.lang) || p.sources.some((s) => s.lang === filter.lang)) &&
+        (filter.show !== "installed" || p.installed) &&
+        (filter.show !== "updates" || p.update_available),
+    ),
+  );
+}
+
+/**
+ * What needs the admin first: updates, then the rest of what's installed, then everything else,
+ * each by name. The sort is stable, so equal names keep the store's order.
+ */
+export function sortPackages(packages: readonly Package[]): Package[] {
+  return [...packages].sort(
+    (a, b) =>
+      Number(b.update_available) - Number(a.update_available) ||
+      Number(b.installed) - Number(a.installed) ||
+      a.name.localeCompare(b.name),
   );
 }
 

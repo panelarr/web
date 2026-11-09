@@ -136,6 +136,16 @@ describe("browsing sources", () => {
     expect(await screen.findByText("Blue Hour Racers")).toBeInTheDocument();
   });
 
+  it("clears a source's search, and its query in the URL", async () => {
+    const { router } = await renderApp("/admin/sources/example:1001?list=search&q=the");
+    const field = await screen.findByRole("searchbox", { name: "Search Example Source" });
+    expect(field).toHaveValue("the");
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(field).toHaveValue("");
+    expect(field).toHaveFocus();
+    await waitFor(() => expect(router.state.location.search).toEqual({ list: "search" }));
+  });
+
   it("searches with the source's own filters, sending only what changed", async () => {
     const bodies: unknown[] = [];
     server.events.on("request:start", async ({ request }) => {

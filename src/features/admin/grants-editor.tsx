@@ -5,9 +5,9 @@ import { $api } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 import { Field } from "@/components/form";
 import { NativeSelect } from "@/components/native-select";
+import { SearchInput } from "@/components/search-input";
 import { ErrorAlert } from "@/components/states";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { CONTENT_RATINGS, type ContentRating, type Grants } from "./grants";
@@ -138,13 +138,13 @@ export function SourcePicker({ selected, onChange }: { selected: string[]; onCha
   return (
     <div className="grid gap-2 rounded-lg border p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Input
-          type="search"
+        <SearchInput
           placeholder="Filter sources"
           aria-label="Filter sources"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="h-8 min-w-0 flex-1 basis-40"
+          onChange={setFilter}
+          className="flex-1 basis-40"
+          inputClassName="h-8"
         />
         <span className="text-xs text-muted-foreground tabular-nums">
           {selected.length} of {total} allowed
