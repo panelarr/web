@@ -140,7 +140,7 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
     "/admin/jobs",
     "/admin/jobs/update-check",
     "/admin/queue",
-    "/admin/system",
+    "/admin/health",
     "/admin/metadata",
     "/admin/metadata?tab=jobs",
     "/admin/metadata?tab=jobs&job=sync.example-provider.dump",

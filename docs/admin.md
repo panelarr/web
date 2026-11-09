@@ -18,7 +18,7 @@ admin key, and reaches plugins through the source contract.
 | A source's settings (Admin → Sources, a source's page, an extension's details) | Its own image retries, overriding its extension's | always |
 | Admin → Plugins → a plugin → Jobs | Its jobs | the plugin has `jobs` |
 | Admin → Plugins → a plugin → Network | Its network profiles, proxies and solvers | always |
-| Admin → System | The server's health, and the metadata service in a line | always |
+| Admin → Health | Everything Panelarr depends on: the server's components, the metadata service, each source plugin, and failing or unchecked sources per plugin with health checks (`/admin/system` redirects here) | always |
 
 A plugin's tabs follow its capabilities, so a plugin that can't do something never shows an
 empty section for it. The server still checks every call: a plugin without `jobs` answers

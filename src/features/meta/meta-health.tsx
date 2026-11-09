@@ -14,13 +14,13 @@ export function componentName(name: string): string {
 }
 
 /** The metadata service's own health: its database, its search backend and each provider's plugin. */
-export function MetaHealthCard() {
+export function MetaHealthCard({ title = "Health" }: { title?: string }) {
   const health = $api.useQuery("get", "/system/meta/health", {}, { refetchInterval: 30_000 });
   return (
     <Card className="self-start">
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-3">
-          Health {health.data ? <HealthBadge status={health.data.status} /> : null}
+          {title} {health.data ? <HealthBadge status={health.data.status} /> : null}
         </CardTitle>
         <CardDescription>
           {health.data?.version ? `Metadata service ${health.data.version}. ` : ""}What it depends on, as it sees it.

@@ -34,6 +34,7 @@ const PAGES = [
   "/admin/plugins/stores?tab=sources",
   "/admin/queue",
   "/admin/storage",
+  "/admin/health",
 ];
 
 test("the main pages have no serious accessibility problems", async ({ page, isMobile }) => {
@@ -61,7 +62,7 @@ test("the dark theme keeps text readable", async ({ page, isMobile }) => {
     localStorage.setItem("panelarr.theme.prefs", JSON.stringify({ theme: "dark", accent: "#E0457B", font: "inter" })),
   );
   const found: string[] = [];
-  for (const path of ["/", "/settings?tab=appearance", "/admin/jobs", "/catalog/ent_1001"]) {
+  for (const path of ["/", "/settings?tab=appearance", "/admin/jobs", "/catalog/ent_1001", "/admin/health"]) {
     await page.goto(path);
     await expect(page.locator("html")).toHaveClass(/dark/);
     await page.waitForLoadState("networkidle");

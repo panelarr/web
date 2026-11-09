@@ -12,7 +12,7 @@ export const ADMIN_PAGES = [
   { to: "/admin/network", label: "Network" },
   { to: "/admin/jobs", label: "Jobs" },
   { to: "/admin/queue", label: "Queue" },
-  { to: "/admin/system", label: "System" },
+  { to: "/admin/health", label: "Health" },
 ] as const;
 
 /** The admin area. The server enforces admin rights on every call; this only keeps users out of pages they can't use. */

@@ -850,7 +850,12 @@ export const operations: MockOperation[] = [
 
   op("get", "/system/meta/health", () => {
     const user = requireAdmin();
-    return user instanceof Response ? user : json(metaHealth(db()));
+    if (user instanceof Response) return user;
+    // As the server does: it can only ask the metadata service once it's connected.
+    if (!db().meta.check.configured) {
+      return problem(503, "meta_unavailable", "The metadata service isn't connected", "Connect it first.");
+    }
+    return json(metaHealth(db()));
   }),
 
   op("post", "/system/meta/entries/{entry_id}/refresh", ({ params }) => {
