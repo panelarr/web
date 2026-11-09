@@ -9,6 +9,7 @@ import { $api } from "@/api/client";
 import { errorMessage, isApiError } from "@/api/errors";
 import type { components } from "@/api/schema.gen";
 import { NativeSelect } from "@/components/native-select";
+import { SearchInput } from "@/components/search-input";
 import { SourceIcon } from "@/components/source-icon";
 import { EmptyState, ErrorAlert, Loading } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { VirtualList } from "@/components/virtual-list";
@@ -93,12 +93,11 @@ export function SourcesHealthPanel({
   const body = (
     <div className="grid gap-4">
       <div className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Input
-          type="search"
+        <SearchInput
           placeholder="Search sources"
           aria-label="Search sources"
           value={search.q ?? ""}
-          onChange={(e) => onSearch({ q: e.target.value || undefined })}
+          onChange={(q) => onSearch({ q: q || undefined })}
         />
         <NativeSelect
           aria-label="Health"

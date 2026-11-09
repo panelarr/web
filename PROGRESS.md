@@ -98,3 +98,7 @@ Settled for now, cheap to change:
 ## Next
 
 The first version is done and checked against a real server. Next: the first release, once pushing is agreed.
+
+## Operator improvements
+
+- [x] **One search field everywhere:** every search (Library and History on desktops, Browse, Admin → Sources and a source's own search, a plugin's sources and extensions, a user's allowed sources, searching a source from a work) has the same ✕ that shows with text, clears and puts the cursor back, and Escape clears too; WebKit's own clear button is hidden. Clearing a source's search clears its query in the URL. Phones keep the library's and history's close ✕.

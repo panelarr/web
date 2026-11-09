@@ -101,6 +101,15 @@ describe("a plugin's sources and their health checks", () => {
     expect(screen.getByText(/3 sources · 1 failing · 1 with scheduled checks off/)).toBeInTheDocument();
   });
 
+  it("search by name, and clear the search", async () => {
+    const { router } = await renderApp("/admin/plugins/stores?tab=sources&q=nothing");
+    const field = await screen.findByRole("searchbox", { name: "Search sources" });
+    expect(field).toHaveValue("nothing");
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    await waitFor(() => sourceRow("ja"));
+    expect(router.state.location.search).not.toHaveProperty("q");
+  });
+
   it("check one now through the plugin's health job, and show the outcome", async () => {
     await renderApp("/admin/plugins/stores?tab=sources");
     const ja = await waitFor(() => sourceRow("ja"));

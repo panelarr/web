@@ -45,7 +45,8 @@ describe("the Extensions tab", () => {
     await userEvent.type(screen.getByRole("searchbox", { name: "Search extensions" }), "night");
     expect(await screen.findByText("1 of 64 extensions · 1 installed · 1 with an update")).toBeInTheDocument();
     expect(row("Night Shelf")).toHaveTextContent(/NSFW/);
-    await userEvent.clear(screen.getByRole("searchbox", { name: "Search extensions" }));
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    await waitFor(() => expect(router.state.location.search).not.toHaveProperty("q"));
 
     await userEvent.selectOptions(screen.getByLabelText("Language"), "ja");
     await waitFor(() => expect(router.state.location.search).toMatchObject({ lang: "ja" }));

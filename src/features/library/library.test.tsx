@@ -94,6 +94,26 @@ describe("the library", () => {
     await waitFor(() => expect(titles()).toEqual(["Iron Garden"]));
   });
 
+  it("clears the search with its ✕ on a desktop, keeping the field", async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      ...matchMedia(query),
+      matches: query === "(min-width: 768px)",
+    })) as typeof window.matchMedia;
+    try {
+      const { router } = await renderApp("/?q=iron");
+      const field = await screen.findByRole("searchbox", { name: "Search your library" });
+      await waitFor(() => expect(titles()).toEqual(["Iron Garden"]));
+      expect(screen.queryByRole("button", { name: "Close the search" })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+      await waitFor(() => expect(titles()).toHaveLength(3));
+      expect(router.state.location.search).not.toHaveProperty("q");
+      expect(field).toHaveFocus();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
   it("sorts, reverses, and remembers it", async () => {
     await renderApp("/");
     await screen.findByText("3 works");

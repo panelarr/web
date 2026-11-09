@@ -7,11 +7,11 @@ import { useMemo } from "react";
 import { $api } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 import { NativeSelect } from "@/components/native-select";
+import { SearchInput } from "@/components/search-input";
 import { SourceIcon } from "@/components/source-icon";
 import { EmptyState, ErrorAlert, Loading, PageHeader } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { hasSettings, SourceSettingsButton } from "@/features/sources/source-settings";
@@ -95,12 +95,11 @@ function SourcesPage() {
         }
       />
       <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
-        <Input
-          type="search"
+        <SearchInput
           placeholder="Search sources"
           aria-label="Search sources"
           value={search.q ?? ""}
-          onChange={(e) => set({ q: e.target.value || undefined })}
+          onChange={(q) => set({ q: q || undefined })}
         />
         <NativeSelect
           aria-label="Plugin"

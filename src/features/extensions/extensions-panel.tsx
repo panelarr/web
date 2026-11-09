@@ -4,10 +4,10 @@ import { Package as PackageIcon, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { isApiError } from "@/api/errors";
 import { NativeSelect } from "@/components/native-select";
+import { SearchInput } from "@/components/search-input";
 import { SourceIcon } from "@/components/source-icon";
 import { EmptyState, ErrorAlert, Loading } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { VirtualList } from "@/components/virtual-list";
 import { formatRelative } from "@/lib/format";
 import { PackageActions, PackageFacts } from "./package-parts";
@@ -55,12 +55,11 @@ export function ExtensionsPanel({
     <div className="grid gap-4">
       <StoresPanel pluginId={pluginId} />
       <div className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]">
-        <Input
-          type="search"
+        <SearchInput
           placeholder="Search extensions"
           aria-label="Search extensions"
           value={search.q ?? ""}
-          onChange={(e) => onSearch({ q: e.target.value || undefined })}
+          onChange={(q) => onSearch({ q: q || undefined })}
         />
         <NativeSelect
           aria-label="Language"

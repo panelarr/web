@@ -2,15 +2,15 @@
 
 import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
 /**
  * Search in a page's title row. Desktops show the field; phones a search icon that opens it in
  * the row (as native apps do), so it doesn't take a row of its own. A query keeps it open; ✕
- * closes it and clears the query.
+ * closes it and clears the query. On desktops the field has the usual clear ✕ and Escape.
  */
 export function HeaderSearch({
   value,
@@ -41,19 +41,17 @@ export function HeaderSearch({
   }
   return (
     <div className={cn("relative min-w-0 flex-1 md:w-72 md:flex-none", className)}>
-      <Search
-        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-        aria-hidden
-      />
-      <Input
-        type="search"
+      <SearchInput
+        icon
+        // Phones close the field with their own ✕ (clearing it too); desktops clear with one.
+        clearable={desktop}
         aria-label={label}
         placeholder={label}
         // Opened by a tap: ready to type.
         autoFocus={!desktop && value === ""}
-        className={cn("pl-9", !desktop && "pr-9")}
+        inputClassName={cn(!desktop && "pr-9")}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         onKeyDown={(e) => {
           if (e.key === "Escape" && !desktop) {
             onChange("");

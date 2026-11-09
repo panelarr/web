@@ -99,7 +99,7 @@ describe("fixing matches", () => {
       }),
     );
     const dialog = await screen.findByRole("dialog");
-    const search = within(dialog).getByRole("textbox", { name: "Search the source" });
+    const search = within(dialog).getByRole("searchbox", { name: "Search the source" });
     await userEvent.clear(search);
     await userEvent.type(search, "Tourou");
     await userEvent.click(within(dialog).getByRole("button", { name: "Search" }));
@@ -120,7 +120,7 @@ describe("fixing matches", () => {
       within(row("Example Source")).getByRole("button", { name: "Search Example Source yourself" }),
     );
     const dialog = await screen.findByRole("dialog");
-    const search = within(dialog).getByRole("textbox", { name: "Search the source" });
+    const search = within(dialog).getByRole("searchbox", { name: "Search the source" });
     await userEvent.clear(search);
     await userEvent.type(search, "Moonlit");
     await userEvent.click(within(dialog).getByRole("button", { name: "Search" }));
@@ -148,7 +148,7 @@ describe("fixing matches", () => {
       }),
     );
     const dialog = await screen.findByRole("dialog");
-    const search = within(dialog).getByRole("textbox", { name: "Search the source" });
+    const search = within(dialog).getByRole("searchbox", { name: "Search the source" });
     await userEvent.clear(search);
     // A query several of the source's series answer: the error shows on the one picked.
     await userEvent.type(search, "a");
@@ -181,7 +181,7 @@ describe("fixing matches", () => {
       }),
     );
     const dialog = await screen.findByRole("dialog");
-    const search = within(dialog).getByRole("textbox", { name: "Search the source" });
+    const search = within(dialog).getByRole("searchbox", { name: "Search the source" });
     await userEvent.clear(search);
     await userEvent.type(search, "Tourou");
     await userEvent.click(within(dialog).getByRole("button", { name: "Search" }));
