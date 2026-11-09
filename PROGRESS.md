@@ -79,6 +79,12 @@ Everything in the metadata service's and source plugins' own admin pages, inside
 
 - [x] **Image retries in the extension admin:** on an extension's details, how failed page images are tried again for all its sources: the default, off, or waits of its own (up to 5, 0–30 s, starting from what's in effect); on a source's settings, its own, inheriting its extension's otherwise. Each says what's in effect and where it comes from; inheriting and off read differently. The reader keeps Try again for when the attempts run out (`docs/admin.md`).
 
+## Fixes after the live check (2026-11-09)
+
+- [x] **Leaving the reader never stacks it:** every way out (close, the chapters links, the series page, Escape) goes back to the series page when the reader was opened from it, and otherwise puts the series page in the reader's place, so Back from there goes where it was opened from (the library keeps its scroll); with no history, the series page's Back goes to the library. Reading on into other chapters keeps that way back.
+- [x] **Adding a work opens it on its Sources tab**, from the catalogue and from a source's series: its chapters come once a source is attached.
+- [x] **A failed attach says so:** a toast, and the error on the search result that was picked.
+
 ## Working assumptions
 
 Settled for now, cheap to change:

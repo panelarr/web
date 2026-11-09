@@ -7,8 +7,9 @@ import { scrollStrip } from "./strip";
 async function openStrip(page: Page) {
   await page.goto("/catalog/ent_1001?mock=ready");
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  // Adding it moves on to the series in the library.
-  await expect(page).toHaveURL(/\/works\//);
+  // Adding it moves on to the series in the library, on its sources; its chapters are a tab away.
+  await expect(page).toHaveURL(/\/works\/[^/?]+\?tab=sources$/);
+  await page.getByRole("tab", { name: "Chapters" }).click();
   await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 15_000 });
   await expect(page.getByTestId("strip-viewer")).toBeVisible();
 }

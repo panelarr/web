@@ -79,15 +79,12 @@ function WorkPage() {
   const { workId } = Route.useParams();
   const router = useRouter();
   const work = $api.useQuery("get", "/works/{work_id}", { params: { path: { work_id: workId } } });
+  // Back where the page was opened from; opened directly (a link, a bookmark), the library.
+  const back = () => (router.history.canGoBack() ? router.history.back() : void router.navigate({ to: "/" }));
   return (
     <>
-      <PhoneTopBar title={work.data?.title} entryId={work.data?.entry_id} onBack={() => router.history.back()} />
-      <Button
-        variant="ghost"
-        size="sm"
-        className="-ml-2 mb-2 hidden sm:inline-flex"
-        onClick={() => router.history.back()}
-      >
+      <PhoneTopBar title={work.data?.title} entryId={work.data?.entry_id} onBack={back} />
+      <Button variant="ghost" size="sm" className="-ml-2 mb-2 hidden sm:inline-flex" onClick={back}>
         <ArrowLeft aria-hidden />
         Back
       </Button>

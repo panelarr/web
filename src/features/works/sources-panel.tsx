@@ -66,7 +66,11 @@ function useWorkMutations(work: Work) {
     attach: $api.useMutation("post", "/works/{work_id}/series/{series_id}/attach", { onSuccess: refresh, onError }),
     detach: $api.useMutation("post", "/works/{work_id}/series/{series_id}/detach", { onSuccess: refresh, onError }),
     priority: $api.useMutation("patch", "/works/{work_id}/series/{series_id}", { onSuccess: refresh, onError }),
-    add: $api.useMutation("post", "/works/{work_id}/series", { onSuccess: refresh }),
+    // A pick that fails says so at once: the dialog's own message may be out of sight.
+    add: $api.useMutation("post", "/works/{work_id}/series", {
+      onSuccess: refresh,
+      onError: (error: unknown) => toast.error(`Not attached: ${errorMessage(error)}`),
+    }),
     match: $api.useMutation("post", "/works/{work_id}/match", {
       onSuccess: () => {
         refresh();
@@ -405,6 +409,7 @@ function SearchSourceDialog({
       onOpenChange={(next) => {
         onOpenChange(next);
         if (next && !search.data) run();
+        if (!next) m.add.reset();
       }}
     >
       <DialogContent className="sm:max-w-xl">
@@ -428,35 +433,49 @@ function SearchSourceDialog({
         {search.error ? <ErrorAlert error={search.error} /> : null}
         {search.data?.series.length === 0 ? <p className="text-sm text-muted-foreground">Nothing found.</p> : null}
         <ul className="grid gap-2">
-          {search.data?.series.map((series) => (
-            <li key={series.key} className="flex items-center gap-3 rounded-lg border p-2.5">
-              <Cover url={series.cover_url} title={series.title} className="w-10 shrink-0 rounded" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium [overflow-wrap:anywhere]">{series.title}</p>
-                <p className="truncate text-xs text-muted-foreground">{series.authors.join(", ")}</p>
-              </div>
-              {series.match ? <Badge variant="outline">{MATCH_LABELS[series.match.state]}</Badge> : null}
-              <Button
-                size="sm"
-                disabled={m.add.isPending || series.match?.state === "attached"}
-                onClick={() =>
-                  m.add.mutate(
-                    { params: { path: { work_id: work.id } }, body: { source_id: state.source.id, key: series.key } },
-                    {
-                      onSuccess: () => {
-                        toast.success(`Attached ${series.title}.`);
-                        onOpenChange(false);
-                      },
-                    },
-                  )
-                }
-              >
-                {series.match?.state === "rejected" ? "Attach anyway" : "Attach"}
-              </Button>
-            </li>
-          ))}
+          {search.data?.series.map((series) => {
+            // The error of an attach is shown on the result that was picked.
+            const failed =
+              m.add.error &&
+              m.add.variables?.body.source_id === state.source.id &&
+              m.add.variables.body.key === series.key
+                ? m.add.error
+                : undefined;
+            return (
+              <li key={series.key} className="grid gap-2 rounded-lg border p-2.5">
+                <div className="flex items-center gap-3">
+                  <Cover url={series.cover_url} title={series.title} className="w-10 shrink-0 rounded" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium [overflow-wrap:anywhere]">{series.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{series.authors.join(", ")}</p>
+                  </div>
+                  {series.match ? <Badge variant="outline">{MATCH_LABELS[series.match.state]}</Badge> : null}
+                  <Button
+                    size="sm"
+                    disabled={m.add.isPending || series.match?.state === "attached"}
+                    onClick={() =>
+                      m.add.mutate(
+                        {
+                          params: { path: { work_id: work.id } },
+                          body: { source_id: state.source.id, key: series.key },
+                        },
+                        {
+                          onSuccess: () => {
+                            toast.success(`Attached ${series.title}.`);
+                            onOpenChange(false);
+                          },
+                        },
+                      )
+                    }
+                  >
+                    {series.match?.state === "rejected" ? "Attach anyway" : "Attach"}
+                  </Button>
+                </div>
+                {failed ? <ErrorAlert error={failed} title="Not attached" /> : null}
+              </li>
+            );
+          })}
         </ul>
-        {m.add.error ? <ErrorAlert error={m.add.error} title="Not attached" /> : null}
       </DialogContent>
     </Dialog>
   );

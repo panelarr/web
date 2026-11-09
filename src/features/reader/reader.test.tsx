@@ -243,6 +243,57 @@ describe("the reader", () => {
   });
 });
 
+describe("leaving the reader", () => {
+  const workPath = () => `/works/${ctx.work?.id}`;
+  const openFromSeries = async () => {
+    const { router } = await renderApp("/");
+    await router.navigate({ to: "/works/$workId", params: { workId: ctx.work?.id ?? "" } });
+    await userEvent.click(await screen.findByRole("link", { name: /^(Start reading|Continue): / }));
+    await screen.findByText("The Lantern Keeper");
+    return router;
+  };
+  const back = async () => {
+    const [button] = screen.getAllByRole("button", { name: "Back" });
+    await userEvent.click(button as HTMLElement);
+  };
+
+  it("goes back to the series page it came from, so Back from there leads where that was opened from", async () => {
+    const router = await openFromSeries();
+    await userEvent.click(screen.getByRole("link", { name: "Close the reader" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(workPath()));
+    await back();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+
+  it("does the same on Escape, once the bars are hidden", async () => {
+    const router = await openFromSeries();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(router.state.location.pathname).toBe(workPath()));
+    await back();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+
+  it("keeps the way back across chapters read in the reader", async () => {
+    const router = await openFromSeries();
+    await userEvent.click(screen.getByRole("button", { name: "Next chapter" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/read/${ctx.chapters[1]?.id}`));
+    await userEvent.click(screen.getByRole("link", { name: "Close the reader" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(workPath()));
+    await back();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+
+  it("opened directly, puts the series page in its place, whose Back leads to the library", async () => {
+    const { router } = await renderApp(`/read/${ctx.chapters[0]?.id}`);
+    await userEvent.click(await screen.findByRole("link", { name: "Close the reader" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(workPath()));
+    expect(router.history.canGoBack()).toBe(false);
+    await back();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+});
+
 describe("startPage", () => {
   const data = (progress?: { page: number; completed: boolean }) =>
     ({

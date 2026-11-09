@@ -149,7 +149,8 @@ function AddFromSource({ sourceId, seriesKey, title }: { sourceId: string; serie
     setCandidates(undefined);
     void queryClient.invalidateQueries({ queryKey: LIBRARY_INDEX_KEY });
     toast.success(`Added ${workTitle}.`);
-    await navigate({ to: "/works/$workId", params: { workId } });
+    // On its sources, like an add from the catalogue: what's attached shows there first.
+    await navigate({ to: "/works/$workId", params: { workId }, search: { tab: "sources" } });
   };
   const find = $api.useMutation("post", "/library/from-source", {
     onSuccess: (result) => {

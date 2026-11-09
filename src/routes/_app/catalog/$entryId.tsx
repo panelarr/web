@@ -154,8 +154,14 @@ function AddButton({ entry }: { entry: Entry }) {
       void queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[1]).startsWith("/catalog") });
       void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/library").queryKey.slice(0, 2) });
       toast.success(`Added ${entry.title}. Looking for it on your sources…`);
-      // On to the work in the library, in place of this page: back leads to where you browsed.
-      void navigate({ to: "/works/$workId", params: { workId: result.work.id }, replace: true });
+      // On to the work in the library, in place of this page: back leads to where you browsed. It
+      // opens on its sources, where the search for it shows; chapters come once one is attached.
+      void navigate({
+        to: "/works/$workId",
+        params: { workId: result.work.id },
+        search: { tab: "sources" },
+        replace: true,
+      });
     },
   });
   const workId = entry.library_work_id ?? add.data?.work.id;

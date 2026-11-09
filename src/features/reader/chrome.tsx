@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Bookmark,
@@ -27,6 +26,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { chapterLabel } from "@/features/works/chapters";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
+import { LeaveReaderLink } from "./leave";
 
 type Chapter = components["schemas"]["UnifiedChapter"];
 
@@ -94,9 +94,7 @@ export function ChapterEdge({
             </Button>
           ) : null}
           <Button variant="ghost" size="sm" asChild onClick={(event) => event.stopPropagation()}>
-            <Link to="/works/$workId" params={{ workId }}>
-              Chapters
-            </Link>
+            <LeaveReaderLink workId={workId}>Chapters</LeaveReaderLink>
           </Button>
         </div>
       </div>
@@ -148,9 +146,7 @@ export function ChapterEdge({
         </p>
       )}
       <Button variant="ghost" size="sm" asChild onClick={(event) => event.stopPropagation()}>
-        <Link to="/works/$workId" params={{ workId }}>
-          Back to the chapters
-        </Link>
+        <LeaveReaderLink workId={workId}>Back to the chapters</LeaveReaderLink>
       </Button>
     </div>
   );
@@ -228,9 +224,9 @@ export function ReaderOverlay({
       <header className={cn(bar, "border-b pt-safe", !visible && "-translate-y-full")}>
         <div className="flex h-12 items-center gap-1 px-1 pl-safe pr-safe">
           <Button variant="ghost" size="icon" asChild tabIndex={tab}>
-            <Link to="/works/$workId" params={{ workId }} aria-label="Close the reader">
+            <LeaveReaderLink workId={workId} aria-label="Close the reader">
               <ArrowLeft aria-hidden />
-            </Link>
+            </LeaveReaderLink>
           </Button>
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-sm font-medium">{workTitle}</p>
@@ -269,9 +265,7 @@ export function ReaderOverlay({
               </DropdownMenuCheckboxItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/works/$workId" params={{ workId }}>
-                  The series page
-                </Link>
+                <LeaveReaderLink workId={workId}>The series page</LeaveReaderLink>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

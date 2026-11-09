@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { BookOpen, Columns3, File, GalleryVertical, Rows3 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import { serverUrl } from "@/lib/server-url";
 import { cn } from "@/lib/utils";
 import { ChapterEdge, ChapterJumpSheet, PageNumber, ReaderOverlay } from "./chrome";
 import { HorizontalViewer } from "./horizontal-viewer";
+import { type ReaderState, readerState, useLeaveReader } from "./leave";
 import { PagedViewer } from "./paged-viewer";
 import { edgeColor, TapZonePreview, useFullscreen, useWakeLock } from "./screen-helpers";
 import { isContinuous, type Mode, type ReaderSettings } from "./settings";
@@ -77,6 +78,12 @@ export function ReaderScreen({
   asked: number | "last" | undefined;
 }) {
   const navigate = useNavigate();
+  const leave = useLeaveReader(data.work_id);
+  // Where the reader was opened from, carried over as it replaces its entry chapter by chapter.
+  const fromWork = useRouterState({ select: (state) => readerState(state.location.state).fromWork });
+  const carried: ReaderState = fromWork ? { fromWork } : {};
+  const carriedRef = useRef(carried);
+  carriedRef.current = carried;
   const queryClient = useQueryClient();
   const reader = useReaderSettings(data.work_id, data.variant.source_id, work?.type);
   // Long strips found in a work without a chosen mode are read as a webtoon.
@@ -149,6 +156,7 @@ export function ReaderScreen({
         params: { chapterId: id },
         search: page === 0 ? {} : { page },
         replace: true,
+        state: { ...carriedRef.current } satisfies ReaderState,
       });
     },
     [navigate],
@@ -178,7 +186,7 @@ export function ReaderScreen({
         params: { chapterId },
         search: {},
         replace: true,
-        state: { continuing: true } as never,
+        state: { ...carriedRef.current, continuing: true } satisfies ReaderState,
       });
     },
     [data.chapter.id, data.next_chapter_id, onIndexChange, save, total, navigate],
@@ -234,8 +242,8 @@ export function ReaderScreen({
   );
 
   // Keyboard: arrows follow the reading direction; Space and Page keys go forward and back.
-  const keys = useRef({ step, goToChapter, data, settings, continuous, sheet, overlay, total });
-  keys.current = { step, goToChapter, data, settings, continuous, sheet, overlay, total };
+  const keys = useRef({ step, goToChapter, data, settings, continuous, sheet, overlay, total, leave });
+  keys.current = { step, goToChapter, data, settings, continuous, sheet, overlay, total, leave };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const k = keys.current;
@@ -263,8 +271,7 @@ export function ReaderScreen({
             : document.documentElement.requestFullscreen?.()),
         Home: () => (k.continuous ? setScroll({ to: 0, id: Date.now() }) : setIndex(0)),
         End: () => (k.continuous ? setScroll({ to: k.total - 1, id: Date.now() }) : setIndex(k.total - 1)),
-        Escape: () =>
-          k.overlay ? setOverlay(false) : void navigate({ to: "/works/$workId", params: { workId: k.data.work_id } }),
+        Escape: () => (k.overlay ? setOverlay(false) : k.leave()),
       };
       const action = map[event.key];
       if (!action) return;
@@ -273,7 +280,7 @@ export function ReaderScreen({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navigate]);
+  }, []);
 
   // "Match the page": the colour of the current page's edges.
   const [pageColor, setPageColor] = useState<string>();

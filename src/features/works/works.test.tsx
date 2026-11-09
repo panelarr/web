@@ -2,11 +2,14 @@
 
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, resetDb } from "@/mocks/db";
 import { addToLibrary } from "@/mocks/handlers";
+import { mockUrl, problem } from "@/mocks/op";
 import { tickMatching } from "@/mocks/works";
 import { renderApp } from "@/test/render";
+import { server } from "@/test/server";
 
 function seed(...entryIds: string[]) {
   const user = db().users.find((u) => u.id === db().currentUserId);
@@ -129,6 +132,40 @@ describe("fixing matches", () => {
     const after = await within(row("Example Source")).findByRole("img", { name: "Cover of Moonlit Bakery" });
     expect(after).not.toBe(before);
     expect(after).toHaveClass("opacity-0");
+  });
+
+  it("says when a picked result can't be attached, at the result and in a toast", async () => {
+    server.use(
+      http.post(mockUrl("/works/{work_id}/series"), () =>
+        problem(502, "source_failed", "The source failed", "The site answered 429."),
+      ),
+    );
+    const [work] = seed("ent_1000");
+    await renderApp(`/works/${work?.id}?tab=sources`);
+    await userEvent.click(
+      await within(await waitFor(() => row("Sample Scans"))).findByRole("button", {
+        name: "Search Sample Scans yourself",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    const search = within(dialog).getByRole("textbox", { name: "Search the source" });
+    await userEvent.clear(search);
+    // A query several of the source's series answer: the error shows on the one picked.
+    await userEvent.type(search, "a");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Search" }));
+    const [first, second] = await waitFor(() => {
+      const buttons = within(dialog).getAllByRole("button", { name: /^Attach/ });
+      expect(buttons.length).toBeGreaterThan(1);
+      return buttons;
+    });
+    await userEvent.click(second as HTMLElement);
+    expect(await screen.findByText("Not attached: The site answered 429.")).toBeInTheDocument();
+    const picked = (second as HTMLElement).closest("li") as HTMLElement;
+    expect(within(picked).getByText("The site answered 429.")).toBeInTheDocument();
+    expect(
+      within((first as HTMLElement).closest("li") as HTMLElement).queryByText("The site answered 429."),
+    ).toBeNull();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("lets users who fix matches search the work's source, marking what the work knows", async () => {
