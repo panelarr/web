@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { Info, LibraryBig, ListFilter, Search, X } from "lucide-react";
+import { ArrowLeft, Info, LibraryBig, ListFilter, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { errorMessage, isApiError } from "@/api/errors";
@@ -73,6 +73,9 @@ function parseRemembered(raw: unknown): LibraryView {
   };
 }
 
+/** How long to wait before asking again for preferences that didn't load (then doubled). */
+const PREFERENCES_RETRY_MS = 2_000;
+
 /** The name of the view every user starts with. */
 const FIRST_VIEW = "Library";
 
@@ -88,6 +91,9 @@ function LibraryPage() {
   const [managing, setManaging] = useState(false);
   const [searching, setSearching] = useState(false);
   const [notice, setNotice] = useState(false);
+  // "Show everything" in an empty view: the whole library for now, the view left as it is.
+  // It holds the view's ID, so it ends when another view is shown (and on a reload).
+  const [everything, setEverything] = useState<string>();
 
   const list = views.views;
   const requested = search.view;
@@ -95,18 +101,34 @@ function LibraryPage() {
 
   // The first visit after saved views arrived: the user's remembered setup becomes their
   // first view. Another device may do the same at the same moment: its name is then taken,
-  // and the list it made is fetched.
+  // and creating it refetches the list that device made.
   const started = useRef(false);
+  const needsFirst = views.query.isSuccess && list?.length === 0;
   useEffect(() => {
-    if (started.current || !views.query.isSuccess || list?.length !== 0 || !remembered.loaded) return;
+    // Only from preferences that loaded: made from the defaults, the view would lose the
+    // user's sort and display for good, as the first view is only made once.
+    if (started.current || !needsFirst || !remembered.loaded) return;
     started.current = true;
     views.create
       .mutateAsync({ name: FIRST_VIEW, definition: toDefinition(remembered.value), default: true })
       .catch((error: unknown) => {
-        if (isApiError(error, "name_taken")) void views.query.refetch();
-        else toast.error(`Your library view wasn't saved: ${errorMessage(error)}`);
+        if (!isApiError(error, "name_taken")) toast.error(`Your library view wasn't saved: ${errorMessage(error)}`);
       });
-  }, [views.query.isSuccess, list?.length, remembered.loaded, remembered.value, views.create, views.query]);
+  }, [needsFirst, remembered.loaded, remembered.value, views.create]);
+
+  // The preferences didn't load: the library shows with the defaults, and they are asked
+  // for again, less often each time, until the first view can be made.
+  const attempts = useRef(0);
+  const { failedAt, retry: retryRemembered } = remembered;
+  useEffect(() => {
+    if (!needsFirst || failedAt === undefined) return;
+    const delay = Math.min(PREFERENCES_RETRY_MS * 2 ** attempts.current, 60_000);
+    const timer = setTimeout(() => {
+      attempts.current += 1;
+      retryRemembered();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [needsFirst, failedAt, retryRemembered]);
 
   // A view that isn't (or is no longer) the user's: their default instead. One they had here
   // (deleted just now, or on another device) goes quietly; a link to someone else's says so.
@@ -123,7 +145,11 @@ function LibraryPage() {
   }, [views.saveError]);
 
   const saved = active ? fromDefinition(active.definition) : remembered.value;
-  const view: LibraryView = { ...saved, q: search.q };
+  const showingEverything = active !== undefined && everything === active.id;
+  useEffect(() => {
+    if (everything !== undefined && everything !== active?.id) setEverything(undefined);
+  }, [everything, active?.id]);
+  const view: LibraryView = { ...(showingEverything ? withoutFilters(saved) : saved), q: search.q };
   const change = (next: Partial<LibraryView>) => {
     const { q, ...rest } = next;
     if (active && Object.keys(rest).length > 0) views.edit(active.id, toDefinition({ ...saved, ...rest }));
@@ -133,15 +159,13 @@ function LibraryPage() {
   };
   const select = (id: string) => {
     setNotice(false);
+    setEverything(undefined);
     void navigate({ search: (prev) => ({ ...(prev.q ? { q: prev.q } : {}), view: id }) });
   };
-  const showEverything = () => {
-    if (!active) return;
-    const before = active.definition;
-    views.edit(active.id, toDefinition(withoutFilters(saved)));
-    toast("The view's filters are off.", {
-      action: { label: "Undo", onClick: () => views.edit(active.id, before) },
-    });
+  // The sheet edits the view itself, so it shows the view again, filters and all.
+  const editView = () => {
+    setEverything(undefined);
+    setSheet(true);
   };
 
   const all = library.data ?? [];
@@ -191,7 +215,7 @@ function LibraryPage() {
               title={label}
               disabled={!active}
               className={cn(filtered > 0 && "text-primary")}
-              onClick={() => setSheet(true)}
+              onClick={editView}
             >
               <ListFilter aria-hidden />
             </Button>
@@ -213,6 +237,18 @@ function LibraryPage() {
             onClick={() => setNotice(false)}
           >
             <X aria-hidden />
+          </Button>
+        </div>
+      ) : null}
+      {showingEverything ? (
+        <div
+          role="status"
+          className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-4 py-2 text-sm text-card-foreground"
+        >
+          <p className="min-w-0 flex-1">Showing everything, without this view's filters.</p>
+          <Button variant="outline" size="sm" className="max-w-full" onClick={() => setEverything(undefined)}>
+            <ArrowLeft aria-hidden />
+            <span className="truncate">Back to {active.name}</span>
           </Button>
         </div>
       ) : null}
@@ -244,10 +280,10 @@ function LibraryPage() {
           <EmptyState icon={<Search />} title="Nothing in this view">
             {active ? (
               <div className="mt-2 flex flex-wrap justify-center gap-2">
-                <Button variant="outline" onClick={() => setSheet(true)}>
+                <Button variant="outline" onClick={editView}>
                   Edit view
                 </Button>
-                {filtered > 0 ? <Button onClick={showEverything}>Show everything</Button> : null}
+                {filtered > 0 ? <Button onClick={() => setEverything(active.id)}>Show everything</Button> : null}
               </div>
             ) : null}
           </EmptyState>

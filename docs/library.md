@@ -33,8 +33,14 @@ server's answers.
 
 The filter / sort / display sheet edits the view shown. Changes show at once and are saved
 about half a second after the last one, so a burst of taps is one request; leaving the page
-saves what's pending. A refused save puts the view back as the server has it. "Duplicate"
-is the way to try a variant without changing a view.
+saves what's pending. A refused save puts the view back as the server has it (a newer change
+still waiting stays, and its save carries both). "Duplicate" is the way to try a variant
+without changing a view.
+
+An empty view offers "Edit view" and "Show everything". Some views are meant to be empty most
+of the time ("New chapters", "Unread, not downloaded"), so "Show everything" saves nothing: it
+shows the whole library for now, with a "Back to <view>" button, and ends when another view is
+shown, the sheet is opened, or the page is reloaded.
 
 ### The URL
 
@@ -49,5 +55,8 @@ is the way to try a variant without changing a view.
 
 Users who had the library before views find one view, "Library", made on their first visit
 from the sort and display they had (the `library` preference) and no filters. If two devices
-do this at once, the second gets `409 name_taken` and fetches the list instead. The old
-preference is read, never written again, so an older app still finds it.
+do this at once, the second gets `409 name_taken` and fetches the list instead. The view is
+only made once the preferences loaded: if they fail, the library shows with the defaults, saves
+nothing, and asks again (after 2 s, then less often), as a view made from the defaults would
+lose the user's setup for good. The old preference is read, never written again, so an older
+app still finds it.

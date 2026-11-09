@@ -173,6 +173,42 @@ describe("the first view", () => {
     expect(db().preferences[ctx.user.id]?.library).toEqual(remembered);
   });
 
+  it("waits for the preferences: none made while they fail, then made from them (AC8)", async () => {
+    const remembered = { sort: "unread", reverse: true, layout: "list" };
+    db().preferences[ctx.user.id] = { version: 1, library: remembered };
+    let failing = true;
+    const posts: unknown[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "POST" && request.url.endsWith("/me/library-views")) posts.push(request.url);
+    });
+    server.use(
+      http.get(mockUrl("/me/preferences"), () =>
+        failing
+          ? HttpResponse.json(
+              { type: "about:blank", title: "Unavailable", status: 503, code: "unavailable" },
+              { status: 503, headers: { "Content-Type": "application/problem+json" } },
+            )
+          : undefined,
+      ),
+    );
+    try {
+      await renderApp("/");
+      // The library shows, with the defaults, and nothing is saved.
+      await screen.findByText("3 works");
+      expect(titles()).toEqual(["Iron Garden", "Moonlit Bakery", "The Lantern Keeper"]);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(myViews()).toHaveLength(0);
+      expect(posts).toHaveLength(0);
+      // They load on a later try: the view keeps what the user chose.
+      failing = false;
+      await waitFor(() => expect(myViews()).toHaveLength(1), { timeout: 5000 });
+      expect(myViews()[0]?.definition).toMatchObject({ sort: "unread", reverse: true, display: { layout: "list" } });
+      expect(posts).toHaveLength(1);
+    } finally {
+      server.events.removeAllListeners("request:start");
+    }
+  });
+
   it("is fetched when another device made it first (AC8)", async () => {
     // This device sees no views; by the time it saves its own, another device has.
     server.use(http.get(mockUrl("/me/library-views"), () => HttpResponse.json({ views: [] }), { once: true }));
@@ -283,20 +319,52 @@ describe("a view's filters, sort and display", () => {
     expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
   });
 
-  it("says when a view is empty, and shows everything again (undoable) or edits it", async () => {
-    seedViews({ name: "Library", definition: { filters: { bookmarked: "include" }, sort: "total" } });
-    await renderApp("/");
-    expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
-    expect(screen.getByText("0 of 3")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Edit view" }));
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    await userEvent.keyboard("{Escape}");
-    await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
-    await waitFor(() => expect(titles()).toHaveLength(3));
-    await waitFor(() => expect(savedView("Library")?.definition).toMatchObject({ sort: "total" }));
-    await waitFor(() => expect(savedView("Library")?.definition.filters).toBeUndefined());
-    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
-    await waitFor(() => expect(savedView("Library")?.definition.filters).toEqual({ bookmarked: "include" }));
+  it("says when a view is empty, and shows everything for now (not saved) or edits it", async () => {
+    const definition = { filters: { bookmarked: "include" as const }, sort: "total" as const };
+    seedViews({ name: "Bookmarked", definition }, { name: "Other" });
+    const patches: unknown[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "PATCH" && request.url.includes("/me/library-views/")) patches.push(request.url);
+    });
+    try {
+      await renderApp("/");
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+      expect(screen.getByText("0 of 3")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Edit view" }));
+      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+
+      // Everything, for now; the view keeps its filters.
+      await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+      await waitFor(() => expect(titles()).toHaveLength(3));
+      expect(screen.getByRole("status")).toHaveTextContent("Showing everything");
+      await userEvent.click(screen.getByRole("button", { name: "Back to Bookmarked" }));
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+
+      // Edit view from there shows the view again, filters and all.
+      await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+      await waitFor(() => expect(titles()).toHaveLength(3));
+      await userEvent.click(screen.getByRole("button", { name: /^Filter, sort and display/ }));
+      const sheet = await screen.findByRole("dialog");
+      expect(within(sheet).getByRole("checkbox", { name: /^Bookmarked/ })).toBeChecked();
+      await userEvent.keyboard("{Escape}");
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+
+      // Switching views ends it too.
+      await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+      await waitFor(() => expect(titles()).toHaveLength(3));
+      const list = await openViews("Bookmarked");
+      await userEvent.click(within(list).getByRole("button", { name: "Other" }));
+      await screen.findByText("3 works");
+      const back = await openViews("Other");
+      await userEvent.click(within(back).getByRole("button", { name: /^Bookmarked/ }));
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+
+      expect(patches).toHaveLength(0);
+      expect(savedView("Bookmarked")?.definition).toEqual(definition);
+    } finally {
+      server.events.removeAllListeners("request:start");
+    }
   });
 
   it("is put back to the defaults by Reset view", async () => {
@@ -332,6 +400,51 @@ describe("a view's filters, sort and display", () => {
     expect(within(sheet).getByRole("checkbox", { name: "Started (1)" })).toBeChecked();
     expect(await screen.findByText(/The view wasn't saved/)).toBeInTheDocument();
     await waitFor(() => expect(within(sheet).getByRole("checkbox", { name: "Started (1)" })).not.toBeChecked());
+  });
+
+  it("keeps a newer change on screen when an earlier save fails, and saves it", async () => {
+    seedViews({ name: "Library" });
+    let first = true;
+    server.use(
+      http.patch(mockUrl("/me/library-views/{id}"), async () => {
+        if (!first) return undefined;
+        first = false;
+        // Slow enough for the next change to come in while it's on its way.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return HttpResponse.json(
+          { type: "about:blank", title: "Unavailable", status: 503, code: "unavailable" },
+          { status: 503, headers: { "Content-Type": "application/problem+json" } },
+        );
+      }),
+    );
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Started (1)" }));
+    // The first save is on its way (after the pause): change something else.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await userEvent.click(within(sheet).getByRole("tab", { name: "Display" }));
+    await userEvent.click(within(sheet).getByRole("radio", { name: "List" }));
+    expect(await screen.findByText(/The view wasn't saved/)).toBeInTheDocument();
+    // Still shown, then saved with both changes.
+    expect(within(sheet).getByRole("radio", { name: "List" })).toBeChecked();
+    await waitFor(() =>
+      expect(savedView("Library")?.definition).toMatchObject({
+        filters: { started: "include" },
+        display: { layout: "list" },
+      }),
+    );
+    expect(within(sheet).getByRole("radio", { name: "List" })).toBeChecked();
+  });
+
+  it("saves the last change when the page is left before the pause ends", async () => {
+    seedViews({ name: "Library" });
+    const { router } = await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Started (1)" }));
+    await router.navigate({ to: "/browse" });
+    await waitFor(() => expect(savedView("Library")?.definition.filters).toEqual({ started: "include" }));
   });
 });
 
@@ -507,6 +620,22 @@ describe("editing views", () => {
       ["Unread manhwa", false],
       ["Unread manhwa copy", false],
     ]);
+  });
+
+  it("puts a name back on Escape, keeping the sheet open; the next Escape closes it", async () => {
+    seedViews({ name: "Library" }, { name: "Second" });
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await manage("Library");
+    const name = within(sheet).getByRole("textbox", { name: "Name of Second" });
+    await userEvent.clear(name);
+    await userEvent.type(name, "Half typed");
+    await userEvent.keyboard("{Escape}");
+    expect(name).toHaveValue("Second");
+    expect(screen.getByRole("dialog", { name: "Edit views" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit views" })).not.toBeInTheDocument());
+    expect(savedView("Second")).toBeDefined();
   });
 
   it("can't delete the only view", async () => {

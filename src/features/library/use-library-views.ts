@@ -67,8 +67,10 @@ export function useLibraryViews() {
           })
           .catch((error: unknown) => {
             if (!mounted.current) return;
-            // Back to what the server has.
+            // Back to what the server has, unless a newer change is still to be saved: that
+            // one stays on screen (and holds this one too), and its own save follows.
             setDrafts((all) => {
+              if (all[id] !== definition) return all;
               const { [id]: _, ...rest } = all;
               return rest;
             });

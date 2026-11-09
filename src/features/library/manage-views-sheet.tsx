@@ -110,6 +110,10 @@ export function ManageViewsSheet({
         <SheetContent
           side={desktop ? "right" : "bottom"}
           className={cn("flex flex-col gap-0", desktop ? "w-full sm:max-w-md" : "max-h-[85dvh] rounded-t-2xl pb-safe")}
+          onEscapeKeyDown={(event) => {
+            // A name being edited takes Escape first (it puts the name back); the next one closes.
+            if (event.target instanceof HTMLElement && event.target.closest("[data-renaming]")) event.preventDefault();
+          }}
         >
           <SheetHeader>
             <SheetTitle>Edit views</SheetTitle>
@@ -226,7 +230,10 @@ export function ManageViewsSheet({
   );
 }
 
-/** The view's name, renamed in place: saved on Enter or leaving the field, Escape puts it back. */
+/**
+ * The view's name, renamed in place: saved on Enter or leaving the field. Escape puts it back
+ * (the sheet then stays open: it closes on Escape only when no name is being edited).
+ */
 function NameField({ view, views }: { view: SavedView; views: LibraryViews }) {
   const [name, setName] = useState(view.name);
   const [error, setError] = useState<string>();
@@ -265,6 +272,7 @@ function NameField({ view, views }: { view: SavedView; views: LibraryViews }) {
         maxLength={MAX_VIEW_NAME}
         autoComplete="off"
         aria-invalid={error ? true : undefined}
+        data-renaming={name !== view.name || error ? "" : undefined}
         onChange={(e) => {
           setName(e.target.value);
           setError(undefined);
