@@ -191,6 +191,23 @@ describe("package helpers", () => {
     expect(filterPackages(list, { show: "updates" }).map((p) => p.id)).toEqual(["b"]);
   });
 
+  it("lists updates first, then installed, then the rest, each by name, under every filter", () => {
+    const list = [
+      pkg({ id: "a", name: "Alpha" }),
+      pkg({ id: "z", name: "Zeta", installed: true }),
+      pkg({ id: "m", name: "Mu", installed: true, update_available: true }),
+      pkg({ id: "b", name: "Beta", installed: true }),
+      pkg({ id: "c", name: "Alpha" }),
+      pkg({ id: "y", name: "Ypsilon", installed: true, update_available: true }),
+    ];
+    expect(filterPackages(list, {}).map((p) => p.id)).toEqual(["m", "y", "b", "z", "a", "c"]);
+    expect(filterPackages(list, { show: "installed" }).map((p) => p.id)).toEqual(["m", "y", "b", "z"]);
+    expect(filterPackages(list, { show: "updates" }).map((p) => p.id)).toEqual(["m", "y"]);
+    expect(filterPackages(list, { q: "a" }).map((p) => p.id)).toEqual(["b", "z", "a", "c"]);
+    // The input is left as it was.
+    expect(list.map((p) => p.id)).toEqual(["a", "z", "m", "b", "c", "y"]);
+  });
+
   it("lists languages with all and multi last, and labels versions", () => {
     expect(packageLanguages([pkg({ langs: ["multi", "ja"] }), pkg({ langs: ["all", "en"] })])).toEqual([
       "en",
