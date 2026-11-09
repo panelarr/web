@@ -9,7 +9,7 @@ import { errorMessage } from "@/api/errors";
 import type { components } from "@/api/schema.gen";
 import { useMe } from "@/auth/session";
 import { formValues, TextField } from "@/components/form";
-import { SearchInput } from "@/components/search-input";
+import { escapeClearsSearchFirst, SearchInput } from "@/components/search-input";
 import { SourceIcon } from "@/components/source-icon";
 import { EmptyState, ErrorAlert } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
@@ -413,7 +413,7 @@ function SearchSourceDialog({
         if (!next) m.add.reset();
       }}
     >
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl" onEscapeKeyDown={escapeClearsSearchFirst}>
         <DialogHeader>
           <DialogTitle>Search {state.source.name}</DialogTitle>
           <DialogDescription>Find {work.title} on this source and attach it.</DialogDescription>

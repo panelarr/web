@@ -69,6 +69,33 @@ describe("users", () => {
     expect(await screen.findByText("sam")).toBeInTheDocument();
   });
 
+  it("clears the sources filter on Escape without closing the dialog", async () => {
+    await renderApp("/admin/users");
+    await userEvent.click(await screen.findByRole("button", { name: "Add user" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(within(dialog).getByLabelText("Username"), "sam");
+    await userEvent.click(within(dialog).getByRole("switch", { name: "All sources" }));
+    const filter = await within(dialog).findByRole("searchbox", { name: "Filter sources" });
+    await userEvent.type(filter, "nothing like it{Escape}");
+    expect(filter).toHaveValue("");
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(within(dialog).getByLabelText("Username")).toHaveValue("sam");
+    // With the filter empty, Escape closes the dialog as usual.
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("keeps the invite dialog open when Escape clears its sources filter", async () => {
+    await renderApp("/admin/users");
+    await userEvent.click(await screen.findByRole("button", { name: /Invite/ }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("switch", { name: "All sources" }));
+    const filter = await within(dialog).findByRole("searchbox", { name: "Filter sources" });
+    await userEvent.type(filter, "moon{Escape}");
+    expect(filter).toHaveValue("");
+    expect(screen.getByRole("dialog")).toBe(dialog);
+  });
+
   it("explains a taken username", async () => {
     await renderApp("/admin/users");
     await userEvent.click(await screen.findByRole("button", { name: "Add user" }));

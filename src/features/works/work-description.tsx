@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { $api } from "@/api/client";
+import { shouldRetryOptionalMeta } from "@/api/query-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { descriptionParagraphs, pickDescription } from "@/lib/description";
@@ -15,10 +16,16 @@ const LONG = 240;
  * The work's description and genres, from its catalogue entry (the same query as the entry's
  * page, so one visit fills both). Collapsed to the first paragraph with More / Less. The
  * metadata service is optional: while it answers, or if it fails or isn't set up, there's
- * nothing here and the rest of the page doesn't wait for it.
+ * nothing here and the rest of the page doesn't wait for it. When it isn't set up, it isn't
+ * asked again and again either.
  */
 export function WorkDescription({ entryId }: { entryId: string }) {
-  const entry = $api.useQuery("get", "/catalog/entries/{entry_id}", { params: { path: { entry_id: entryId } } });
+  const entry = $api.useQuery(
+    "get",
+    "/catalog/entries/{entry_id}",
+    { params: { path: { entry_id: entryId } } },
+    { retry: shouldRetryOptionalMeta },
+  );
   const [expanded, setExpanded] = useState(false);
   const id = useId();
   const paragraphs = useMemo(() => {

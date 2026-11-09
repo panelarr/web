@@ -9,6 +9,7 @@ import { inviteLink } from "@/auth/invite-link";
 import { CopyField } from "@/components/copy-field";
 import { Field, formValues, PasswordConfirm, TextField } from "@/components/form";
 import { NativeSelect } from "@/components/native-select";
+import { escapeClearsSearchFirst } from "@/components/search-input";
 import { ErrorAlert } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,7 +61,7 @@ export function AddUserDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   };
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className={dialogClass}>
+      <DialogContent className={dialogClass} onEscapeKeyDown={escapeClearsSearchFirst}>
         <form
           className="grid gap-4"
           onSubmit={(event) => {
@@ -154,7 +155,7 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const link = create.data ? inviteLink(create.data.token) : undefined;
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className={dialogClass}>
+      <DialogContent className={dialogClass} onEscapeKeyDown={escapeClearsSearchFirst}>
         {create.data && link ? (
           <>
             <DialogHeader>

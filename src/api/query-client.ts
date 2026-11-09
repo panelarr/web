@@ -18,6 +18,16 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
   return error.status === NETWORK_ERROR || error.status >= 500;
 }
 
+/**
+ * For extras from the metadata service that a page shows only when they're there (a series'
+ * description): `meta_unavailable` usually means no metadata service is connected, which asking
+ * again won't change, so those queries fail at once and the page goes on without them.
+ */
+export function shouldRetryOptionalMeta(failureCount: number, error: unknown): boolean {
+  if (error instanceof ApiError && error.code === "meta_unavailable") return false;
+  return shouldRetry(failureCount, error);
+}
+
 export interface QueryClientOptions {
   /**
    * Called for every failed query and mutation, e.g. to send a signed-out user to sign in.

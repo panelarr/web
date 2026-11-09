@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, Puzzle, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { $api } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import type { components } from "@/api/schema.gen";
@@ -33,7 +34,12 @@ const onThisPage = (query: { queryKey: readonly unknown[] }) => PATHS.has(query.
 export function HealthOverview() {
   const queryClient = useQueryClient();
   const server = $api.useQuery("get", "/system/health", {}, { refetchInterval: HEALTH_POLL_MS });
-  const checking = useIsFetching({ predicate: onThisPage }) > 0;
+  // Spins for a check someone asked for, not for the page's own polls every 30 seconds.
+  const [checking, setChecking] = useState(false);
+  const checkNow = () => {
+    setChecking(true);
+    void queryClient.refetchQueries({ predicate: onThisPage }).finally(() => setChecking(false));
+  };
   return (
     <>
       <PageHeader
@@ -47,11 +53,7 @@ export function HealthOverview() {
           ) : undefined
         }
         actions={
-          <Button
-            variant="outline"
-            disabled={checking}
-            onClick={() => void queryClient.refetchQueries({ predicate: onThisPage })}
-          >
+          <Button variant="outline" disabled={checking} onClick={checkNow}>
             <RefreshCw className={cn(checking && "animate-spin")} aria-hidden />
             Check now
           </Button>

@@ -25,8 +25,9 @@ describe("Admin → Health", () => {
     const components = within(screen.getByRole("list", { name: "Server components" }));
     expect(components.getByText("database")).toBeInTheDocument();
     expect(components.getByText("meta")).toBeInTheDocument();
-    // The metadata service's own components.
-    expect(await within(card("Metadata service")).findByText("Search")).toBeInTheDocument();
+    // The metadata service's own components. Its card is swapped for the service's own once the
+    // health answers, so it's looked up anew each time.
+    await waitFor(() => expect(within(card("Metadata service")).getByText("Search")).toBeInTheDocument());
     expect(within(card("Metadata service")).getByText(/Metadata service 0\.9\.0/)).toBeInTheDocument();
     // Both plugins, healthy.
     await waitFor(() => pluginRow("Example Store Plugin"));
@@ -135,6 +136,45 @@ describe("Admin → Health", () => {
     const before = asked;
     await userEvent.click(screen.getByRole("button", { name: "Check now" }));
     await waitFor(() => expect(asked).toBeGreaterThan(before));
+  });
+
+  it("spins Check now only for a check someone asked for", async () => {
+    let answer: Promise<void> = Promise.resolve();
+    let release = () => {};
+    const hold = () => {
+      answer = new Promise((resolve) => {
+        release = resolve;
+      });
+    };
+    server.use(
+      http.get(mockUrl("/system/health"), async () => {
+        await answer;
+        return undefined;
+      }),
+    );
+    const { queryClient } = await renderApp("/admin/health");
+    await screen.findByText("Panelarr server dev");
+    const button = screen.getByRole("button", { name: "Check now" });
+    const spinning = () => button.querySelector("svg")?.classList.contains("animate-spin");
+    const key = { queryKey: ["get", "/system/health"] };
+
+    // A poll in the background (what refetchInterval does): the button stays as it is.
+    hold();
+    void queryClient.refetchQueries(key);
+    await waitFor(() => expect(queryClient.isFetching(key)).toBe(1));
+    expect(spinning()).toBe(false);
+    expect(button).toBeEnabled();
+    release();
+    await waitFor(() => expect(queryClient.isFetching(key)).toBe(0));
+
+    // Asked for: it spins until every answer is back.
+    hold();
+    await userEvent.click(button);
+    await waitFor(() => expect(spinning()).toBe(true));
+    expect(button).toBeDisabled();
+    release();
+    await waitFor(() => expect(spinning()).toBe(false));
+    expect(button).toBeEnabled();
   });
 
   it("is reached from the admin tabs, for admins only", async () => {
