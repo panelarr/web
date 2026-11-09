@@ -53,8 +53,9 @@ async function watchPages(page: Page) {
 test("loads the pages ahead the reader asks for, in order, a few at a time", async ({ page }) => {
   await page.goto("/catalog/ent_1001?mock=slow-pages");
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  // Adding it moves on to the series in the library.
-  await expect(page).toHaveURL(/\/works\//);
+  // Adding it moves on to the series in the library, on its sources; its chapters are a tab away.
+  await expect(page).toHaveURL(/\/works\/[^/?]+\?tab=sources$/);
+  await page.getByRole("tab", { name: "Chapters" }).click();
   await page.getByRole("link", { name: /Start reading/ }).click({ timeout: 15_000 });
   await expect(page.getByTestId("strip-viewer")).toBeVisible();
   // A tap in the middle shows the reader's menu.

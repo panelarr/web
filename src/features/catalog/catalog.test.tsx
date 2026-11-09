@@ -133,6 +133,9 @@ describe("a catalogue entry", () => {
     expect(db().works[0]?.entry_id).toBe("ent_1000");
     const workPath = `/works/${db().works[0]?.id}`;
     await waitFor(() => expect(router.state.location.pathname).toBe(workPath));
+    // On its sources: the chapters come once a source is attached.
+    expect(router.state.location.search).toEqual({ tab: "sources" });
+    expect(await screen.findByRole("tab", { name: "Sources", selected: true })).toBeInTheDocument();
     expect(db().library).toHaveLength(1);
 
     await router.navigate({ to: "/browse" });

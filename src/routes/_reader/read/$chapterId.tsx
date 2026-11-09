@@ -9,6 +9,7 @@ import { isApiError } from "@/api/errors";
 import { MANUAL } from "@/api/events";
 import { ErrorAlert, Loading } from "@/components/states";
 import { Button } from "@/components/ui/button";
+import { LeaveReaderLink, readerState } from "@/features/reader/leave";
 import { ReaderScreen } from "@/features/reader/reader-screen";
 
 interface ReadSearch {
@@ -37,7 +38,7 @@ function ReadPage() {
   const { page, variant } = Route.useSearch();
   // Scrolling on into another chapter (long strips) keeps the same reader: only the URL follows.
   const continuing = useRouterState({
-    select: (state) => (state.location.state as { continuing?: boolean }).continuing === true,
+    select: (state) => readerState(state.location.state).continuing === true,
   });
   const session = useRef(chapterId);
   if (!continuing) session.current = chapterId;
@@ -125,10 +126,10 @@ function WayBack({ chapterId, error }: { chapterId: string; error?: unknown }) {
     <div className="flex flex-wrap justify-center gap-2">
       {workId ? (
         <Button variant="outline" asChild>
-          <Link to="/works/$workId" params={{ workId }}>
+          <LeaveReaderLink workId={workId}>
             <ArrowLeft aria-hidden />
             Back to the series
-          </Link>
+          </LeaveReaderLink>
         </Button>
       ) : window.history.length > 1 ? (
         <Button variant="outline" onClick={() => router.history.back()}>

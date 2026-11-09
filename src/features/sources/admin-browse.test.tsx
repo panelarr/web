@@ -169,6 +169,7 @@ describe("browsing sources", () => {
     expect(await screen.findByText(/Chapters \(\d+\)/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Add to library" }));
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/works\//));
+    expect(router.state.location.search).toEqual({ tab: "sources" });
     expect(db().library).toHaveLength(1);
   });
 

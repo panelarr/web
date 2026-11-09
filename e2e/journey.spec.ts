@@ -30,7 +30,9 @@ test("set up, add, read, download", async ({ page }) => {
   await page.getByRole("searchbox", { name: "Search the catalogue" }).fill("lantern");
   await page.getByRole("link", { name: /The Lantern Keeper/ }).click();
   await page.getByRole("button", { name: "Add to library" }).filter({ visible: true }).click();
-  await expect(page).toHaveURL(/\/works\//);
+  // It opens on its sources, where matching shows.
+  await expect(page).toHaveURL(/\/works\/[^/?]+\?tab=sources$/);
+  await expect(page.getByRole("tab", { name: "Sources", selected: true })).toBeVisible();
 
   // The work page.
   await page.goto("/");

@@ -72,8 +72,9 @@ test("runs a job and watches it finish over the live event stream", async ({ pag
 test("adds a series from a source, then fixes its match on another source", async ({ page }) => {
   await page.goto("/admin/sources/example:1001/series?key=%2Fseries%2F1000&mock=ready");
   await page.getByRole("button", { name: "Add to library" }).click();
-  await expect(page).toHaveURL(/\/works\//);
-  await page.getByRole("tab", { name: "Sources" }).click();
+  // It opens on its sources.
+  await expect(page).toHaveURL(/\/works\/[^/?]+\?tab=sources$/);
+  await expect(page.getByRole("tab", { name: "Sources", selected: true })).toBeVisible();
   // Matching runs on the mock server; the page follows it live.
   const sample = page.locator("li", { has: page.getByText("Sample Scans", { exact: true }) }).first();
   await expect(sample.getByText(/Needs a decision|Search failed/)).toBeVisible({ timeout: 10_000 });

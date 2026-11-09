@@ -40,6 +40,7 @@ import { VirtualList } from "@/components/virtual-list";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { useLibrary } from "@/features/catalog/library-index";
 import { downloadLabel, useCanDownload, useOpenDownloads } from "@/features/downloads/use-downloads";
+import { openedFrom } from "@/features/reader/leave";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { type ChapterView, chapterName, filtersOn, nextToDownload, scanlators, viewChapters } from "./chapter-view";
@@ -180,6 +181,7 @@ export function ChaptersPanel({
           <Link
             to="/read/$chapterId"
             params={{ chapterId: continueChapter.id }}
+            state={openedFrom(work.id)}
             aria-label={`${started ? "Continue" : "Start reading"}: ${chapterLabel(continueChapter)}`}
           >
             <Play className="fill-current" aria-hidden />
@@ -517,6 +519,7 @@ function ChapterRow({
             <Link
               to="/read/$chapterId"
               params={{ chapterId: chapter.id }}
+              state={openedFrom(work.id)}
               aria-label={read ? `${name} (read)` : name}
               className="block truncate font-medium underline-offset-4 hover:underline"
             >

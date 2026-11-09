@@ -28,4 +28,9 @@ declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof createAppRouter>;
   }
+  /** What the reader keeps in its history entry (see `features/reader/leave.tsx`). */
+  interface HistoryState {
+    fromWork?: string;
+    continuing?: boolean;
+  }
 }
