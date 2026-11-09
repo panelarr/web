@@ -120,6 +120,11 @@ function PluginUpdatesCard({ section: { plugin, updates } }: { section: PluginUp
                   {pkg.error ? (
                     <p className="mt-1 text-xs text-destructive [overflow-wrap:anywhere]">{pkg.error}</p>
                   ) : null}
+                  {tasks.failure(pkg) ? (
+                    <p role="alert" className="mt-1 text-xs text-destructive [overflow-wrap:anywhere]">
+                      {tasks.failure(pkg)}
+                    </p>
+                  ) : null}
                 </div>
                 <PackageActions pkg={pkg} tasks={tasks} />
               </li>

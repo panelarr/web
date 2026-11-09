@@ -135,6 +135,40 @@ describe("Admin → Updates", () => {
     expect(await within(stores).findByText("Everything is up to date.")).toBeInTheDocument();
   });
 
+  it("sends each update once while Update all is on its way, and shows a failed one on its row", async () => {
+    lanternOutdated();
+    const posts: string[] = [];
+    server.use(
+      http.post(mockUrl("/plugins/stores/packages/:packageId/update"), async ({ params }) => {
+        posts.push(String(params.packageId));
+        await delay(50);
+        if (params.packageId === "org.example.lantern") {
+          return problem(409, "package_busy", "Package busy", "Lantern Reader is being changed already.");
+        }
+        // Otherwise the mock's own handler answers.
+        return undefined;
+      }),
+    );
+    await renderApp(UPDATES);
+    const stores = await waitFor(() => section("Example Store Plugin"));
+    await userEvent.click(await within(stores).findByRole("button", { name: "Update all (2)" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Update all" }));
+    // Both rows wait for the server: no Update button left to click a second time.
+    await waitFor(() => expect(posts).toHaveLength(2));
+    expect(within(stores).queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
+    expect(within(stores).queryByRole("button", { name: /Update all/ })).not.toBeInTheDocument();
+
+    // The failed one says why on its own row and can be tried again; the other is under way.
+    const lantern = (await within(stores).findByText("Lantern Reader")).closest("li");
+    if (!lantern) throw new Error("no Lantern Reader row");
+    expect(await within(lantern).findByRole("alert")).toHaveTextContent(
+      "Update failed: Lantern Reader is being changed already.",
+    );
+    expect(within(lantern).getByRole("button", { name: "Update" })).toBeEnabled();
+    expect(within(stores).getByRole("button", { name: "Update all (1)" })).toBeInTheDocument();
+    expect(posts.sort()).toEqual(["org.example.lantern", "org.example.polyglot"]);
+  });
+
   it("says so when no plugin manages extensions", async () => {
     db().plugins = db().plugins.filter((p) => !p.capabilities.includes("packages"));
     await renderApp(UPDATES);

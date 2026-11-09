@@ -67,11 +67,17 @@ describe("Admin → Health", () => {
 
   it("says when the metadata service isn't connected yet", async () => {
     db().meta.check = { ...db().meta.check, configured: false, ready: false };
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (new URL(request.url).pathname.endsWith("/system/meta/health")) asked.push(request.url);
+    });
     await renderApp("/admin/health");
     const meta = await waitFor(() => card("Metadata service"));
     expect(await within(meta).findByText("Not connected yet.")).toBeInTheDocument();
     expect(within(meta).getByRole("link", { name: "Connect it" })).toHaveAttribute("href", "/admin/metadata");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // There's no service to ask, so it isn't asked.
+    expect(asked).toEqual([]);
   });
 
   it("says plugins are optional when there are none, with no source checks", async () => {

@@ -73,9 +73,12 @@ export function HealthOverview() {
  */
 function MetaHealthSection() {
   const meta = $api.useQuery("get", "/system/meta", {}, { refetchInterval: HEALTH_POLL_MS });
-  const health = $api.useQuery("get", "/system/meta/health", {}, { refetchInterval: HEALTH_POLL_MS });
   const configured = meta.data?.check.configured;
-  if (health.data && !health.error) return <MetaHealthCard title="Metadata service" />;
+  // Asked once the server has said whether there's a service to ask (or couldn't say): when it
+  // isn't configured, "Not connected yet." shows at once instead of waiting for a failure.
+  const asking = !meta.isPending && configured !== false;
+  const health = $api.useQuery("get", "/system/meta/health", {}, { refetchInterval: HEALTH_POLL_MS, enabled: asking });
+  if (configured !== false && health.data && !health.error) return <MetaHealthCard title="Metadata service" />;
   return (
     <Card className="self-start">
       <CardHeader>
@@ -83,7 +86,7 @@ function MetaHealthSection() {
         <CardDescription>Where Panelarr finds works. The library needs it.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        {health.isPending ? (
+        {meta.isPending || (asking && health.isPending) ? (
           <Loading />
         ) : (
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
