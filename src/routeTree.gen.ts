@@ -28,6 +28,7 @@ import { Route as AppAdminNetworkRouteImport } from './routes/_app/admin/network
 import { Route as AppAdminQueueRouteImport } from './routes/_app/admin/queue'
 import { Route as AppAdminStorageRouteImport } from './routes/_app/admin/storage'
 import { Route as AppAdminSystemRouteImport } from './routes/_app/admin/system'
+import { Route as AppAdminUpdatesRouteImport } from './routes/_app/admin/updates'
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
 import { Route as AppCatalogEntryIdRouteImport } from './routes/_app/catalog/$entryId'
 import { Route as AppWorksWorkIdRouteImport } from './routes/_app/works/$workId'
@@ -138,6 +139,11 @@ const AppAdminSystemRoute = AppAdminSystemRouteImport.update({
   path: '/system',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminUpdatesRoute = AppAdminUpdatesRouteImport.update({
+  id: '/updates',
+  path: '/updates',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppBrowseIndexRoute = AppBrowseIndexRouteImport.update({
   id: '/browse/',
   path: '/browse/',
@@ -239,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/admin/queue': typeof AppAdminQueueRoute
   '/admin/storage': typeof AppAdminStorageRoute
   '/admin/system': typeof AppAdminSystemRoute
+  '/admin/updates': typeof AppAdminUpdatesRoute
   '/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/works/$workId': typeof AppWorksWorkIdRoute
   '/read/$chapterId': typeof ReaderReadChapterIdRoute
@@ -273,6 +280,7 @@ export interface FileRoutesByTo {
   '/admin/queue': typeof AppAdminQueueRoute
   '/admin/storage': typeof AppAdminStorageRoute
   '/admin/system': typeof AppAdminSystemRoute
+  '/admin/updates': typeof AppAdminUpdatesRoute
   '/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/works/$workId': typeof AppWorksWorkIdRoute
   '/read/$chapterId': typeof ReaderReadChapterIdRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/_app/admin/queue': typeof AppAdminQueueRoute
   '/_app/admin/storage': typeof AppAdminStorageRoute
   '/_app/admin/system': typeof AppAdminSystemRoute
+  '/_app/admin/updates': typeof AppAdminUpdatesRoute
   '/_app/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/_app/works/$workId': typeof AppWorksWorkIdRoute
   '/_reader/read/$chapterId': typeof ReaderReadChapterIdRoute
@@ -348,6 +357,7 @@ export interface FileRouteTypes {
     | '/admin/queue'
     | '/admin/storage'
     | '/admin/system'
+    | '/admin/updates'
     | '/catalog/$entryId'
     | '/works/$workId'
     | '/read/$chapterId'
@@ -382,6 +392,7 @@ export interface FileRouteTypes {
     | '/admin/queue'
     | '/admin/storage'
     | '/admin/system'
+    | '/admin/updates'
     | '/catalog/$entryId'
     | '/works/$workId'
     | '/read/$chapterId'
@@ -419,6 +430,7 @@ export interface FileRouteTypes {
     | '/_app/admin/queue'
     | '/_app/admin/storage'
     | '/_app/admin/system'
+    | '/_app/admin/updates'
     | '/_app/catalog/$entryId'
     | '/_app/works/$workId'
     | '/_reader/read/$chapterId'
@@ -581,6 +593,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminSystemRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/updates': {
+      id: '/_app/admin/updates'
+      path: '/updates'
+      fullPath: '/admin/updates'
+      preLoaderRoute: typeof AppAdminUpdatesRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/browse/': {
       id: '/_app/browse/'
       path: '/browse'
@@ -703,6 +722,7 @@ interface AppAdminRouteChildren {
   AppAdminQueueRoute: typeof AppAdminQueueRoute
   AppAdminStorageRoute: typeof AppAdminStorageRoute
   AppAdminSystemRoute: typeof AppAdminSystemRoute
+  AppAdminUpdatesRoute: typeof AppAdminUpdatesRoute
   AppAdminIndexRoute: typeof AppAdminIndexRoute
   AppAdminPluginsPluginIdRoute: typeof AppAdminPluginsPluginIdRoute
   AppAdminUsersUserIdRoute: typeof AppAdminUsersUserIdRoute
@@ -723,6 +743,7 @@ const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminQueueRoute: AppAdminQueueRoute,
   AppAdminStorageRoute: AppAdminStorageRoute,
   AppAdminSystemRoute: AppAdminSystemRoute,
+  AppAdminUpdatesRoute: AppAdminUpdatesRoute,
   AppAdminIndexRoute: AppAdminIndexRoute,
   AppAdminPluginsPluginIdRoute: AppAdminPluginsPluginIdRoute,
   AppAdminUsersUserIdRoute: AppAdminUsersUserIdRoute,

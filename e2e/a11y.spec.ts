@@ -35,6 +35,7 @@ const PAGES = [
   "/admin/queue",
   "/admin/storage",
   "/admin/health",
+  "/admin/updates",
 ];
 
 test("the main pages have no serious accessibility problems", async ({ page, isMobile }) => {

@@ -7,6 +7,7 @@ export const ADMIN_PAGES = [
   { to: "/admin/users", label: "Users" },
   { to: "/admin/plugins", label: "Plugins" },
   { to: "/admin/sources", label: "Sources" },
+  { to: "/admin/updates", label: "Updates" },
   { to: "/admin/metadata", label: "Metadata" },
   { to: "/admin/storage", label: "Storage" },
   { to: "/admin/network", label: "Network" },

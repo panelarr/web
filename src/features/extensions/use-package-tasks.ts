@@ -23,6 +23,19 @@ const packageListOptions = (pluginId: string) =>
 
 export const packageListKey = (pluginId: string) => packageListOptions(pluginId).queryKey;
 
+/**
+ * Only a plugin's installed packages with an update (Admin → Updates). Short, so it's asked
+ * again after any of them changes rather than patched.
+ */
+export const updatesListOptions = (pluginId: string) =>
+  $api.queryOptions(
+    "get",
+    "/plugins/{plugin_id}/packages",
+    { params: { path: { plugin_id: pluginId }, query: { updates: true } } },
+    // As the full list: asking the stores can be slow, so events and reconnects leave it alone.
+    { staleTime: 60_000, meta: MANUAL },
+  );
+
 /** A plugin's packages from all its stores: one big list, loaded once and kept. */
 export function usePackageList(pluginId: string) {
   return useQuery(packageListOptions(pluginId));
@@ -73,6 +86,7 @@ export function usePackageTasks(pluginId: string) {
           return path === "/plugins/{plugin_id}" && init?.params?.path?.plugin_id === pluginId;
         },
       });
+      void queryClient.invalidateQueries({ queryKey: updatesListOptions(pluginId).queryKey });
       if (!packageId) {
         void queryClient.invalidateQueries({ queryKey: packageListKey(pluginId) });
         return;
@@ -92,9 +106,9 @@ export function usePackageTasks(pluginId: string) {
   /** The package a task is about: one started here, or a row that carries the task. */
   const packageOfTask = (taskId: string): string | undefined =>
     Object.entries(started).find(([, s]) => s.taskId === taskId)?.[0] ??
-    queryClient
-      .getQueryData<{ packages: Package[] }>(packageListKey(pluginId))
-      ?.packages.find((p) => p.task_id === taskId)?.id;
+    [packageListKey(pluginId), updatesListOptions(pluginId).queryKey]
+      .flatMap((key) => queryClient.getQueryData<{ packages: Package[] }>(key)?.packages ?? [])
+      .find((p) => p.task_id === taskId)?.id;
 
   const onTask = (task: TaskEvent) => {
     if (task.kind !== KIND) return;
