@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, resetDb } from "@/mocks/db";
@@ -102,6 +102,33 @@ describe("fixing matches", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Search" }));
     await userEvent.click(await within(dialog).findByRole("button", { name: "Attach" }));
     expect(await screen.findByText("Attached on 2 of 2 sources.")).toBeInTheDocument();
+  });
+
+  it("shows the picked series' own cover, not the one it replaced", async () => {
+    const [work] = seed("ent_1000");
+    await renderApp(`/works/${work?.id}?tab=sources`);
+    const before = await within(await waitFor(() => row("Example Source"))).findByRole("img", {
+      name: "Cover of The Lantern Keeper",
+    });
+    fireEvent.load(before);
+    expect(before).toHaveClass("opacity-100");
+
+    await userEvent.click(
+      within(row("Example Source")).getByRole("button", { name: "Search Example Source yourself" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    const search = within(dialog).getByRole("textbox", { name: "Search the source" });
+    await userEvent.clear(search);
+    await userEvent.type(search, "Moonlit");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Search" }));
+    await within(dialog).findByText("Moonlit Bakery");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Attach" }));
+
+    // The attached row is re-rendered in place with the new series: its cover must not keep the
+    // old series' image (a browser keeps painting it while the new src loads).
+    const after = await within(row("Example Source")).findByRole("img", { name: "Cover of Moonlit Bakery" });
+    expect(after).not.toBe(before);
+    expect(after).toHaveClass("opacity-0");
   });
 
   it("lets users who fix matches search the work's source, marking what the work knows", async () => {
