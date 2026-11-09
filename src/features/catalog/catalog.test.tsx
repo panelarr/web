@@ -69,6 +69,10 @@ describe("browsing the catalogue", () => {
     expect(await screen.findByText("Moonlit Bakery")).toBeInTheDocument();
     expect(screen.getByText("“Tsukiyo no Panya”")).toBeInTheDocument();
     expect(screen.getByText("1 work")).toBeInTheDocument();
+    // ✕ clears it and brings every title back.
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(screen.getByRole("searchbox", { name: "Search the catalogue" })).toHaveValue("");
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
   });
 
   it("says when the catalogue has no entries at all", async () => {

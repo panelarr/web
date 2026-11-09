@@ -45,7 +45,8 @@ describe("the Extensions tab", () => {
     await userEvent.type(screen.getByRole("searchbox", { name: "Search extensions" }), "night");
     expect(await screen.findByText("1 of 64 extensions · 1 installed · 1 with an update")).toBeInTheDocument();
     expect(row("Night Shelf")).toHaveTextContent(/NSFW/);
-    await userEvent.clear(screen.getByRole("searchbox", { name: "Search extensions" }));
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    await waitFor(() => expect(router.state.location.search).not.toHaveProperty("q"));
 
     await userEvent.selectOptions(screen.getByLabelText("Language"), "ja");
     await waitFor(() => expect(router.state.location.search).toMatchObject({ lang: "ja" }));
@@ -188,6 +189,23 @@ describe("package helpers", () => {
     expect(filterPackages(list, { q: "beta" }).map((p) => p.id)).toEqual(["a"]);
     expect(filterPackages(list, { lang: "ja" }).map((p) => p.id)).toEqual(["a"]);
     expect(filterPackages(list, { show: "updates" }).map((p) => p.id)).toEqual(["b"]);
+  });
+
+  it("lists updates first, then installed, then the rest, each by name, under every filter", () => {
+    const list = [
+      pkg({ id: "a", name: "Alpha" }),
+      pkg({ id: "z", name: "Zeta", installed: true }),
+      pkg({ id: "m", name: "Mu", installed: true, update_available: true }),
+      pkg({ id: "b", name: "Beta", installed: true }),
+      pkg({ id: "c", name: "Alpha" }),
+      pkg({ id: "y", name: "Ypsilon", installed: true, update_available: true }),
+    ];
+    expect(filterPackages(list, {}).map((p) => p.id)).toEqual(["m", "y", "b", "z", "a", "c"]);
+    expect(filterPackages(list, { show: "installed" }).map((p) => p.id)).toEqual(["m", "y", "b", "z"]);
+    expect(filterPackages(list, { show: "updates" }).map((p) => p.id)).toEqual(["m", "y"]);
+    expect(filterPackages(list, { q: "a" }).map((p) => p.id)).toEqual(["b", "z", "a", "c"]);
+    // The input is left as it was.
+    expect(list.map((p) => p.id)).toEqual(["a", "z", "m", "b", "c", "y"]);
   });
 
   it("lists languages with all and multi last, and labels versions", () => {

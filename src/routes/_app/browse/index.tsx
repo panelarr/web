@@ -7,10 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
 import { useIsAdmin } from "@/auth/session";
+import { SearchInput } from "@/components/search-input";
 import { EmptyState, ErrorAlert, Loading, PageHeader } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { EntryCard, EntryGrid } from "@/features/catalog/entry-card";
 import { CatalogFilters, type CatalogSearch, countFilters, validateCatalogSearch } from "@/features/catalog/filters";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
@@ -56,24 +56,19 @@ function BrowsePage() {
               commitQuery(text);
             }}
           >
-            <div className="relative min-w-0 flex-1">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                type="search"
-                enterKeyHint="search"
-                aria-label="Search the catalogue"
-                placeholder="Search by any title"
-                className="h-10 pl-9"
-                value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  commitQuery(e.target.value);
-                }}
-              />
-            </div>
+            <SearchInput
+              icon
+              enterKeyHint="search"
+              aria-label="Search the catalogue"
+              placeholder="Search by any title"
+              className="flex-1"
+              inputClassName="h-10"
+              value={text}
+              onChange={(value) => {
+                setText(value);
+                commitQuery(value);
+              }}
+            />
             <Button type="button" variant="outline" className="h-10" onClick={() => setFiltersOpen(true)}>
               <SlidersHorizontal aria-hidden />
               <span className="sr-only sm:not-sr-only">Filters</span>

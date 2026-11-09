@@ -38,6 +38,7 @@ import type { ChapterView } from "@/features/works/chapter-view";
 import { ChaptersPanel } from "@/features/works/chapters-panel";
 import { SeriesChaptersPanel } from "@/features/works/series-chapters";
 import { SourcesPanel } from "@/features/works/sources-panel";
+import { WorkDescription } from "@/features/works/work-description";
 import { cn } from "@/lib/utils";
 
 type Work = components["schemas"]["Work"];
@@ -145,6 +146,7 @@ function WorkDetails({ work }: { work: Work }) {
           </div>
         </div>
       </header>
+      <WorkDescription entryId={work.entry_id} />
       <Tabs
         value={tab}
         onValueChange={(value) =>

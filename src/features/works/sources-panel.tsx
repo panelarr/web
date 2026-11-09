@@ -9,6 +9,7 @@ import { errorMessage } from "@/api/errors";
 import type { components } from "@/api/schema.gen";
 import { useMe } from "@/auth/session";
 import { formValues, TextField } from "@/components/form";
+import { SearchInput } from "@/components/search-input";
 import { SourceIcon } from "@/components/source-icon";
 import { EmptyState, ErrorAlert } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
@@ -424,7 +425,7 @@ function SearchSourceDialog({
             run();
           }}
         >
-          <Input aria-label="Search the source" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <SearchInput aria-label="Search the source" className="flex-1" value={query} onChange={setQuery} />
           <Button type="submit" variant="outline" disabled={search.isPending}>
             {search.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Search aria-hidden />}
             Search

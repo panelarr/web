@@ -49,6 +49,11 @@ describe("users", () => {
     await userEvent.click(within(dialog).getByRole("switch", { name: "Download chapters" }));
     await userEvent.selectOptions(within(dialog).getByLabelText("Content up to"), "erotic");
     await userEvent.click(within(dialog).getByRole("switch", { name: "All sources" }));
+    const filter = await within(dialog).findByRole("searchbox", { name: "Filter sources" });
+    await userEvent.type(filter, "nothing like it");
+    expect(within(dialog).getByText("No source matches.")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Clear search" }));
+    expect(filter).toHaveValue("");
     await userEvent.click(await within(dialog).findByRole("checkbox", { name: /Example Source/ }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Add user" }));
 
@@ -234,6 +239,10 @@ describe("sources", () => {
     await waitFor(() => expect(router.state.location.search).toEqual({ q: "demo" }));
     expect(screen.getByText("Demo Comics")).toBeInTheDocument();
     expect(screen.queryByText("Sample Scans")).not.toBeInTheDocument();
+    // ✕ clears the search, and the URL with it.
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(await screen.findByText("Sample Scans")).toBeInTheDocument();
   });
 });
 
