@@ -19,6 +19,7 @@ API, so anyone can build their own client against the same API.
 - **Fix matches:** see how a work is matched on each source, with the evidence; attach, reject, search the work's source yourself or paste a link.
 - **Chapters:** one list across sources, filling gaps from each, with the chosen copy and why; a tab per source; new chapter badges.
 - **Read:** a full-screen reader for phones and desktops: single or double page, vertical, webtoon or horizontal scroll, right to left or left to right, swipe, pinch and double-tap zoom, tap zones, keyboard shortcuts, settings per series, per source or everywhere, and progress that follows you across devices.
+- **Library views:** named views of your library, each with its own filters (include or leave out unread, started, downloaded, bookmarked, new; type, status, updated within N days), sort (including recently updated) and display; switch from the heading, one is your default, kept on your account (see `docs/library.md`).
 - **Updates:** new chapters of your library by day, one row per series; read, download or mark them from there; check now.
 - **History:** what you read, by day, one line per series with Resume; every chapter read, search, remove or clear.
 - **Download:** chapters stored once for everyone, live progress, automatic downloads of new chapters, local or S3-compatible storage.

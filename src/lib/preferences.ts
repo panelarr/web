@@ -8,7 +8,10 @@ import type { StoredPreferences } from "@/theme/sync";
  * One part of the user's stored preferences (on every device), read through `parse` (which
  * fills in defaults and drops anything unknown) and saved whole when it changes.
  */
-export function usePreference<T>(key: string, parse: (raw: unknown) => T): { value: T; save: (next: T) => void } {
+export function usePreference<T>(
+  key: string,
+  parse: (raw: unknown) => T,
+): { value: T; save: (next: T) => void; loaded: boolean } {
   const queryClient = useQueryClient();
   // One cache entry for the preferences, read and written: they hold more than one feature's.
   const options = $api.queryOptions("get", "/me/preferences", {}, { staleTime: Number.POSITIVE_INFINITY });
@@ -23,5 +26,5 @@ export function usePreference<T>(key: string, parse: (raw: unknown) => T): { val
       // Not saved: this page keeps the choice; the next change tries again.
     });
   };
-  return { value, save };
+  return { value, save, loaded: stored.isSuccess || stored.isError };
 }

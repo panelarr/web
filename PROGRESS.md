@@ -85,6 +85,12 @@ Everything in the metadata service's and source plugins' own admin pages, inside
 - [x] **Adding a work opens it on its Sources tab**, from the catalogue and from a source's series: its chapters come once a source is attached.
 - [x] **A failed attach says so:** a toast, and the error on the search result that was picked.
 
+## Saved library views (FEAT-0018)
+
+- [x] **W1. Model and data:** the server's views API (spec synced); a view's definition in the app: include/exclude filters (unread, started, downloaded, bookmarked, new), types, statuses, updated within N days, the Recently updated sort on `last_updated_at`; the views hook (changes shown at once, rolled back when refused, refetched on `library_views.changed`); the mock server keeps views as the server does.
+- [x] **W2. Views on the library:** the heading names the view and opens the list (a menu on desktops, a sheet from the bottom on phones); `?view=<id>` (pushed when switching; `/` is the default view); someone else's or a missing view falls back to the default with a notice; old `?only=` links are dropped; the first visit makes "Library" from the remembered sort and display (another device doing the same at once is fine); the sheet edits the active view and saves after a short pause; Reset view; an empty view's own state.
+- [x] **W3. New view and Edit views:** create from this view or everything (then set it up in the sheet); rename in place, reorder by dragging or with up and down, make default, duplicate, delete with a confirmation; the only view can't be deleted (`docs/library.md`).
+
 ## Working assumptions
 
 Settled for now, cheap to change:

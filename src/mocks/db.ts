@@ -48,6 +48,9 @@ export interface MockLibraryEntry {
   auto_download: boolean;
 }
 
+/** A saved library view and whose it is. */
+export type MockLibraryView = S["LibraryView"] & { user_id: string };
+
 export interface MockDb extends JobsState, NetworkState {
   users: S["User"][];
   passwords: Record<string, string>;
@@ -92,6 +95,10 @@ export interface MockDb extends JobsState, NetworkState {
   readerSettings: Record<string, Record<string, Record<string, unknown>>>;
   /** Per user: app preferences. */
   preferences: Record<string, Record<string, unknown>>;
+  /** Every user's saved library views. */
+  libraryViews: MockLibraryView[];
+  /** When a later check found a chapter (chapter ID → time); chapters a work was listed with have none. */
+  appeared: Record<string, string>;
   storages: S["StorageInfo"][];
   /** Page images take 100–1500 ms and long-strip pages vary in height (the slow-pages scenario). */
   slowPages?: boolean;
@@ -153,6 +160,8 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     downloaded: [],
     readerSettings: {},
     preferences: {},
+    libraryViews: [],
+    appeared: {},
     storages: initialStorages(),
     ...initialNetwork(),
     jobs: initialJobs(),
