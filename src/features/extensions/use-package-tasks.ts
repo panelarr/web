@@ -23,6 +23,19 @@ const packageListOptions = (pluginId: string) =>
 
 export const packageListKey = (pluginId: string) => packageListOptions(pluginId).queryKey;
 
+/**
+ * Only a plugin's installed packages with an update (Admin → Updates). Short, so it's asked
+ * again after any of them changes rather than patched.
+ */
+export const updatesListOptions = (pluginId: string) =>
+  $api.queryOptions(
+    "get",
+    "/plugins/{plugin_id}/packages",
+    { params: { path: { plugin_id: pluginId }, query: { updates: true } } },
+    // As the full list: asking the stores can be slow, so events and reconnects leave it alone.
+    { staleTime: 60_000, meta: MANUAL },
+  );
+
 /** A plugin's packages from all its stores: one big list, loaded once and kept. */
 export function usePackageList(pluginId: string) {
   return useQuery(packageListOptions(pluginId));
@@ -58,6 +71,18 @@ export function usePackageTasks(pluginId: string) {
   // Names for the toasts, by task (ours only) and by package (while its request is on its way).
   const ours = useRef(new Map<string, { name: string; action: PackageAction }>());
   const names = useRef(new Map<string, string>());
+  // Packages whose request is on its way, until the server answers. Each package has its own
+  // entry (one mutation can't tell several calls apart), so "Update all" disables every row it
+  // started and a second click can't send the same request again. The ref is the synchronous
+  // guard; the state re-renders the rows.
+  const inflight = useRef(new Set<string>());
+  const [sendingIds, setSendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  // The last request that failed per package, shown on its row until it's tried again.
+  const [failures, setFailures] = useState<Record<string, string>>({});
+  const settle = (id: string) => {
+    inflight.current.delete(id);
+    setSendingIds(new Set(inflight.current));
+  };
 
   /**
    * After a package changed: that package alone is fetched and put into the cached list (the
@@ -73,6 +98,7 @@ export function usePackageTasks(pluginId: string) {
           return path === "/plugins/{plugin_id}" && init?.params?.path?.plugin_id === pluginId;
         },
       });
+      void queryClient.invalidateQueries({ queryKey: updatesListOptions(pluginId).queryKey });
       if (!packageId) {
         void queryClient.invalidateQueries({ queryKey: packageListKey(pluginId) });
         return;
@@ -92,9 +118,9 @@ export function usePackageTasks(pluginId: string) {
   /** The package a task is about: one started here, or a row that carries the task. */
   const packageOfTask = (taskId: string): string | undefined =>
     Object.entries(started).find(([, s]) => s.taskId === taskId)?.[0] ??
-    queryClient
-      .getQueryData<{ packages: Package[] }>(packageListKey(pluginId))
-      ?.packages.find((p) => p.task_id === taskId)?.id;
+    [packageListKey(pluginId), updatesListOptions(pluginId).queryKey]
+      .flatMap((key) => queryClient.getQueryData<{ packages: Package[] }>(key)?.packages ?? [])
+      .find((p) => p.task_id === taskId)?.id;
 
   const onTask = (task: TaskEvent) => {
     if (task.kind !== KIND) return;
@@ -121,11 +147,15 @@ export function usePackageTasks(pluginId: string) {
       const id = vars.params.path.package_id;
       ours.current.set(ref.task_id, { name: names.current.get(id) ?? id, action });
       setStarted((prev) => ({ ...prev, [id]: { taskId: ref.task_id, action } }));
+      settle(id);
     },
     onError: (error: unknown, vars: { params: { path: { package_id: string } } }) => {
       const id = vars.params.path.package_id;
+      const message = errorMessage(error);
+      setFailures((prev) => ({ ...prev, [id]: `${ACTION_LABELS[action].failed}: ${message}` }));
+      settle(id);
       toast.error(`${names.current.get(id) ?? id}: ${ACTION_LABELS[action].failed.toLowerCase()}`, {
-        description: errorMessage(error),
+        description: message,
       });
     },
   });
@@ -135,6 +165,10 @@ export function usePackageTasks(pluginId: string) {
 
   /** Starts an action; installing may name the offer (store) to install from. */
   const run = (pkg: Package, action: PackageAction, originId?: string) => {
+    if (inflight.current.has(pkg.id)) return;
+    inflight.current.add(pkg.id);
+    setSendingIds(new Set(inflight.current));
+    setFailures(({ [pkg.id]: _, ...rest }) => rest);
     names.current.set(pkg.id, pkg.name);
     const params = { path: { plugin_id: pluginId, package_id: pkg.id } };
     if (action === "install") install.mutate({ params, body: originId ? { origin_id: originId } : {} });
@@ -153,10 +187,12 @@ export function usePackageTasks(pluginId: string) {
   };
 
   /** A request for this package is on its way (before the server answers with a task). */
-  const sending = (pkg: Package) =>
-    [install, update, uninstall].some((m) => m.isPending && m.variables?.params.path.package_id === pkg.id);
+  const sending = (pkg: Package) => sendingIds.has(pkg.id);
 
-  return { run, openTask, sending };
+  /** Why the last request for this package failed, if it did. */
+  const failure = (pkg: Package): string | undefined => failures[pkg.id];
+
+  return { run, openTask, sending, failure };
 }
 
 export type PackageTasks = ReturnType<typeof usePackageTasks>;

@@ -32,7 +32,7 @@ right there. The most specific choice wins:
 | a plugin, its extensions, its sources | the plugin's page → Network |
 | an extension | the plugin's page → Extensions → its details |
 | a source | Admin → Sources → its "Settings and network" |
-| the metadata service and each provider | Admin → System |
+| the metadata service and each provider | Admin → Metadata |
 
 The pickers show what's in effect and where it comes from, and whether the plugin has it yet:
 *on its way* (changes arrive within seconds), *in use*, or *not applied* (with the reason; the

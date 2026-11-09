@@ -22,11 +22,13 @@ import { Route as AppMoreRouteImport } from './routes/_app/more'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppUpdatesRouteImport } from './routes/_app/updates'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
+import { Route as AppAdminHealthRouteImport } from './routes/_app/admin/health'
 import { Route as AppAdminMetadataRouteImport } from './routes/_app/admin/metadata'
 import { Route as AppAdminNetworkRouteImport } from './routes/_app/admin/network'
 import { Route as AppAdminQueueRouteImport } from './routes/_app/admin/queue'
 import { Route as AppAdminStorageRouteImport } from './routes/_app/admin/storage'
 import { Route as AppAdminSystemRouteImport } from './routes/_app/admin/system'
+import { Route as AppAdminUpdatesRouteImport } from './routes/_app/admin/updates'
 import { Route as AppBrowseIndexRouteImport } from './routes/_app/browse/index'
 import { Route as AppCatalogEntryIdRouteImport } from './routes/_app/catalog/$entryId'
 import { Route as AppWorksWorkIdRouteImport } from './routes/_app/works/$workId'
@@ -107,6 +109,11 @@ const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminHealthRoute = AppAdminHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppAdminMetadataRoute = AppAdminMetadataRouteImport.update({
   id: '/metadata',
   path: '/metadata',
@@ -130,6 +137,11 @@ const AppAdminStorageRoute = AppAdminStorageRouteImport.update({
 const AppAdminSystemRoute = AppAdminSystemRouteImport.update({
   id: '/system',
   path: '/system',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminUpdatesRoute = AppAdminUpdatesRouteImport.update({
+  id: '/updates',
+  path: '/updates',
   getParentRoute: () => AppAdminRoute,
 } as any)
 const AppBrowseIndexRoute = AppBrowseIndexRouteImport.update({
@@ -227,11 +239,13 @@ export interface FileRoutesByFullPath {
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
   '/updates': typeof AppUpdatesRoute
+  '/admin/health': typeof AppAdminHealthRoute
   '/admin/metadata': typeof AppAdminMetadataRoute
   '/admin/network': typeof AppAdminNetworkRoute
   '/admin/queue': typeof AppAdminQueueRoute
   '/admin/storage': typeof AppAdminStorageRoute
   '/admin/system': typeof AppAdminSystemRoute
+  '/admin/updates': typeof AppAdminUpdatesRoute
   '/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/works/$workId': typeof AppWorksWorkIdRoute
   '/read/$chapterId': typeof ReaderReadChapterIdRoute
@@ -260,11 +274,13 @@ export interface FileRoutesByTo {
   '/more': typeof AppMoreRoute
   '/settings': typeof AppSettingsRoute
   '/updates': typeof AppUpdatesRoute
+  '/admin/health': typeof AppAdminHealthRoute
   '/admin/metadata': typeof AppAdminMetadataRoute
   '/admin/network': typeof AppAdminNetworkRoute
   '/admin/queue': typeof AppAdminQueueRoute
   '/admin/storage': typeof AppAdminStorageRoute
   '/admin/system': typeof AppAdminSystemRoute
+  '/admin/updates': typeof AppAdminUpdatesRoute
   '/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/works/$workId': typeof AppWorksWorkIdRoute
   '/read/$chapterId': typeof ReaderReadChapterIdRoute
@@ -297,11 +313,13 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/updates': typeof AppUpdatesRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/admin/health': typeof AppAdminHealthRoute
   '/_app/admin/metadata': typeof AppAdminMetadataRoute
   '/_app/admin/network': typeof AppAdminNetworkRoute
   '/_app/admin/queue': typeof AppAdminQueueRoute
   '/_app/admin/storage': typeof AppAdminStorageRoute
   '/_app/admin/system': typeof AppAdminSystemRoute
+  '/_app/admin/updates': typeof AppAdminUpdatesRoute
   '/_app/catalog/$entryId': typeof AppCatalogEntryIdRoute
   '/_app/works/$workId': typeof AppWorksWorkIdRoute
   '/_reader/read/$chapterId': typeof ReaderReadChapterIdRoute
@@ -333,11 +351,13 @@ export interface FileRouteTypes {
     | '/more'
     | '/settings'
     | '/updates'
+    | '/admin/health'
     | '/admin/metadata'
     | '/admin/network'
     | '/admin/queue'
     | '/admin/storage'
     | '/admin/system'
+    | '/admin/updates'
     | '/catalog/$entryId'
     | '/works/$workId'
     | '/read/$chapterId'
@@ -366,11 +386,13 @@ export interface FileRouteTypes {
     | '/more'
     | '/settings'
     | '/updates'
+    | '/admin/health'
     | '/admin/metadata'
     | '/admin/network'
     | '/admin/queue'
     | '/admin/storage'
     | '/admin/system'
+    | '/admin/updates'
     | '/catalog/$entryId'
     | '/works/$workId'
     | '/read/$chapterId'
@@ -402,11 +424,13 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/updates'
     | '/_app/'
+    | '/_app/admin/health'
     | '/_app/admin/metadata'
     | '/_app/admin/network'
     | '/_app/admin/queue'
     | '/_app/admin/storage'
     | '/_app/admin/system'
+    | '/_app/admin/updates'
     | '/_app/catalog/$entryId'
     | '/_app/works/$workId'
     | '/_reader/read/$chapterId'
@@ -527,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminIndexRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/health': {
+      id: '/_app/admin/health'
+      path: '/health'
+      fullPath: '/admin/health'
+      preLoaderRoute: typeof AppAdminHealthRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/metadata': {
       id: '/_app/admin/metadata'
       path: '/metadata'
@@ -560,6 +591,13 @@ declare module '@tanstack/react-router' {
       path: '/system'
       fullPath: '/admin/system'
       preLoaderRoute: typeof AppAdminSystemRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/updates': {
+      id: '/_app/admin/updates'
+      path: '/updates'
+      fullPath: '/admin/updates'
+      preLoaderRoute: typeof AppAdminUpdatesRouteImport
       parentRoute: typeof AppAdminRoute
     }
     '/_app/browse/': {
@@ -678,11 +716,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppAdminRouteChildren {
+  AppAdminHealthRoute: typeof AppAdminHealthRoute
   AppAdminMetadataRoute: typeof AppAdminMetadataRoute
   AppAdminNetworkRoute: typeof AppAdminNetworkRoute
   AppAdminQueueRoute: typeof AppAdminQueueRoute
   AppAdminStorageRoute: typeof AppAdminStorageRoute
   AppAdminSystemRoute: typeof AppAdminSystemRoute
+  AppAdminUpdatesRoute: typeof AppAdminUpdatesRoute
   AppAdminIndexRoute: typeof AppAdminIndexRoute
   AppAdminPluginsPluginIdRoute: typeof AppAdminPluginsPluginIdRoute
   AppAdminUsersUserIdRoute: typeof AppAdminUsersUserIdRoute
@@ -697,11 +737,13 @@ interface AppAdminRouteChildren {
 }
 
 const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminHealthRoute: AppAdminHealthRoute,
   AppAdminMetadataRoute: AppAdminMetadataRoute,
   AppAdminNetworkRoute: AppAdminNetworkRoute,
   AppAdminQueueRoute: AppAdminQueueRoute,
   AppAdminStorageRoute: AppAdminStorageRoute,
   AppAdminSystemRoute: AppAdminSystemRoute,
+  AppAdminUpdatesRoute: AppAdminUpdatesRoute,
   AppAdminIndexRoute: AppAdminIndexRoute,
   AppAdminPluginsPluginIdRoute: AppAdminPluginsPluginIdRoute,
   AppAdminUsersUserIdRoute: AppAdminUsersUserIdRoute,

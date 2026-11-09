@@ -26,6 +26,18 @@ test("installs an extension, and its source shows in Sources to be browsed", asy
   await expect(page.getByRole("navigation", { name: "Lists" })).toBeVisible();
 });
 
+test("updates an extension from Admin → Updates, and it leaves the list", async ({ page }) => {
+  await page.goto("/admin/updates?mock=ready");
+  const stores = page.getByRole("region", { name: "Example Store Plugin" });
+  await expect(stores.getByText("Polyglot Comics")).toBeVisible();
+  await expect(stores.getByText("v2.0.0 → v2.1.0")).toBeVisible();
+  await stores.getByRole("button", { name: "Update", exact: true }).click();
+  await expect(stores.getByText("Everything is up to date.")).toBeVisible({ timeout: 10_000 });
+  await stores.getByRole("link", { name: "Its extensions" }).click();
+  await expect(page).toHaveURL(/\/admin\/plugins\/stores\?tab=extensions&show=updates$/);
+  await expect(page.getByText(/^0 of 64 extensions/)).toBeVisible();
+});
+
 test("regular users don't browse sources", async ({ page }) => {
   await page.goto("/browse/sources/example:1001?mock=user");
   await expect(page).toHaveURL(/\/browse$/);

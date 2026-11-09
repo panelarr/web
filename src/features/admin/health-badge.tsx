@@ -7,6 +7,8 @@ const TONES: Record<string, string> = {
   degraded: "bg-warning",
   failing: "bg-destructive",
   down: "bg-destructive",
+  unavailable: "bg-destructive",
+  off: "bg-muted-foreground/50",
   unknown: "bg-muted-foreground/50",
 };
 
@@ -15,6 +17,8 @@ const LABELS: Record<string, string> = {
   degraded: "Degraded",
   failing: "Failing",
   down: "Down",
+  unavailable: "Unavailable",
+  off: "Off",
   unknown: "Not checked",
 };
 

@@ -246,16 +246,7 @@ describe("sources", () => {
   });
 });
 
-describe("system", () => {
-  it("shows component health, and the metadata service in a line with a link to its page", async () => {
-    await renderApp("/admin/system");
-    expect(await screen.findByText("database")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Providers, jobs and settings" })).toHaveAttribute(
-      "href",
-      "/admin/metadata",
-    );
-  });
-
+describe("metadata", () => {
   it("shows the metadata connection on the metadata service's page", async () => {
     await renderApp("/admin/metadata");
     expect(await screen.findByText("A metadata provider has entries")).toBeInTheDocument();
