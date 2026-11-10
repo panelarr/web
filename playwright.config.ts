@@ -7,7 +7,7 @@ const port = Number(process.env.E2E_PORT || 5174);
 const previewPort = Number(process.env.E2E_PREVIEW_PORT || 4174);
 
 /**
- * The reader's specs also run on iOS Safari's engine whenever WebKit is installed
+ * The reader's and the library views' specs also run on iOS Safari's engine whenever WebKit is installed
  * (`pnpm exec playwright install webkit`); `E2E_WEBKIT=0` leaves it out, `E2E_WEBKIT=1` insists on it.
  */
 function webkitInstalled(): boolean {
@@ -55,7 +55,7 @@ export default defineConfig({
       ? [
           {
             name: "phone-webkit",
-            testMatch: /(reader(-stability)?|strip-preload)\.spec/,
+            testMatch: /(reader(-stability)?|strip-preload|library-views)\.spec/,
             use: { ...devices["iPhone 13"], viewport: { width: 375, height: 740 } },
           },
         ]

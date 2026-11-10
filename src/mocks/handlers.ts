@@ -12,6 +12,7 @@ import { initialDuplicates, judgeTest } from "./duplicates";
 import { emit, onMockEvent } from "./events";
 import { packageKey, packageRetries, sourceKey, sourceRetries, validDelays } from "./image-retries";
 import { finishRun, type JobStore, queueState, startRun, taskEvent } from "./jobs";
+import { libraryViewOperations } from "./library-views";
 import {
   initialSearchEngine,
   metaHealth,
@@ -370,6 +371,12 @@ function readingStats(userId: string, workId: string) {
     .sort()
     .at(-1);
   const unread = chapters.filter((c) => !mine[c.id]?.completed).length;
+  // When a later check last found one of its chapters (the newest that appeared).
+  const updated = chapters
+    .map((c) => d.appeared?.[c.id])
+    .filter((at) => at !== undefined)
+    .sort()
+    .at(-1);
   return {
     chapters: chapters.length,
     unread,
@@ -378,6 +385,7 @@ function readingStats(userId: string, workId: string) {
     ...(next && unread > 0 ? { continue_chapter_id: next } : {}),
     ...(lastRead ? { last_read_at: lastRead } : {}),
     ...(latest ? { latest_chapter_at: latest } : {}),
+    ...(updated ? { last_updated_at: updated } : {}),
   };
 }
 
@@ -1969,6 +1977,8 @@ export const operations: MockOperation[] = [
         fresh[workId] = [...new Set([...(fresh[workId] ?? []), newest.chapter.id])];
         entry.new_chapters = fresh[workId].length;
       }
+      d.appeared ??= {};
+      d.appeared[newest.chapter.id] = now();
       emit("chapters.new", { work_id: workId, new: 1 });
     }
     commit();
@@ -2714,6 +2724,8 @@ export const operations: MockOperation[] = [
     commit();
     return json(queueState(d));
   }),
+
+  ...libraryViewOperations(requireUser),
 ];
 
 // Jobs: the same model for the server's, meta's and plugins' (contracts/jobs.md).

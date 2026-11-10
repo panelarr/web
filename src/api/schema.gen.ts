@@ -2269,6 +2269,7 @@ export interface paths {
          *     | `library.changed` | the user | `WorkEvent` |
          *     | `progress.synced` | the user (all devices) | `WorkEvent` (`chapter_id`, `page`, `completed` when one chapter changed) |
          *     | `bookmarks.changed` | the user (all devices) | `WorkEvent` |
+         *     | `library_views.changed` | the user (all devices) | `LibraryViewsEvent` |
          */
         get: operations["streamEvents"];
         put?: never;
@@ -2692,7 +2693,11 @@ export interface paths {
         get?: never;
         /**
          * Save where you are in a chapter
-         * @description Reaching the last page (when `pages` is given) marks the chapter read, unless `completed` says otherwise. Your other devices get a `progress.synced` event.
+         * @description Reaching the last page (when `pages` is given) marks the chapter
+         *     read. A read chapter stays read when you open it again and save an
+         *     earlier page: the page still moves (for history and resuming), but
+         *     only an explicit `completed` (or marking it unread) changes the
+         *     read mark. Your other devices get a `progress.synced` event.
          */
         put: operations["setChapterProgress"];
         post?: never;
@@ -2923,6 +2928,91 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/me/library-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your saved library views
+         * @description Named views of your library, each with filters, a sort and display
+         *     settings (a `LibraryViewDefinition`), in your order. Exactly one is
+         *     your default once you have any. The server only stores views;
+         *     clients apply them to the library. Other devices hear
+         *     `library_views.changed` when they change.
+         */
+        get: operations["listMyLibraryViews"];
+        put?: never;
+        /**
+         * Save a library view
+         * @description Adds the view at the end of your order. Your first view is the
+         *     default; `default: true` makes a later one the default. Names are
+         *     trimmed and unique per user, ignoring case (`409`, code
+         *     `name_taken`); you keep at most 50 views (`409`, code `view_limit`).
+         *     A definition is at most 4 KiB.
+         */
+        post: operations["createMyLibraryView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/library-views/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder your library views
+         * @description The IDs of all your views, each once, in the new order; anything else answers `409`, code `order_mismatch`.
+         */
+        put: operations["orderMyLibraryViews"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/library-views/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One of your library views
+         * @description Another user's view answers `404`, like a missing one.
+         */
+        get: operations["getMyLibraryView"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a library view
+         * @description Deleting your default view makes the first remaining view the default. Your only view can't be deleted (`409`, code `last_view`).
+         */
+        delete: operations["deleteMyLibraryView"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a library view
+         * @description Only the fields sent change; `definition` is replaced as a whole.
+         *     `default: true` makes the view your default (the old default stops
+         *     being one). `default: false` on your default view answers `409`,
+         *     code `default_required`: make another view the default instead.
+         */
+        patch: operations["updateMyLibraryView"];
         trace?: never;
     };
     "/storages": {
@@ -3212,6 +3302,7 @@ export interface components {
         SetProgressRequest: {
             page: number;
             pages?: number;
+            /** @description Sets the read mark either way. Left out, the last page marks the chapter read and an earlier page keeps the mark it had. */
             completed?: boolean;
         };
         WorkProgress: {
@@ -3462,6 +3553,93 @@ export interface components {
              * @description When its newest chapter came out (or was first seen, when the source gives no date).
              */
             latest_chapter_at?: string;
+            /**
+             * Format: date-time
+             * @description When Panelarr last found a new chapter of it in a later check (the newest of its available chapters that appeared after the work was first listed); absent when none ever did.
+             */
+            last_updated_at?: string;
+        };
+        /** @description A saved view of your library. */
+        LibraryView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Its place in your order, from 0. */
+            position: number;
+            /** @description The view your library opens with; exactly one of your views is. */
+            default: boolean;
+            definition: components["schemas"]["LibraryViewDefinition"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        LibraryViewList: {
+            views: components["schemas"]["LibraryView"][];
+        };
+        /**
+         * @description What a view shows and how. Every field is optional: an absent filter
+         *     lets everything through, and clients fill in their own defaults for
+         *     the sort and display. Unknown keys and values are refused, so a new
+         *     filter or sort needs a server that knows it. At most 4 KiB.
+         */
+        LibraryViewDefinition: {
+            filters?: components["schemas"]["LibraryViewFilters"];
+            /** @description Only works of these types (`work.type`); empty or absent means any. */
+            types?: string[];
+            /** @description Only works with these publication statuses (`work.status`); empty or absent means any. */
+            statuses?: string[];
+            /** @description Only works with a new chapter found within this many days (`last_updated_at`). */
+            updated_within_days?: number;
+            /**
+             * @description `title`; `added` (to your library); `read` (`last_read_at`);
+             *     `latest` (`latest_chapter_at`); `updated` (`last_updated_at`);
+             *     `unread`; `total` (chapters).
+             * @enum {string}
+             */
+            sort?: "title" | "added" | "read" | "latest" | "updated" | "unread" | "total";
+            reverse?: boolean;
+            display?: components["schemas"]["LibraryViewDisplay"];
+        };
+        /** @description Each filter keeps (`include`) or drops (`exclude`) the works it matches; absent means either. */
+        LibraryViewFilters: {
+            unread?: components["schemas"]["LibraryViewFilterMode"];
+            started?: components["schemas"]["LibraryViewFilterMode"];
+            downloaded?: components["schemas"]["LibraryViewFilterMode"];
+            bookmarked?: components["schemas"]["LibraryViewFilterMode"];
+            new?: components["schemas"]["LibraryViewFilterMode"];
+        };
+        /** @enum {string} */
+        LibraryViewFilterMode: "include" | "exclude";
+        LibraryViewDisplay: {
+            /** @enum {string} */
+            layout?: "compact" | "comfortable" | "list";
+            unread_badges?: boolean;
+            download_badges?: boolean;
+            continue_button?: boolean;
+        };
+        CreateLibraryViewRequest: {
+            name: string;
+            definition: components["schemas"]["LibraryViewDefinition"];
+            /** @description Make it your default view. */
+            default?: boolean;
+        };
+        UpdateLibraryViewRequest: {
+            name?: string;
+            definition?: components["schemas"]["LibraryViewDefinition"];
+            /** @description `true` makes it your default view; `false` is refused on the default (`default_required`). */
+            default?: boolean;
+        };
+        OrderLibraryViewsRequest: {
+            ids: string[];
+        };
+        /** @description Data of `library_views.changed`; refetch your views. */
+        LibraryViewsEvent: {
+            /**
+             * Format: uuid
+             * @description The view that changed, when one did (absent after reordering).
+             */
+            view_id?: string;
         };
         LibraryPage: {
             entries: components["schemas"]["LibraryEntry"][];
@@ -9467,6 +9645,148 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMyLibraryViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your views in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryViewList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createMyLibraryView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLibraryViewRequest"];
+            };
+        };
+        responses: {
+            /** @description The new view. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryView"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    orderMyLibraryViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderLibraryViewsRequest"];
+            };
+        };
+        responses: {
+            /** @description Your views in the new order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryViewList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMyLibraryView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The view. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryView"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteMyLibraryView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateMyLibraryView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLibraryViewRequest"];
+            };
+        };
+        responses: {
+            /** @description The view now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryView"];
+                };
             };
             default: components["responses"]["Problem"];
         };

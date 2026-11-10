@@ -2,12 +2,19 @@
 
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { components } from "@/api/schema.gen";
 import { unifiedChapters } from "@/mocks/chapters";
-import { db } from "@/mocks/db";
+import { db, type MockLibraryView, newId } from "@/mocks/db";
+import { emit } from "@/mocks/events";
 import { addToLibrary } from "@/mocks/handlers";
+import { mockUrl } from "@/mocks/op";
 import { tickMatching } from "@/mocks/works";
 import { renderApp } from "@/test/render";
+import { server } from "@/test/server";
+
+type Definition = components["schemas"]["LibraryViewDefinition"];
 
 /** Three works; The Lantern Keeper started (its first chapter read). */
 function seed() {
@@ -27,10 +34,33 @@ function seed() {
   return { user, lantern, chapters };
 }
 
+/** Saved views for the user, in this order; the first is the default unless one says so. */
+function seedViews(...views: Array<{ name: string; definition?: Definition; default?: boolean }>): MockLibraryView[] {
+  const hasDefault = views.some((v) => v.default);
+  const made = views.map((v, position) => ({
+    user_id: ctx.user.id,
+    id: newId(),
+    name: v.name,
+    position,
+    default: hasDefault ? v.default === true : position === 0,
+    definition: v.definition ?? {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
+  db().libraryViews.push(...made);
+  return made;
+}
+
+const savedView = (name: string) => db().libraryViews.find((v) => v.user_id === ctx.user.id && v.name === name);
+const myViews = () =>
+  db()
+    .libraryViews.filter((v) => v.user_id === ctx.user.id)
+    .sort((a, b) => a.position - b.position);
+
 /** The works in the order shown. */
 const titles = () =>
   screen
-    .getAllByRole("link")
+    .queryAllByRole("link")
     .filter((link) => link.getAttribute("href")?.startsWith("/works/"))
     .map((link) => link.querySelector("p")?.textContent);
 const card = (title: string) =>
@@ -38,6 +68,16 @@ const card = (title: string) =>
     .getAllByText(title)
     .find((el) => el.closest("a[href^='/works/']"))
     ?.closest("a")?.parentElement ?? document.body) as HTMLElement;
+
+const openSheet = async () => {
+  await userEvent.click(screen.getByRole("button", { name: /^Filter, sort and display/ }));
+  return screen.findByRole("dialog");
+};
+/** The heading's view list (a sheet on phones, as in these tests). */
+const openViews = async (current: string) => {
+  await userEvent.click(within(screen.getByRole("heading", { level: 1 })).getByRole("button", { name: current }));
+  return screen.findByRole("dialog", { name: "Library views" });
+};
 
 let ctx: ReturnType<typeof seed>;
 beforeEach(() => {
@@ -60,19 +100,9 @@ describe("the library", () => {
     expect(screen.getByRole("link", { name: "Start Iron Garden" })).toBeInTheDocument();
   });
 
-  it("filters to started works, in the URL, and searches", async () => {
+  it("searches, from the title row", async () => {
     const { router } = await renderApp("/");
     await screen.findByText("3 works");
-    await userEvent.click(screen.getByRole("button", { name: "Filter, sort and display" }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Started (1)" }));
-    await waitFor(() => expect(router.state.location.search).toEqual({ only: "started" }));
-    // The page behind the sheet is hidden while it's open.
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(titles()).toEqual(["The Lantern Keeper"]));
-    await userEvent.click(screen.getByRole("button", { name: "Filter, sort and display (1 filters on)" }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Started (1)" }));
-    await userEvent.keyboard("{Escape}");
-
     // On a phone the search is an icon in the title row; it opens a field there, ready to type.
     await userEvent.click(screen.getByRole("button", { name: "Search your library" }));
     const field = screen.getByRole("searchbox", { name: "Search your library" });
@@ -113,43 +143,524 @@ describe("the library", () => {
       window.matchMedia = matchMedia;
     }
   });
+});
 
-  it("sorts, reverses, and remembers it", async () => {
+describe("the first view", () => {
+  it("is made from the remembered sort and display, without filters, once (AC8)", async () => {
+    const remembered = { sort: "title", reverse: true, layout: "list", unreadBadges: false };
+    db().preferences[ctx.user.id] = { version: 1, library: remembered };
     await renderApp("/");
-    await screen.findByText("3 works");
-    expect(titles()).toEqual(["Iron Garden", "Moonlit Bakery", "The Lantern Keeper"]);
-    await userEvent.click(screen.getByRole("button", { name: "Filter, sort and display" }));
-    await userEvent.click(await screen.findByRole("tab", { name: "Sort" }));
-    await userEvent.click(screen.getByRole("button", { name: "Title" }));
-    await waitFor(() => expect(db().preferences[ctx.user.id]?.library).toMatchObject({ sort: "title", reverse: true }));
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(titles()).toEqual(["The Lantern Keeper", "Moonlit Bakery", "Iron Garden"]));
-    await userEvent.click(screen.getByRole("button", { name: "Filter, sort and display" }));
-    await userEvent.click(await screen.findByRole("tab", { name: "Sort" }));
-    await userEvent.click(screen.getByRole("button", { name: "Recently read" }));
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(titles()[0]).toBe("The Lantern Keeper"));
+    await waitFor(() => expect(myViews()).toHaveLength(1));
+    expect(myViews()[0]).toMatchObject({
+      name: "Library",
+      default: true,
+      definition: {
+        sort: "title",
+        reverse: true,
+        display: { layout: "list", unread_badges: false, download_badges: false, continue_button: true },
+      },
+    });
+    expect(myViews()[0]?.definition.filters).toBeUndefined();
+    // It looks as before: the heading, the order and the list.
+    expect(screen.getByRole("heading", { name: "Library" })).toBeInTheDocument();
+    const list = await screen.findByRole("list", { name: "Library" });
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((li) => li.querySelector("p")?.textContent),
+    ).toEqual(["The Lantern Keeper", "Moonlit Bakery", "Iron Garden"]);
+    // The old preference stays, for an older app.
+    expect(db().preferences[ctx.user.id]?.library).toEqual(remembered);
   });
 
-  it("shows a list or a compact grid, with the badges asked for", async () => {
+  it("waits for the preferences: none made while they fail, then made from them (AC8)", async () => {
+    const remembered = { sort: "unread", reverse: true, layout: "list" };
+    db().preferences[ctx.user.id] = { version: 1, library: remembered };
+    let failing = true;
+    const posts: unknown[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "POST" && request.url.endsWith("/me/library-views")) posts.push(request.url);
+    });
+    server.use(
+      http.get(mockUrl("/me/preferences"), () =>
+        failing
+          ? HttpResponse.json(
+              { type: "about:blank", title: "Unavailable", status: 503, code: "unavailable" },
+              { status: 503, headers: { "Content-Type": "application/problem+json" } },
+            )
+          : undefined,
+      ),
+    );
+    try {
+      await renderApp("/");
+      // The library shows, with the defaults, and nothing is saved.
+      await screen.findByText("3 works");
+      expect(titles()).toEqual(["Iron Garden", "Moonlit Bakery", "The Lantern Keeper"]);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(myViews()).toHaveLength(0);
+      expect(posts).toHaveLength(0);
+      // They load on a later try: the view keeps what the user chose.
+      failing = false;
+      await waitFor(() => expect(myViews()).toHaveLength(1), { timeout: 5000 });
+      expect(myViews()[0]?.definition).toMatchObject({ sort: "unread", reverse: true, display: { layout: "list" } });
+      expect(posts).toHaveLength(1);
+    } finally {
+      server.events.removeAllListeners("request:start");
+    }
+  });
+
+  it("is fetched when another device made it first (AC8)", async () => {
+    // This device sees no views; by the time it saves its own, another device has.
+    server.use(http.get(mockUrl("/me/library-views"), () => HttpResponse.json({ views: [] }), { once: true }));
+    const [other] = seedViews({ name: "Library", definition: { sort: "unread" } });
+    await renderApp("/");
+    await waitFor(() =>
+      expect(within(screen.getByRole("heading", { level: 1 })).getByRole("button", { name: "Library" })).toBeVisible(),
+    );
+    expect(myViews()).toEqual([other]);
+    expect(screen.queryByText(/wasn't saved/)).not.toBeInTheDocument();
+  });
+});
+
+describe("a view's filters, sort and display", () => {
+  it("are changed in the sheet and saved to the view, not others (AC5)", async () => {
+    seedViews({ name: "Library" }, { name: "Other", definition: { sort: "total" } });
+    const { router } = await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await openSheet();
+    expect(within(sheet).getByRole("heading", { name: "Library" })).toBeInTheDocument();
+    // Started: only these.
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Started (1)" }));
+    expect(within(sheet).getByRole("checkbox", { name: "Started (1)" })).toBeChecked();
+    await waitFor(() => expect(savedView("Library")?.definition.filters).toEqual({ started: "include" }));
+    // Again: leave them out.
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Started (1)" }));
+    expect(within(sheet).getByRole("checkbox", { name: "Started (1)" })).toBePartiallyChecked();
+    await waitFor(() => expect(savedView("Library")?.definition.filters).toEqual({ started: "exclude" }));
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(titles()).toEqual(["Iron Garden", "Moonlit Bakery"]));
+    expect(screen.getByText("2 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter, sort and display (1 filters on)" })).toBeInTheDocument();
+    // Nothing in the URL, and the other view is as it was.
+    expect(router.state.location.search).toEqual({});
+    expect(savedView("Other")?.definition).toEqual({ sort: "total" });
+  });
+
+  it("saves a burst of changes once, after a pause", async () => {
+    seedViews({ name: "Library" });
+    const patches: unknown[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "PATCH" && request.url.includes("/me/library-views/")) patches.push(request.url);
+    });
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("tab", { name: "Display" }));
+    await userEvent.click(within(sheet).getByRole("radio", { name: "List" }));
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Downloaded chapters" }));
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Unread chapters" }));
+    await waitFor(() =>
+      expect(savedView("Library")?.definition.display).toEqual({
+        layout: "list",
+        unread_badges: false,
+        download_badges: true,
+        continue_button: true,
+      }),
+    );
+    expect(patches).toHaveLength(1);
+    server.events.removeAllListeners("request:start");
+  });
+
+  it("sorts, reverses, and shows the badges asked for", async () => {
+    seedViews({ name: "Library" });
     const lanternChapter = ctx.chapters[2]?.id;
     if (lanternChapter) db().downloaded.push(lanternChapter);
     await renderApp("/");
     await screen.findByText("3 works");
-    await userEvent.click(screen.getByRole("button", { name: "Filter, sort and display" }));
-    await userEvent.click(await screen.findByRole("tab", { name: "Display" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Downloaded chapters" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Unread chapters" }));
-    await userEvent.click(screen.getByRole("radio", { name: "List" }));
+    expect(titles()).toEqual(["Iron Garden", "Moonlit Bakery", "The Lantern Keeper"]);
+    let sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("tab", { name: "Sort" }));
+    expect(within(sheet).getByRole("button", { name: "Recently updated" })).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Title" }));
+    await waitFor(() => expect(savedView("Library")?.definition).toMatchObject({ sort: "title", reverse: true }));
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(titles()).toEqual(["The Lantern Keeper", "Moonlit Bakery", "Iron Garden"]));
+
+    sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("tab", { name: "Display" }));
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Downloaded chapters" }));
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Unread chapters" }));
+    await userEvent.click(within(sheet).getByRole("radio", { name: "List" }));
     await userEvent.keyboard("{Escape}");
     const list = await screen.findByRole("list", { name: "Library" });
     const lantern = within(list).getByText("The Lantern Keeper").closest("li") as HTMLElement;
     expect(within(lantern).getByText("1")).toHaveTextContent("1 downloaded");
     expect(within(lantern).queryByText(/unread/)).not.toBeInTheDocument();
-    expect(db().preferences[ctx.user.id]?.library).toMatchObject({
-      layout: "list",
-      unreadBadges: false,
-      downloadBadges: true,
+  });
+
+  it("filters by type, status and how recently updated, offering only what's in the library", async () => {
+    seedViews({ name: "Library" });
+    const types = Object.fromEntries(db().works.map((w) => [w.title, w.type]));
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await openSheet();
+    const typeGroup = within(sheet).getByRole("group", { name: "Type" });
+    const offered = within(typeGroup).getAllByRole("checkbox");
+    expect(offered.length).toBe(new Set(Object.values(types)).size);
+    const ironType = types["Iron Garden"] ?? "";
+    const box = within(typeGroup).getByRole("checkbox", { name: new RegExp(`^${ironType.replace("_", " ")}`, "i") });
+    await userEvent.click(box);
+    await waitFor(() => expect(savedView("Library")?.definition.types).toEqual([ironType]));
+    expect(within(sheet).getByRole("group", { name: "Status" })).toBeInTheDocument();
+    // Nothing found a new chapter yet.
+    await userEvent.selectOptions(within(sheet).getByRole("combobox", { name: "Updated within" }), "7");
+    await waitFor(() => expect(savedView("Library")?.definition.updated_within_days).toBe(7));
+    await userEvent.keyboard("{Escape}");
+    expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+  });
+
+  it("says when a view is empty, and shows everything for now (not saved) or edits it", async () => {
+    const definition = { filters: { bookmarked: "include" as const }, sort: "total" as const };
+    seedViews({ name: "Bookmarked", definition }, { name: "Other" });
+    const patches: unknown[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "PATCH" && request.url.includes("/me/library-views/")) patches.push(request.url);
     });
+    try {
+      await renderApp("/");
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+      expect(screen.getByText("0 of 3")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Edit view" }));
+      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+
+      // Everything, for now; the view keeps its filters.
+      await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+      await waitFor(() => expect(titles()).toHaveLength(3));
+      expect(screen.getByRole("status")).toHaveTextContent("Showing everything");
+      await userEvent.click(screen.getByRole("button", { name: "Back to Bookmarked" }));
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+
+      // Edit view from there shows the view again, filters and all.
+      await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+      await waitFor(() => expect(titles()).toHaveLength(3));
+      await userEvent.click(screen.getByRole("button", { name: /^Filter, sort and display/ }));
+      const sheet = await screen.findByRole("dialog");
+      expect(within(sheet).getByRole("checkbox", { name: /^Bookmarked/ })).toBeChecked();
+      await userEvent.keyboard("{Escape}");
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+
+      // Switching views ends it too.
+      await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+      await waitFor(() => expect(titles()).toHaveLength(3));
+      const list = await openViews("Bookmarked");
+      await userEvent.click(within(list).getByRole("button", { name: "Other" }));
+      await screen.findByText("3 works");
+      const back = await openViews("Other");
+      await userEvent.click(within(back).getByRole("button", { name: /^Bookmarked/ }));
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+
+      expect(patches).toHaveLength(0);
+      expect(savedView("Bookmarked")?.definition).toEqual(definition);
+    } finally {
+      server.events.removeAllListeners("request:start");
+    }
+  });
+
+  it("is put back to the defaults by Reset view", async () => {
+    seedViews({ name: "Library", definition: { filters: { started: "include" }, sort: "unread", reverse: true } });
+    await renderApp("/");
+    await screen.findByText("1 of 3");
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Reset view" }));
+    await waitFor(() =>
+      expect(savedView("Library")?.definition).toEqual({
+        sort: "title",
+        reverse: false,
+        display: { layout: "comfortable", unread_badges: true, download_badges: false, continue_button: true },
+      }),
+    );
+    expect(savedView("Library")?.name).toBe("Library");
+  });
+
+  it("goes back to what's saved when the server refuses a change", async () => {
+    seedViews({ name: "Library" });
+    server.use(
+      http.patch(mockUrl("/me/library-views/{id}"), () =>
+        HttpResponse.json(
+          { type: "about:blank", title: "Unavailable", status: 503, code: "unavailable" },
+          { status: 503, headers: { "Content-Type": "application/problem+json" } },
+        ),
+      ),
+    );
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Started (1)" }));
+    expect(within(sheet).getByRole("checkbox", { name: "Started (1)" })).toBeChecked();
+    expect(await screen.findByText(/The view wasn't saved/)).toBeInTheDocument();
+    await waitFor(() => expect(within(sheet).getByRole("checkbox", { name: "Started (1)" })).not.toBeChecked());
+  });
+
+  it("keeps a newer change on screen when an earlier save fails, and saves it", async () => {
+    seedViews({ name: "Library" });
+    let first = true;
+    server.use(
+      http.patch(mockUrl("/me/library-views/{id}"), async () => {
+        if (!first) return undefined;
+        first = false;
+        // Slow enough for the next change to come in while it's on its way.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return HttpResponse.json(
+          { type: "about:blank", title: "Unavailable", status: 503, code: "unavailable" },
+          { status: 503, headers: { "Content-Type": "application/problem+json" } },
+        );
+      }),
+    );
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Started (1)" }));
+    // The first save is on its way (after the pause): change something else.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await userEvent.click(within(sheet).getByRole("tab", { name: "Display" }));
+    await userEvent.click(within(sheet).getByRole("radio", { name: "List" }));
+    expect(await screen.findByText(/The view wasn't saved/)).toBeInTheDocument();
+    // Still shown, then saved with both changes.
+    expect(within(sheet).getByRole("radio", { name: "List" })).toBeChecked();
+    await waitFor(() =>
+      expect(savedView("Library")?.definition).toMatchObject({
+        filters: { started: "include" },
+        display: { layout: "list" },
+      }),
+    );
+    expect(within(sheet).getByRole("radio", { name: "List" })).toBeChecked();
+  });
+
+  it("saves the last change when the page is left before the pause ends", async () => {
+    seedViews({ name: "Library" });
+    const { router } = await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("checkbox", { name: "Started (1)" }));
+    await router.navigate({ to: "/browse" });
+    await waitFor(() => expect(savedView("Library")?.definition.filters).toEqual({ started: "include" }));
+  });
+});
+
+describe("switching views", () => {
+  it("shows the default view on /, another by its ID, and Back returns (AC2, AC3)", async () => {
+    const [, started] = seedViews(
+      { name: "Library" },
+      { name: "Started, by unread", definition: { filters: { started: "include" }, display: { layout: "list" } } },
+    );
+    const { router } = await renderApp("/");
+    await screen.findByText("3 works");
+    const list = await openViews("Library");
+    const items = within(list)
+      .getAllByRole("button")
+      .filter((b) => b.textContent !== "Close");
+    expect(items.map((b) => b.textContent)).toEqual([
+      "LibraryDefault",
+      "Started, by unread",
+      "New view…",
+      "Edit views…",
+    ]);
+    expect(within(list).getByRole("button", { name: /^Library/ })).toHaveAttribute("aria-current", "true");
+    await userEvent.click(within(list).getByRole("button", { name: "Started, by unread" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ view: started?.id }));
+    expect(await screen.findByRole("list", { name: "Library" })).toBeInTheDocument();
+    expect(titles()).toEqual(["The Lantern Keeper"]);
+    expect(within(screen.getByRole("heading", { level: 1 })).getByRole("button")).toHaveTextContent(
+      "Started, by unread",
+    );
+    // Back: the view before.
+    router.history.back();
+    await waitFor(() => expect(titles()).toHaveLength(3));
+    expect(router.state.location.search).toEqual({});
+  });
+
+  it("follows changes made on another device", async () => {
+    const [library] = seedViews({ name: "Library" });
+    await renderApp("/");
+    await screen.findByText("3 works");
+    if (library) {
+      library.name = "Renamed elsewhere";
+      library.definition = { filters: { started: "include" } };
+    }
+    emit("library_views.changed", { view_id: library?.id ?? "" });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Renamed elsewhere" })).toBeInTheDocument());
+    expect(titles()).toEqual(["The Lantern Keeper"]);
+  });
+
+  it("opens the default view on /", async () => {
+    seedViews({ name: "All" }, { name: "Started", definition: { filters: { started: "include" } }, default: true });
+    await renderApp("/");
+    await waitFor(() => expect(titles()).toEqual(["The Lantern Keeper"]));
+    expect(screen.getByRole("heading", { name: "Started" })).toBeInTheDocument();
+  });
+
+  it("shows the default view, saying so, for a view that isn't the user's (AC9)", async () => {
+    seedViews({ name: "Library" });
+    const theirs = db().users[1];
+    if (!theirs) throw new Error("no second user");
+    db().libraryViews.push({
+      user_id: theirs.id,
+      id: newId(),
+      name: "Theirs",
+      position: 0,
+      default: true,
+      definition: { filters: { started: "include" } },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    const id = db().libraryViews.at(-1)?.id;
+    const { router } = await renderApp(`/?view=${id}`);
+    expect(await screen.findByText(/That view isn't one of yours/)).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(titles()).toHaveLength(3);
+  });
+
+  it("drops the old ?only= filters from the URL, replacing it", async () => {
+    seedViews({ name: "Library" });
+    const { router } = await renderApp("/?only=started&q=garden");
+    await waitFor(() => expect(router.state.location.search).toEqual({ q: "garden" }));
+    expect(router.history.length).toBe(1);
+    await waitFor(() => expect(titles()).toEqual(["Iron Garden"]));
+  });
+});
+
+describe("new views", () => {
+  it("are made from this view or everything, then shown with the sheet open (AC1)", async () => {
+    seedViews({ name: "Library", definition: { filters: { started: "include" } } });
+    const { router } = await renderApp("/");
+    await screen.findByText("1 of 3");
+    let list = await openViews("Library");
+    await userEvent.click(within(list).getByRole("button", { name: "New view…" }));
+    let dialog = await screen.findByRole("dialog", { name: "New view" });
+    await userEvent.type(within(dialog).getByLabelText("Name"), "Everything");
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Everything" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ view: savedView("Everything")?.id }));
+    expect(savedView("Everything")?.definition.filters).toBeUndefined();
+    // The sheet opens on it, to set it up.
+    const sheet = await screen.findByRole("dialog");
+    expect(within(sheet).getByRole("heading", { name: "Everything" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(titles()).toHaveLength(3));
+
+    // A name taken (ignoring case) is said in the dialog.
+    list = await openViews("Everything");
+    await userEvent.click(within(list).getByRole("button", { name: "New view…" }));
+    dialog = await screen.findByRole("dialog", { name: "New view" });
+    await userEvent.type(within(dialog).getByLabelText("Name"), "library");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+    expect(await within(dialog).findByText("You have a view with this name.")).toBeInTheDocument();
+    // From this view: its filters come along.
+    await userEvent.clear(within(dialog).getByLabelText("Name"));
+    await userEvent.type(within(dialog).getByLabelText("Name"), "Copy of everything");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(savedView("Copy of everything")).toBeDefined());
+    expect(myViews().map((v) => v.name)).toEqual(["Library", "Everything", "Copy of everything"]);
+  });
+});
+
+describe("editing views", () => {
+  const manage = async (current: string) => {
+    const list = await openViews(current);
+    await userEvent.click(within(list).getByRole("button", { name: "Edit views…" }));
+    return screen.findByRole("dialog", { name: "Edit views" });
+  };
+
+  it("renames, reorders, duplicates, makes the default and deletes (AC4)", async () => {
+    seedViews({ name: "Library" }, { name: "Second" }, { name: "Third" });
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await manage("Library");
+
+    // Rename in place.
+    const name = within(sheet).getByRole("textbox", { name: "Name of Second" });
+    await userEvent.clear(name);
+    await userEvent.type(name, "Unread manhwa{Enter}");
+    await waitFor(() => expect(savedView("Unread manhwa")).toBeDefined());
+    // A taken name is refused and put back.
+    const third = within(sheet).getByRole("textbox", { name: "Name of Third" });
+    await userEvent.clear(third);
+    await userEvent.type(third, "LIBRARY{Enter}");
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent("You have a view named “LIBRARY”.");
+    expect(third).toHaveValue("Third");
+
+    // Up and down.
+    await userEvent.click(within(sheet).getByRole("button", { name: "Move Third up" }));
+    await waitFor(() => expect(myViews().map((v) => v.name)).toEqual(["Library", "Third", "Unread manhwa"]));
+    expect(within(sheet).getByRole("button", { name: "Move Library up" })).toBeDisabled();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Move Library down" }));
+    await waitFor(() => expect(myViews().map((v) => v.name)).toEqual(["Third", "Library", "Unread manhwa"]));
+
+    // Duplicate.
+    await userEvent.click(within(sheet).getByRole("button", { name: "More for Unread manhwa" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(savedView("Unread manhwa copy")).toBeDefined());
+
+    // Make default: the mark moves, there's always one.
+    await userEvent.click(within(sheet).getByRole("button", { name: "More for Third" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Make default" }));
+    await waitFor(() => expect(savedView("Third")?.default).toBe(true));
+    expect(myViews().filter((v) => v.default)).toHaveLength(1);
+
+    // Delete the default, confirmed: the first remaining becomes the default.
+    await userEvent.click(within(sheet).getByRole("button", { name: "More for Third" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete…" }));
+    const confirm = await screen.findByRole("alertdialog");
+    expect(confirm).toHaveTextContent("Your first remaining view becomes the default.");
+    await userEvent.click(within(confirm).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(savedView("Third")).toBeUndefined());
+    expect(myViews().map((v) => [v.name, v.default])).toEqual([
+      ["Library", true],
+      ["Unread manhwa", false],
+      ["Unread manhwa copy", false],
+    ]);
+  });
+
+  it("puts a name back on Escape, keeping the sheet open; the next Escape closes it", async () => {
+    seedViews({ name: "Library" }, { name: "Second" });
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await manage("Library");
+    const name = within(sheet).getByRole("textbox", { name: "Name of Second" });
+    await userEvent.clear(name);
+    await userEvent.type(name, "Half typed");
+    await userEvent.keyboard("{Escape}");
+    expect(name).toHaveValue("Second");
+    expect(screen.getByRole("dialog", { name: "Edit views" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit views" })).not.toBeInTheDocument());
+    expect(savedView("Second")).toBeDefined();
+  });
+
+  it("can't delete the only view", async () => {
+    seedViews({ name: "Library" });
+    await renderApp("/");
+    await screen.findByText("3 works");
+    const sheet = await manage("Library");
+    expect(within(sheet).getByText("Your only view can't be deleted.")).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByRole("button", { name: "More for Library" }));
+    expect(await screen.findByRole("menuitem", { name: "Delete…" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "Make default" })).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("leaves a view that was deleted for the default, quietly", async () => {
+    const [, other] = seedViews(
+      { name: "Library" },
+      { name: "Other", definition: { filters: { started: "include" } } },
+    );
+    const { router } = await renderApp(`/?view=${other?.id}`);
+    await waitFor(() => expect(titles()).toEqual(["The Lantern Keeper"]));
+    const sheet = await manage("Other");
+    await userEvent.click(within(sheet).getByRole("button", { name: "More for Other" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete…" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(screen.queryByText(/That view isn't one of yours/)).not.toBeInTheDocument();
   });
 });
