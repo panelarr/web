@@ -107,6 +107,24 @@ describe("fixing matches", () => {
     expect(await screen.findByText("Attached on 2 of 2 sources.")).toBeInTheDocument();
   });
 
+  it("clears the source search on Escape, and closes on the next one", async () => {
+    const [work] = seed("ent_1000");
+    await renderApp(`/works/${work?.id}?tab=sources`);
+    await userEvent.click(
+      await within(await waitFor(() => row("Sample Scans"))).findByRole("button", {
+        name: "Search Sample Scans yourself",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    const search = within(dialog).getByRole("searchbox", { name: "Search the source" });
+    expect(search).not.toHaveValue("");
+    await userEvent.type(search, "{Escape}");
+    expect(search).toHaveValue("");
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
   it("shows the picked series' own cover, not the one it replaced", async () => {
     const [work] = seed("ent_1000");
     await renderApp(`/works/${work?.id}?tab=sources`);

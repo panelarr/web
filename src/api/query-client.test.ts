@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./errors";
-import { shouldRetry } from "./query-client";
+import { shouldRetry, shouldRetryOptionalMeta } from "./query-client";
 
 const err = (status: number) => new ApiError({ status, code: "x", title: "x" });
 
@@ -25,5 +25,15 @@ describe("shouldRetry", () => {
     expect(shouldRetry(0, err(401))).toBe(false);
     expect(shouldRetry(0, err(429))).toBe(false);
     expect(shouldRetry(0, new Error("bug"))).toBe(false);
+  });
+});
+
+describe("shouldRetryOptionalMeta", () => {
+  it("doesn't retry when the metadata service isn't there, and otherwise retries as usual", () => {
+    const failed = (code: string) => new ApiError({ status: 503, code, title: "x" });
+    expect(shouldRetryOptionalMeta(0, failed("meta_unavailable"))).toBe(false);
+    expect(shouldRetryOptionalMeta(0, failed("http_503"))).toBe(true);
+    expect(shouldRetryOptionalMeta(2, failed("http_503"))).toBe(false);
+    expect(shouldRetryOptionalMeta(0, err(404))).toBe(false);
   });
 });

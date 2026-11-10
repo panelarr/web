@@ -4,7 +4,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { SearchInput } from "./search-input";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { escapeClearsSearchFirst, SearchInput } from "./search-input";
 
 function Harness({ initial = "", onClear }: { initial?: string; onClear?: () => void }) {
   const [value, setValue] = useState(initial);
@@ -54,5 +55,39 @@ describe("SearchInput", () => {
     expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
     await userEvent.type(screen.getByRole("searchbox"), "{Escape}");
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("clears before a dialog that hands it Escape closes", async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent onEscapeKeyDown={escapeClearsSearchFirst}>
+          <DialogTitle>Things</DialogTitle>
+          <DialogDescription>Find a thing.</DialogDescription>
+          <Harness initial="moon" />
+        </DialogContent>
+      </Dialog>,
+    );
+    const field = screen.getByRole("searchbox", { name: "Search things" });
+    await userEvent.type(field, "{Escape}");
+    expect(field).toHaveValue("");
+    expect(onOpenChange).not.toHaveBeenCalled();
+    await userEvent.type(field, "{Escape}");
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("leaves Escape to a dialog that doesn't hand it over", async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogTitle>Things</DialogTitle>
+          <DialogDescription>Find a thing.</DialogDescription>
+          <Harness initial="moon" />
+        </DialogContent>
+      </Dialog>,
+    );
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search things" }), "{Escape}");
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

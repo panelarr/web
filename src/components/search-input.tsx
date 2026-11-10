@@ -5,6 +5,22 @@ import { type ComponentProps, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+/** Escape presses a dialog left to a search field, which clears it instead of closing the dialog. */
+const handedToSearch = new WeakSet<Event>();
+
+/**
+ * For a dialog's `onEscapeKeyDown`: Radix dialogs see Escape before the field does, so without
+ * this, Escape in a search field that has text closes the whole dialog (and loses a half-filled
+ * form). With it, that Escape clears the field and the dialog stays; the next one closes it.
+ */
+export function escapeClearsSearchFirst(event: KeyboardEvent) {
+  const target = event.target;
+  if (target instanceof HTMLInputElement && target.dataset.clearsOnEscape !== undefined && target.value !== "") {
+    event.preventDefault(); // the dialog stays open
+    handedToSearch.add(event);
+  }
+}
+
 /**
  * A search field with one way to clear it everywhere: a ✕ that shows only while there's text
  * (clears and puts the cursor back in the field) and Escape. The browser's own clear button is
@@ -58,11 +74,15 @@ export function SearchInput({
           clearable && "pr-9",
           inputClassName,
         )}
+        // Marks a field Escape would clear, for escapeClearsSearchFirst.
+        data-clears-on-escape={showClear ? "" : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
+          // A dialog that handed this Escape over has prevented its default already; anyone
+          // else who did (or the caller's own onKeyDown) keeps it from clearing.
           onKeyDown?.(e);
-          if (e.defaultPrevented || !clearable) return;
+          if ((e.defaultPrevented && !handedToSearch.has(e.nativeEvent)) || !clearable) return;
           if (e.key === "Escape" && value !== "") {
             e.preventDefault();
             clear();
