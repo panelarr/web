@@ -267,13 +267,14 @@ function attachSeries(
   workId: string,
   ref: S["SeriesRef"],
   origin: S["MatchSeries"]["origin"],
+  bestEffort = false,
 ): S["MatchSeries"] | undefined {
   const d = db();
   const work = d.works.find((w) => w.id === workId);
   const row = d.matching[workId]?.find((r) => r.source.id === ref.source_id);
   const forEntry = CATALOG.findIndex((e) => e.id === work?.entry_id);
   if (!work || !row) return undefined;
-  const series = matchSeries(ref.source_id, seriesIndex(ref.key), forEntry, "attached", origin);
+  const series = matchSeries(ref.source_id, seriesIndex(ref.key), forEntry, "attached", origin, bestEffort);
   if (!series) return undefined;
   const previous = row.attached;
   row.candidates = row.candidates.filter((c) => c.key !== ref.key);
@@ -1820,10 +1821,10 @@ export const operations: MockOperation[] = [
     const ref = body.url
       ? resolveUrl(body.url)
       : body.source_id && body.key
-        ? { source_id: body.source_id, key: body.key }
+        ? { source_id: body.source_id, key: body.key, best_effort: false }
         : undefined;
     if (!ref) return problem(404, "not_found", "Not found", "No plugin recognises that URL.");
-    const attached = attachSeries(workId, ref, body.url ? "url" : "manual");
+    const attached = attachSeries(workId, ref, body.url ? "url" : "manual", ref.best_effort);
     if (!attached) return problem(404, "not_found", "Not found", "That series isn't on the source.");
     commit();
     return json(attached, 201);

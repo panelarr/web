@@ -90,6 +90,33 @@ describe("fixing matches", () => {
     expect(await screen.findByText("Attached on 2 of 2 sources.")).toBeInTheDocument();
   });
 
+  it.each([
+    { url: "https://example.com/1002/series/1000", bestEffort: false },
+    { url: "https://example.com/1002/read/1000", bestEffort: true },
+  ])("says when attaching by URL was only a best guess ($bestEffort)", async ({ url, bestEffort }) => {
+    const [work] = seed("ent_1000");
+    await renderApp(`/works/${work?.id}?tab=sources`);
+    await userEvent.click(await screen.findByRole("button", { name: "Attach by URL" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(within(dialog).getByLabelText("Series URL"), url);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Attach" }));
+    expect(await screen.findByText("Attached on 2 of 2 sources.")).toBeInTheDocument();
+    const attached = db().matching[work?.id ?? ""]?.find((r) => r.source.id === "example:1002")?.attached;
+    expect(attached?.evidence.best_effort).toBe(bestEffort);
+    const title = attached?.title ?? "";
+    const guess = `Attached ${title}, but this was a best guess. Check that it's the right series.`;
+    const sampleScans = row("Sample Scans");
+    if (bestEffort) {
+      expect(await screen.findByText(guess)).toBeInTheDocument();
+      expect(screen.queryByText(`Attached ${title}.`)).not.toBeInTheDocument();
+      expect(within(sampleScans).getByText("Best guess")).toBeInTheDocument();
+    } else {
+      expect(await screen.findByText(`Attached ${title}.`)).toBeInTheDocument();
+      expect(screen.queryByText(guess)).not.toBeInTheDocument();
+      expect(within(sampleScans).queryByText("Best guess")).not.toBeInTheDocument();
+    }
+  });
+
   it("searches a source by hand and attaches the result", async () => {
     const [work] = seed("ent_1000");
     await renderApp(`/works/${work?.id}?tab=sources`);
