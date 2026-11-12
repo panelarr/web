@@ -3676,6 +3676,8 @@ export interface components {
             authors_match?: boolean;
             source_authors: string[];
             chapter_count?: number;
+            /** @description The source's plugin only guessed this series (for example the only result of searching the site for a pasted URL), so a person should check it is the right one. title_score then compares the guess with the work's title. */
+            best_effort?: boolean;
         };
         MatchSeries: {
             /** Format: uuid */
