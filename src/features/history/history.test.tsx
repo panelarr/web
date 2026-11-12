@@ -2,7 +2,7 @@
 
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { unifiedChapters } from "@/mocks/chapters";
 import { db } from "@/mocks/db";
 import { addToLibrary } from "@/mocks/handlers";
@@ -10,7 +10,20 @@ import { tickMatching } from "@/mocks/works";
 import { renderApp } from "@/test/render";
 import { byDay, chapterText, dayLabel, type HistoryItem, pageText } from "./history";
 
-const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+/** Midnight at the start of today, local time. */
+const startOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+/** Noon yesterday (local), whatever the time of day now. */
+const yesterday = () => new Date(startOfToday() - 12 * 3_600_000).toISOString();
+/**
+ * Some minutes ago, but never before today started: just after midnight the reads stay on today, `offset` ms after
+ * midnight, so their order holds too.
+ */
+const todayAgo = (minutes: number, offset: number) =>
+  new Date(Math.max(Date.now() - minutes * 60_000, startOfToday() + offset)).toISOString();
 
 function seed() {
   const user = db().users[0];
@@ -35,31 +48,35 @@ function seed() {
     };
   };
   // Yesterday: the manga's first chapter, read to the end; today: two chapters of the manhwa.
-  read(manga.chapters[0]?.id ?? "", 21, true, hoursAgo(30));
-  read(manhwa.chapters[0]?.id ?? "", 21, true, hoursAgo(0.5));
-  read(manhwa.chapters[1]?.id ?? "", 12, false, hoursAgo(0.2));
+  read(manga.chapters[0]?.id ?? "", 21, true, yesterday());
+  read(manhwa.chapters[0]?.id ?? "", 21, true, todayAgo(30, 0));
+  read(manhwa.chapters[1]?.id ?? "", 12, false, todayAgo(12, 1));
   return { user, manga, manhwa };
 }
 
 let ctx: ReturnType<typeof seed>;
-beforeEach(() => {
-  ctx = seed();
-});
 
 const rows = () => screen.getAllByRole("link", { name: /^Resume / });
 
+async function expectByDay() {
+  await renderApp("/history");
+  const today = await screen.findByRole("region", { name: "Today" });
+  expect(within(today).getByText(ctx.manhwa.work.title)).toBeInTheDocument();
+  expect(within(today).getByText(/· Page 13\/22 · /)).toBeInTheDocument();
+  const yesterday = screen.getByRole("region", { name: "Yesterday" });
+  expect(within(yesterday).getByText(ctx.manga.work.title)).toBeInTheDocument();
+  expect(within(today).getByRole("link", { name: `Resume ${ctx.manhwa.work.title}` })).toHaveAttribute(
+    "href",
+    `/read/${ctx.manhwa.chapters[1]?.id}`,
+  );
+}
+
 describe("history", () => {
-  it("shows one line per series by day, newest first, resuming where the series is at", async () => {
-    await renderApp("/history");
-    const today = await screen.findByRole("region", { name: "Today" });
-    expect(within(today).getByText(ctx.manhwa.work.title)).toBeInTheDocument();
-    expect(within(today).getByText(/· Page 13\/22 · /)).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Yesterday" })).toBeInTheDocument();
-    expect(within(today).getByRole("link", { name: `Resume ${ctx.manhwa.work.title}` })).toHaveAttribute(
-      "href",
-      `/read/${ctx.manhwa.chapters[1]?.id}`,
-    );
+  beforeEach(() => {
+    ctx = seed();
   });
+
+  it("shows one line per series by day, newest first, resuming where the series is at", expectByDay);
 
   it("shows every chapter read when asked, and searches", async () => {
     const { router } = await renderApp("/history");
@@ -100,6 +117,20 @@ describe("history", () => {
     const navs = await screen.findAllByRole("navigation", { name: "Main" });
     for (const nav of navs) expect(within(nav).getByRole("link", { name: "History" })).toBeInTheDocument();
   });
+});
+
+// The days are local: the grouping must hold just after midnight, early in the morning and late at night.
+describe.each(["00:10", "04:00", "23:50"])("history at %s", (clock) => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`2026-10-18T${clock}:00`));
+    ctx = seed();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("still groups today's and yesterday's reads by day", expectByDay);
 });
 
 describe("history's labels", () => {

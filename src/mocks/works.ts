@@ -46,6 +46,7 @@ export function matchSeries(
   forEntry: number,
   state: S["MatchSeries"]["state"],
   origin: S["MatchSeries"]["origin"],
+  bestEffort = false,
 ): S["MatchSeries"] | undefined {
   const series = sourceSeries(sourceId, i);
   const entry = CATALOG[forEntry];
@@ -73,6 +74,7 @@ export function matchSeries(
       authors_match: series.authors.some((a) => authors.includes(a)),
       source_authors: series.authors,
       chapter_count: sourceChapters(sourceId, i).length,
+      best_effort: bestEffort,
     },
   };
 }
@@ -122,13 +124,18 @@ export function tickMatching(state: WorksState): boolean {
   return changed;
 }
 
-/** Finds a series by a URL on one of the mock sources ("https://example.com/1001/series/1004"). */
-export function resolveUrl(url: string): { source_id: string; key: string } | undefined {
-  const match = /^https:\/\/example\.(?:com|org|net)\/(\d+)\/series\/(\d+)$/.exec(url.trim());
+/**
+ * Finds a series by a URL on one of the mock sources ("https://example.com/1001/series/1004"). A page that isn't a
+ * series' own ("https://example.com/1001/read/1004") is only a guess, as when a plugin searches the site for the URL.
+ */
+export function resolveUrl(url: string): { source_id: string; key: string; best_effort: boolean } | undefined {
+  const match = /^https:\/\/example\.(?:com|org|net)\/(\d+)\/(series|read)\/(\d+)$/.exec(url.trim());
   if (!match) return undefined;
   const sourceId = `example:${match[1]}`;
-  const i = Number(match[2]) - 1000;
-  return sourceSeries(sourceId, i) ? { source_id: sourceId, key: seriesKey(i) } : undefined;
+  const i = Number(match[3]) - 1000;
+  return sourceSeries(sourceId, i)
+    ? { source_id: sourceId, key: seriesKey(i), best_effort: match[2] === "read" }
+    : undefined;
 }
 
 /** The catalogue entries a source series might be, best first (for adding from a source). */

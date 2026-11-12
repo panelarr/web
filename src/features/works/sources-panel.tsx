@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, Link2, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { Check, ExternalLink, Link2, Loader2, RefreshCw, Search, TriangleAlert, X } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { $api } from "@/api/client";
@@ -312,6 +312,12 @@ function SeriesRow({
           {attached ? (
             <Badge variant="secondary">{series.origin === "auto" ? "Attached automatically" : "Attached"}</Badge>
           ) : null}
+          {attached && series.evidence.best_effort ? (
+            <Badge variant="outline" className="border-warning" title="The source only guessed this series">
+              <TriangleAlert className="text-warning" aria-hidden />
+              Best guess
+            </Badge>
+          ) : null}
         </p>
         <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{evidenceText(series)}</p>
         {series.evidence.source_authors.length > 0 ? (
@@ -351,7 +357,14 @@ function AttachUrlDialog({
               { params: { path: { work_id: work.id } }, body: { url: formValues(event.currentTarget).url ?? "" } },
               {
                 onSuccess: (series) => {
-                  toast.success(`Attached ${series.title}.`);
+                  // The source's plugin only guessed the series from the URL: ask for a look.
+                  if (series.evidence.best_effort) {
+                    toast.warning(
+                      `Attached ${series.title}, but this was a best guess. Check that it's the right series.`,
+                    );
+                  } else {
+                    toast.success(`Attached ${series.title}.`);
+                  }
                   close(false);
                 },
               },
