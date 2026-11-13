@@ -4060,6 +4060,14 @@ export interface components {
             types?: string[];
             /** @description Only works with these publication statuses (`work.status`); empty or absent means any. */
             statuses?: string[];
+            /**
+             * @description Only works with these content ratings (`work.content_rating`);
+             *     empty or absent means any. A view only narrows what you may
+             *     already see: works above your content-rating ceiling are never in
+             *     your library listing, whatever a view says. Values above your
+             *     ceiling are accepted and simply match nothing.
+             */
+            content_ratings?: components["schemas"]["EntryContentRating"][];
             /** @description Only works with a new chapter found within this many days (`last_updated_at`). */
             updated_within_days?: number;
             /**
