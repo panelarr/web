@@ -37,6 +37,12 @@ const PAGES = [
   "/admin/storage",
   "/admin/health",
   "/admin/updates",
+  // Single sign-on (last: these reset the mock to its scenarios).
+  "/login?mock=sso-admins&sso_error=not_linked",
+  "/login?mock=sso-signed-out",
+  "/settings?tab=security&mock=sso",
+  "/admin/users",
+  "/admin/health",
 ];
 
 test("the main pages have no serious accessibility problems", async ({ page, isMobile }) => {

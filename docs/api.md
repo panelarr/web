@@ -62,6 +62,9 @@ behave as on a real server. Pick a starting point with `?mock=<scenario>` (it la
 | `signed-out` | Set up, nobody signed in |
 | `user` | Signed in as `reader`, a user without admin rights |
 | `degraded` | Signed in, but the metadata service has no entries yet |
+| `sso` | Like `ready`, with single sign-on on (`docs/sso.md`): `reader` and `casey` (no password) have linked logins, admin groups decide roles, sign-out also at the provider |
+| `sso-signed-out` | Like `sso`, nobody signed in |
+| `sso-admins` | Like `sso-signed-out`, with password sign-in for admins only |
 
 Mocks can't quietly drift from what the server sends: every fixture is validated against the
 spec's schemas (`src/mocks/fixtures.test.ts`), and in tests every JSON answer the mock server

@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Share2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Share2, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
 import { inviteLink } from "@/auth/invite-link";
+import { systemAuthQuery } from "@/auth/sso";
 import { CopyField } from "@/components/copy-field";
 import { Field, formValues, PasswordConfirm, TextField } from "@/components/form";
 import { NativeSelect } from "@/components/native-select";
 import { escapeClearsSearchFirst } from "@/components/search-input";
 import { ErrorAlert } from "@/components/states";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -129,6 +131,26 @@ export function AddUserDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   );
 }
 
+/**
+ * With admin groups configured, the identity provider decides who is an admin at every single
+ * sign-on: an admin invite accepted by someone outside those groups creates a user.
+ */
+function AdminRoleFromGroups({ role }: { role: Role }) {
+  const auth = useQuery({ ...systemAuthQuery(), enabled: role === "admin" });
+  const groups = auth.data?.oidc.enabled ? (auth.data.oidc.admin_groups ?? []) : [];
+  if (role !== "admin" || groups.length === 0) return null;
+  return (
+    <Alert>
+      <TriangleAlert aria-hidden />
+      <AlertTitle>The identity provider manages the admin role</AlertTitle>
+      <AlertDescription>
+        Single sign-on makes members of {groups.join(", ")} admins and everyone else a user. If they accept with SSO and
+        aren't in {groups.length === 1 ? "that group" : "one of those groups"}, they become a user.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 const EXPIRIES = [
   { hours: 24, label: "1 day" },
   { hours: 72, label: "3 days" },
@@ -206,6 +228,7 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               )}
             </Field>
             <RoleSelect value={role} onChange={setRole} />
+            <AdminRoleFromGroups role={role} />
             <GrantsEditor value={grants} onChange={setGrants} isAdmin={role === "admin"} />
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => close(false)}>

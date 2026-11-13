@@ -9,6 +9,10 @@
 //   degraded    set up and signed in, but the metadata service has no entries yet
 //   big-store   like ready, with a store of 1,500 extensions
 //   slow-pages  like ready, with page images arriving slowly, in any order, of varied heights
+//   sso             like ready, with single sign-on (src/mocks/oidc.ts): the reader and Casey (no
+//                   password) have linked logins, admin groups decide roles, logout at the provider
+//   sso-signed-out  like sso, nobody signed in
+//   sso-admins      like sso-signed-out, with password sign-in for admins only
 //
 // In the browser, pick one with `?mock=<scenario>`; it lasts for the tab (sessionStorage).
 import type { components } from "@/api/schema.gen";
@@ -32,11 +36,23 @@ import type { MockImport } from "./imports";
 import { initialJobs, initialMetaJobs, initialPluginJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
 import { initialMetaSyncRuns, initialSearchEngine } from "./meta";
 import { initialNetwork, type NetworkState } from "./network";
+import { initialIdentities, initialOidc, type MockIdentity, type MockOidc, ssoUser } from "./oidc";
 import { initialOrigins, initialPackageSources, initialPackages, type MockPackage } from "./packages";
 
 type S = components["schemas"];
 
-export const SCENARIOS = ["ready", "fresh", "signed-out", "user", "degraded", "big-store", "slow-pages"] as const;
+export const SCENARIOS = [
+  "ready",
+  "fresh",
+  "signed-out",
+  "user",
+  "degraded",
+  "big-store",
+  "slow-pages",
+  "sso",
+  "sso-signed-out",
+  "sso-admins",
+] as const;
 export type Scenario = (typeof SCENARIOS)[number];
 
 export type MockInvite = S["Invite"] & { token: string };
@@ -115,6 +131,12 @@ export interface MockDb extends JobsState, NetworkState {
   imports: MockImport[];
   /** Series some import applied, per user ("user|source|key"): applying them again changes nothing. */
   importedSeries?: string[];
+  /** Single sign-on's settings; undefined when it's off (the default). */
+  oidc?: MockOidc;
+  /** Single sign-on logins linked to users. */
+  identities: MockIdentity[];
+  /** How the current session was started (provider logout applies to single sign-on only). */
+  sessionMethod?: "password" | "oidc";
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -167,6 +189,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     preferences: {},
     libraryViews: [],
     imports: [],
+    identities: [],
     appeared: {},
     storages: initialStorages(),
     ...initialNetwork(),
@@ -220,6 +243,16 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
       return { ...ready, currentUserId: undefined };
     case "user":
       return { ...ready, currentUserId: readerUser.id };
+    case "sso":
+    case "sso-signed-out":
+    case "sso-admins":
+      return {
+        ...ready,
+        users: [...ready.users, clone(ssoUser)],
+        oidc: initialOidc(scenario === "sso-admins" ? { password: "admins" } : {}),
+        identities: initialIdentities(readerUser.id),
+        ...(scenario === "sso" ? {} : { currentUserId: undefined }),
+      };
     case "degraded":
       return {
         ...ready,

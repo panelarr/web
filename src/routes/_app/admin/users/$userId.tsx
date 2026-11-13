@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { $api } from "@/api/client";
+import { isApiError } from "@/api/errors";
 import type { components } from "@/api/schema.gen";
 import { displayName, useMe } from "@/auth/session";
 import { Field, formValues, PasswordConfirm, TextField } from "@/components/form";
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { IdentityRows, useSsoEnabled } from "@/features/account/linked-logins";
 import { type Grants, grantsPatch, type Role } from "@/features/admin/grants";
 import { GrantsEditor } from "@/features/admin/grants-editor";
 import { formatDateTime } from "@/lib/format";
@@ -72,6 +74,7 @@ function UserPage() {
 function UserDetails({ user }: { user: User }) {
   const { user: me } = useMe();
   const self = me.id === user.id;
+  const sso = useSsoEnabled();
   return (
     <>
       <PageHeader
@@ -80,6 +83,7 @@ function UserDetails({ user }: { user: User }) {
             {displayName(user)}
             {user.role === "admin" ? <Badge>Admin</Badge> : null}
             {user.disabled ? <Badge variant="destructive">Disabled</Badge> : null}
+            {sso && user.sso ? <Badge variant="outline">SSO</Badge> : null}
           </span>
         }
         description={`${user.username} · added ${formatDateTime(user.created_at)}${
@@ -91,6 +95,7 @@ function UserDetails({ user }: { user: User }) {
         <div className="grid content-start gap-6">
           <AccountCard user={user} self={self} />
           <PasswordCard user={user} />
+          {sso ? <IdentitiesCard user={user} /> : null}
         </div>
         <GrantsCard user={user} />
       </div>
@@ -194,11 +199,17 @@ function GrantsCard({ user }: { user: User }) {
 function PasswordCard({ user }: { user: User }) {
   const [mismatch, setMismatch] = useState(false);
   const update = useUserMutation(user, "Password reset. They were signed out everywhere.");
+  // Users created by single sign-on have no password until someone sets one.
+  const none = user.has_password === false;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Reset password</CardTitle>
-        <CardDescription>Sets a new password and signs them out everywhere.</CardDescription>
+        <CardTitle>{none ? "Set a password" : "Reset password"}</CardTitle>
+        <CardDescription>
+          {none
+            ? "They sign in with single sign-on and have no password. Setting one signs them out everywhere."
+            : "Sets a new password and signs them out everywhere."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -226,10 +237,55 @@ function PasswordCard({ user }: { user: User }) {
           <PasswordConfirm mismatch={mismatch} />
           <div>
             <Button type="submit" variant="outline" disabled={update.isPending}>
-              Reset password
+              {none ? "Set password" : "Reset password"}
             </Button>
           </div>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** The user's linked single sign-on logins; unlinking also ends their single sign-on sessions. */
+function IdentitiesCard({ user }: { user: User }) {
+  const queryClient = useQueryClient();
+  const params = { params: { path: { id: user.id } } };
+  const identities = $api.useQuery("get", "/users/{id}/identities", params);
+  const unlink = $api.useMutation("delete", "/users/{id}/identities/{identity_id}", {
+    onSuccess: () => {
+      toast.success("Login unlinked. Their single sign-on sessions were ended.");
+      for (const path of ["/users/{id}/identities", "/users/{id}"] as const) {
+        void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", path, params).queryKey });
+      }
+      void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/users").queryKey });
+    },
+  });
+  const list = identities.data?.identities;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Linked logins</CardTitle>
+        <CardDescription>Their single sign-on logins. Unlinking ends their single sign-on sessions.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {isApiError(unlink.error, "last_login_method") ? (
+          <p role="alert" className="text-sm text-destructive">
+            This is their only way to sign in. Set a password for them first, or disable the user.
+          </p>
+        ) : unlink.error ? (
+          <ErrorAlert error={unlink.error} />
+        ) : null}
+        {identities.error ? <ErrorAlert error={identities.error} onRetry={() => void identities.refetch()} /> : null}
+        {identities.isPending ? <Loading /> : null}
+        {list && list.length > 0 ? (
+          <IdentityRows
+            identities={list}
+            unlinking={unlink.isPending}
+            onUnlink={(identity) => unlink.mutate({ params: { path: { id: user.id, identity_id: identity.id } } })}
+          />
+        ) : list ? (
+          <p className="text-sm text-muted-foreground">No login is linked. They link one from their account page.</p>
+        ) : null}
       </CardContent>
     </Card>
   );
