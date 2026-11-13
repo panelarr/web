@@ -9,6 +9,7 @@ import { tickJobs } from "./jobs";
 import { tickMetaSyncs } from "./meta";
 import { isDraft } from "./op";
 import { tickPackages } from "./packages";
+import { answerSsoNavigation } from "./provider-pages";
 import { tickMatching } from "./works";
 
 /**
@@ -20,6 +21,9 @@ export async function startMockWorker(mode: "all" | "drafts"): Promise<void> {
   const picked = mode === "all" ? operations : operations.filter(isDraft);
   if (picked.length === 0) return;
   const scenario = loadBrowserDb();
+  // Single sign-on's navigations (start, the provider, its callback) are answered here instead
+  // of starting the app; the page then moves on by itself.
+  if (mode === "all" && answerSsoNavigation()) return new Promise(() => {});
   const handlers = picked.map((operation) => operation.handler);
   const worker = setupWorker(...(mode === "all" ? [...handlers, createEventsHandler()] : handlers));
   if (mode === "all") {
@@ -41,7 +45,7 @@ export async function startMockWorker(mode: "all" | "drafts"): Promise<void> {
   });
   console.info(
     mode === "all"
-      ? `Panelarr: mocking the whole API (scenario "${scenario}"; change it with ?mock=fresh|ready|signed-out|user|degraded).`
+      ? `Panelarr: mocking the whole API (scenario "${scenario}"; change it with ?mock=fresh|ready|signed-out|user|degraded|sso|sso-signed-out|sso-admins).`
       : `Panelarr: mocking ${picked.length} draft endpoints.`,
   );
 }

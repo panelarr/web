@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { KeyRound, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
 import { tokenFromHash } from "@/auth/invite-link";
+import { authMethodsQuery, ssoStartUrl } from "@/auth/sso";
 import { AuthLayout } from "@/components/auth-layout";
 import { formValues, PasswordConfirm, TextField } from "@/components/form";
 import { ErrorAlert, Loading } from "@/components/states";
@@ -54,8 +55,36 @@ function InvitePage() {
       title="Join Panelarr"
       description={`You're invited${check.data.role === "admin" ? " as an admin" : ""}. The invite is valid until ${formatDateTime(check.data.expires_at)}.`}
     >
-      <AcceptForm token={token} />
+      <div className="grid gap-6">
+        <AcceptWithSso token={token} />
+        <AcceptForm token={token} />
+      </div>
     </AuthLayout>
+  );
+}
+
+/**
+ * With single sign-on, the invite can be accepted by signing in at the identity provider: the
+ * server creates the account with the invite's role and permissions and links that login.
+ */
+function AcceptWithSso({ token }: { token: string }) {
+  const methods = useQuery(authMethodsQuery());
+  if (!methods.data?.oidc) return null;
+  return (
+    <>
+      <Button asChild size="lg">
+        {/* A navigation: the server sends the browser on to the identity provider. */}
+        <a href={ssoStartUrl({ invite: token })}>
+          <KeyRound aria-hidden />
+          Accept with SSO
+        </a>
+      </Button>
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" aria-hidden />
+        or choose a username and password
+        <span className="h-px flex-1 bg-border" aria-hidden />
+      </div>
+    </>
   );
 }
 

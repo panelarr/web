@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HealthBadge } from "@/features/admin/health-badge";
 import { ServerHealthCard } from "@/features/admin/server-health-card";
+import { SignInCard } from "@/features/admin/sign-in-card";
 import { MetaHealthCard } from "@/features/meta/meta-health";
 import { formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,14 @@ type Plugin = components["schemas"]["Plugin"];
 export const HEALTH_POLL_MS = 30_000;
 
 /** The queries this page shows, by path: Check now asks all of them again. */
-const PATHS = new Set(["/system/health", "/system/meta", "/system/meta/health", "/plugins", "/sources"]);
+const PATHS = new Set([
+  "/system/health",
+  "/system/meta",
+  "/system/meta/health",
+  "/plugins",
+  "/sources",
+  "/system/auth",
+]);
 const onThisPage = (query: { queryKey: readonly unknown[] }) => PATHS.has(query.queryKey[1] as string);
 
 /**
@@ -64,6 +72,7 @@ export function HealthOverview() {
         <MetaHealthSection />
         <PluginsHealthCard />
         <SourceChecksCard />
+        <SignInCard pollMs={HEALTH_POLL_MS} />
       </div>
     </>
   );

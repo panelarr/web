@@ -23,6 +23,7 @@ import {
   startMetaSync,
 } from "./meta";
 import { applied, filterOwned, metaNetwork, networkTest, pluginNetwork, profileView, sourceNetwork } from "./network";
+import { mockProviderUrl, oidcOperations } from "./oidc";
 import { type MockOperation, mockUrl, op, problem } from "./op";
 import { type MockPackage, packageIconSvg, packageView, queuePackageTask, syncPackageSources } from "./packages";
 import { pageCount, pageSvg } from "./reader";
@@ -65,9 +66,20 @@ function requireAdmin(): S["User"] | Response {
   return user;
 }
 
-function signIn(user: S["User"]): S["LoginResponse"] {
+/** A user as the users endpoints and `/me` show them: whether they have a password, and a linked login. */
+export function withAuthFlags(user: S["User"]): S["User"] {
+  const d = db();
+  return {
+    ...user,
+    has_password: d.passwords[user.username.toLowerCase()] !== undefined,
+    sso: d.identities.some((i) => i.user_id === user.id),
+  };
+}
+
+export function signIn(user: S["User"], method: "password" | "oidc" = "password"): S["LoginResponse"] {
   const d = db();
   d.currentUserId = user.id;
+  d.sessionMethod = method;
   user.last_login_at = now();
   d.sessions = d.sessions.map((s) => ({ ...s, current: false }));
   d.sessions.unshift({
@@ -84,7 +96,7 @@ function signIn(user: S["User"]): S["LoginResponse"] {
     document.cookie = `panelarr_csrf=${CSRF}; path=/; SameSite=Lax`;
   }
   commit();
-  return { user, csrf_token: CSRF };
+  return { user: withAuthFlags(user), csrf_token: CSRF };
 }
 
 function setupStatus(): S["SetupStatus"] {
@@ -100,7 +112,7 @@ function setupStatus(): S["SetupStatus"] {
 
 function me(user: S["User"]): S["Me"] {
   const scopes: S["ApiKeyScope"][] = user.role === "admin" ? ["read", "write", "admin"] : ["read", "write"];
-  return { user, auth: { method: "session", scopes } };
+  return { user: withAuthFlags(user), auth: { method: "session", scopes } };
 }
 
 /** One more check of the metadata service: a provider being synced gains entries. */
@@ -464,7 +476,10 @@ export const operations: MockOperation[] = [
     }
     const body = (await request.json()) as S["LoginRequest"];
     const user = d.users.find((u) => u.username.toLowerCase() === body.username.toLowerCase());
-    if (!user || d.passwords[user.username.toLowerCase()] !== body.password || user.disabled) {
+    // With passwords for admins only, anyone else is refused just like a wrong password.
+    const allowed = d.oidc?.password !== "admins" || user?.role === "admin";
+    const password = user ? d.passwords[user.username.toLowerCase()] : undefined;
+    if (!user || password === undefined || password !== body.password || user.disabled || !allowed) {
       d.failedLogins += 1;
       commit();
       return problem(401, "invalid_credentials", "Invalid credentials", "Wrong username or password.");
@@ -479,8 +494,16 @@ export const operations: MockOperation[] = [
     const d = db();
     d.sessions = d.sessions.filter((s) => !s.current);
     d.currentUserId = undefined;
+    const atProvider = d.oidc?.logout === "provider" && d.sessionMethod === "oidc";
+    d.sessionMethod = undefined;
     syncSessionCookie();
     commit();
+    if (atProvider) {
+      const loginPage = new URL("login", document.baseURI).href;
+      return json<S["LogoutResult"]>({
+        redirect_to: mockProviderUrl("end-session", { post_logout_redirect_uri: loginPage }),
+      });
+    }
     return new HttpResponse(null, { status: 204 });
   }),
 
@@ -547,7 +570,9 @@ export const operations: MockOperation[] = [
     if (user instanceof Response) return user;
     const body = (await request.json()) as S["ChangePasswordRequest"];
     const d = db();
-    if (d.passwords[user.username.toLowerCase()] !== body.current_password) {
+    // A user created by single sign-on sets a first password with an empty current one.
+    const current = d.passwords[user.username.toLowerCase()] ?? "";
+    if (current !== body.current_password) {
       return problem(403, "invalid_credentials", "Invalid credentials", "The current password is wrong.");
     }
     d.passwords[user.username.toLowerCase()] = body.new_password;
@@ -1540,7 +1565,7 @@ export const operations: MockOperation[] = [
   op("get", "/users", () => {
     const user = requireAdmin();
     if (user instanceof Response) return user;
-    const users = [...db().users].sort((a, b) => a.username.localeCompare(b.username));
+    const users = [...db().users].sort((a, b) => a.username.localeCompare(b.username)).map(withAuthFlags);
     return json<S["UserList"]>({ users, next_page_token: "" });
   }),
 
@@ -1564,14 +1589,14 @@ export const operations: MockOperation[] = [
     d.users.push(user);
     d.passwords[body.username.toLowerCase()] = body.password;
     commit();
-    return json(user, 201);
+    return json(withAuthFlags(user), 201);
   }),
 
   op("get", "/users/{id}", ({ params }) => {
     const admin = requireAdmin();
     if (admin instanceof Response) return admin;
     const user = db().users.find((u) => u.id === params.id);
-    return user ? json(user) : problem(404, "not_found", "Not found");
+    return user ? json(withAuthFlags(user)) : problem(404, "not_found", "Not found");
   }),
 
   op("patch", "/users/{id}", async ({ params, request }) => {
@@ -1600,7 +1625,7 @@ export const operations: MockOperation[] = [
     if (body.password !== undefined) d.passwords[user.username.toLowerCase()] = body.password;
     if (body.grants) user.grants = { ...user.grants, ...body.grants };
     commit();
-    return json(user);
+    return json(withAuthFlags(user));
   }),
 
   op("delete", "/users/{id}", ({ params }) => {
@@ -1611,6 +1636,7 @@ export const operations: MockOperation[] = [
     }
     const d = db();
     d.users = d.users.filter((u) => u.id !== params.id);
+    d.identities = d.identities.filter((i) => i.user_id !== params.id);
     commit();
     return new HttpResponse(null, { status: 204 });
   }),
@@ -2728,6 +2754,7 @@ export const operations: MockOperation[] = [
   }),
 
   ...libraryViewOperations(requireUser),
+  ...oidcOperations(requireUser, requireAdmin, db, commit),
   ...importOperations(requireUser, {
     addToLibrary: (user, entryId) => {
       const added = addToLibrary(user, entryId);

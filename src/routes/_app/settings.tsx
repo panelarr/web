@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ssoErrorParam } from "@/auth/sso";
 import { ScrollStrip } from "@/components/scroll-strip";
 import { PageHeader } from "@/components/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiKeysCard } from "@/features/account/api-keys-card";
 import { AppearanceCard } from "@/features/account/appearance-card";
+import { LinkedLoginsCard, useSsoEnabled } from "@/features/account/linked-logins";
 import { ProfileCard } from "@/features/account/profile-card";
 import { PasswordCard, SessionsCard } from "@/features/account/security-cards";
 import { ImportsCard } from "@/features/imports/imports-card";
@@ -19,17 +21,32 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
+interface SettingsSearch {
+  tab?: Tab;
+  /** Back from the identity provider after linking a login: it worked, or why not. */
+  sso?: "linked";
+  sso_error?: string;
+}
+
 export const Route = createFileRoute("/_app/settings")({
-  validateSearch: (search: Record<string, unknown>): { tab?: Tab } =>
-    TABS.some((t) => t.id === search.tab) ? { tab: search.tab as Tab } : {},
+  validateSearch: (search: Record<string, unknown>): SettingsSearch => {
+    const ssoError = ssoErrorParam(search.sso_error);
+    return {
+      ...(TABS.some((t) => t.id === search.tab) ? { tab: search.tab as Tab } : {}),
+      ...(search.sso === "linked" ? { sso: "linked" as const } : {}),
+      ...(ssoError !== undefined ? { sso_error: ssoError } : {}),
+    };
+  },
   component: SettingsPage,
 });
 
 function SettingsPage() {
   // The selected tab comes from the URL's search params (never from link matching), so
   // exactly one tab is selected and the address can be shared or bookmarked.
-  const tab = Route.useSearch().tab ?? "profile";
+  const search = Route.useSearch();
+  const tab = search.tab ?? "profile";
   const navigate = useNavigate({ from: Route.fullPath });
+  const sso = useSsoEnabled();
   return (
     <>
       <PageHeader title="Settings" />
@@ -48,6 +65,7 @@ function SettingsPage() {
         </TabsContent>
         <TabsContent value="security" className="mt-4 grid gap-6">
           <PasswordCard />
+          {sso ? <LinkedLoginsCard ssoError={search.sso_error} linked={search.sso === "linked"} /> : null}
           <SessionsCard />
         </TabsContent>
         <TabsContent value="api-keys" className="mt-4">

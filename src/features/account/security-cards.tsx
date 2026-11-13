@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { $api } from "@/api/client";
 import { isApiError } from "@/api/errors";
+import { useMe } from "@/auth/session";
 import { formValues, PasswordConfirm, TextField } from "@/components/form";
 import { ErrorAlert, Loading } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
@@ -16,18 +17,27 @@ import { describeUserAgent } from "@/lib/user-agent";
 
 export function PasswordCard() {
   const queryClient = useQueryClient();
+  // Users created by single sign-on have no password until they set a first one.
+  const first = useMe().user.has_password === false;
   const [mismatch, setMismatch] = useState(false);
   const change = $api.useMutation("post", "/me/password", {
     onSuccess: (_data, _vars) => {
-      toast.success("Password changed. Your other sessions were signed out.");
+      toast.success(
+        first ? "Password set. You can sign in with it too." : "Password changed. Your other sessions were signed out.",
+      );
       void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/me/sessions").queryKey });
+      void queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/me").queryKey });
     },
   });
   return (
     <Card>
       <CardHeader>
         <CardTitle>Password</CardTitle>
-        <CardDescription>Changing it signs out every other session.</CardDescription>
+        <CardDescription>
+          {first
+            ? "You sign in with single sign-on and have no password yet. Set one to sign in with it too."
+            : "Changing it signs out every other session."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -48,13 +58,15 @@ export function PasswordCard() {
           ) : change.error && !isApiError(change.error, "invalid_request") ? (
             <ErrorAlert error={change.error} />
           ) : null}
-          <TextField
-            label="Current password"
-            name="current_password"
-            type="password"
-            autoComplete="current-password"
-            required
-          />
+          {first ? null : (
+            <TextField
+              label="Current password"
+              name="current_password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
+          )}
           <TextField
             label="New password"
             name="password"
@@ -70,7 +82,7 @@ export function PasswordCard() {
           <div>
             <Button type="submit" disabled={change.isPending}>
               {change.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
-              Change password
+              {first ? "Set password" : "Change password"}
             </Button>
           </div>
         </form>

@@ -11,6 +11,7 @@ import { ErrorAlert, Loading, PageHeader } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-menu";
+import { useSsoEnabled } from "@/features/account/linked-logins";
 import { ratingLabel } from "@/features/admin/grants";
 import { AddUserDialog, InviteDialog } from "@/features/admin/user-dialogs";
 import { formatRelative } from "@/lib/format";
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/_app/admin/users/")({
 
 function UsersPage() {
   const users = $api.useQuery("get", "/users");
+  const sso = useSsoEnabled();
   const [adding, setAdding] = useState(false);
   const [inviting, setInviting] = useState(false);
   return (
@@ -48,7 +50,7 @@ function UsersPage() {
       {users.data ? (
         <ul className="divide-y overflow-hidden rounded-xl border bg-card">
           {users.data.users.map((user) => (
-            <UserRow key={user.id} user={user} />
+            <UserRow key={user.id} user={user} sso={sso} />
           ))}
         </ul>
       ) : null}
@@ -59,7 +61,7 @@ function UsersPage() {
   );
 }
 
-function UserRow({ user }: { user: User }) {
+function UserRow({ user, sso }: { user: User; sso: boolean }) {
   const g = user.grants;
   return (
     <li>
@@ -75,6 +77,11 @@ function UserRow({ user }: { user: User }) {
             {user.display_name ? <span className="text-sm text-muted-foreground">{user.username}</span> : null}
             {user.role === "admin" ? <Badge>Admin</Badge> : null}
             {user.disabled ? <Badge variant="destructive">Disabled</Badge> : null}
+            {sso && user.sso ? (
+              <Badge variant="outline" title="A single sign-on login is linked">
+                SSO
+              </Badge>
+            ) : null}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
             {user.role === "admin"
