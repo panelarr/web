@@ -251,6 +251,16 @@ export interface paths {
          *
          *     `return_to` must not point into the API (`/api/...`).
          *
+         *     Refusals are answered as problems only to API clients that can be
+         *     told apart: a `Sec-Fetch-Mode` other than `navigate`, or, without
+         *     it, an `Accept` that asks for JSON and not HTML. A browser
+         *     navigation is redirected instead (`302`) to
+         *     `/login?sso_error=<code>`, with a valid `return_to` kept in
+         *     `redirect`, or for `intent=link` back to a valid `return_to` with
+         *     `sso_error=<code>` added. An invalid `return_to` is never put
+         *     into the redirect. The `404` when single sign-on isn't configured
+         *     stays a problem.
+         *
          *     `intent=link` links the login to the signed-in user instead. Use
          *     `POST /auth/oidc/link`, which carries the CSRF token in a header;
          *     this navigation form is kept for older clients and needs the
@@ -6377,7 +6387,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description To the identity provider. */
+            /** @description To the identity provider, or, for a refused browser navigation, to the login page (or a link's `return_to`) with `sso_error`. */
             302: {
                 headers: {
                     Location?: string;
