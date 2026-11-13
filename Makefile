@@ -24,7 +24,7 @@ test: ## Run the unit and component tests
 e2e: ## Run the Playwright smoke tests (desktop, phone, and the reader on WebKit when installed) against the mock server
 	$(PNPM) e2e
 
-e2e-webkit: ## Only the reader's tests on iOS Safari's engine (needs `pnpm exec playwright install webkit`)
+e2e-webkit: ## Only the reader's, library views' and imports' tests on iOS Safari's engine (needs `pnpm exec playwright install webkit`)
 	E2E_WEBKIT=1 $(PNPM) e2e --project phone-webkit
 
 lint: ## Lint and check formatting (Biome)

@@ -94,7 +94,7 @@ Everything in the metadata service's and source plugins' own admin pages, inside
 ## Import from Suwayomi or Mihon (FEAT-0017)
 
 - [x] **W1. Upload and preview:** the server's imports API (spec synced); Settings → Import with how to make a backup, an upload area (picked or dropped) that says what went wrong (not a backup, too large, an import already running with a link to it, the server busy with a countdown to Try again) and the user's imports; an import's page with matching followed live from events (reload-safe), the totals, package hints (admins get a link to the package in Extensions, others are told to ask an admin), the categories note, tabs by outcome in the URL with each series' source and chapters read a page at a time, and delete (`docs/imports.md`). The mock server matches a made-up backup.
-- [ ] **W2. Apply, report and resolve:** apply with progress, the report, choosing an entry for series that need one, cancel.
+- [x] **W2. Apply, report and resolve:** Apply import (asked first) and Resume import for one cancelled or failed after its preview; progress from events that survives a reload, and Cancel import while matching or applying; the report (imported, already imported, skipped; times capped in the future) with each series' result, chapters placed, waiting and not placed, and the server's message (such as a series not attached for lack of permission); Choose on series that need a choice, weren't found or were skipped, with the candidates and the catalogue's search from adding a work, or Skip; too many imports and an import already running say what to do (`docs/imports.md`).
 
 ## Working assumptions
 

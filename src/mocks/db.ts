@@ -113,6 +113,8 @@ export interface MockDb extends JobsState, NetworkState {
   imageRetries: Record<string, OwnRetries>;
   /** Every user's imports from other apps' backups. */
   imports: MockImport[];
+  /** Series some import applied, per user ("user|source|key"): applying them again changes nothing. */
+  importedSeries?: string[];
 }
 
 const clone = <T>(value: T): T => structuredClone(value);

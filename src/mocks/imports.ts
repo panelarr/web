@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Imports from another app's backup, as the server keeps them: per user, matched in the
-// background a few series at a time with `import.progress` and then `import.finished`.
-// The mock can't read a backup: any gzip file is "a backup" holding the same made-up library.
+// background a few series at a time with `import.progress` and then `import.finished`, then
+// applied the same way. The mock can't read a backup: any gzip file is "a backup" holding the
+// same made-up library.
 import { HttpResponse } from "msw";
 import type { components } from "@/api/schema.gen";
+import { CATALOG, withinCeiling } from "./catalog";
 import { commit, db, type MockDb, newId } from "./db";
 import { emit } from "./events";
 import { type MockOperation, op, problem } from "./op";
@@ -17,11 +19,32 @@ export interface MockImport {
   sha256: string;
   import: S["Import"];
   items: S["ImportItem"][];
+  /** Whether its preview finished: only then can it be applied (or resumed). */
+  previewed: boolean;
+  /** Series apply has gone through, in the backup's order: a resumed apply goes on from here. */
+  applied: number;
 }
 
+/** What the mock needs from the rest of the mock server (set by `importOperations`). */
+export interface ImportDeps {
+  addToLibrary: (user: S["User"], entryId: string) => { created: boolean; workId: string } | undefined;
+}
+let deps: ImportDeps | undefined;
+
 export const MAX_BACKUP_BYTES = 64 * 1024 * 1024;
+/** The most imports a user keeps, as the server's cap. */
+export const MAX_IMPORTS = 20;
 /** Series the mock's preview matches per tick (a tick is a second in the browser). */
 const PER_TICK = 12;
+/** Series the mock's apply goes through per tick: slower, so there's time to cancel. */
+const APPLY_PER_TICK = 5;
+/** Last-read times in the future the mock's apply caps, once. */
+const CLAMPED = 2;
+
+/** The server's messages for a series apply kept something for. */
+export const WHY_MAY_NOT_ATTACH =
+  "reading imported; the series isn't attached: your account may not add works or fix matches, so chapters are placed by number";
+const WHY_KEPT_OTHER = "kept the series already attached on this source; chapters are placed by number";
 
 const TITLES = [
   "Harbor Lights",
@@ -95,6 +118,9 @@ export function backupItems(): S["ImportItem"][] {
       chapters: chaptersRead + bookmarks + (idx % 3 === 0 ? 1 : 0),
       chapters_read: chaptersRead,
       bookmarks,
+      placed: 0,
+      unplaced: 0,
+      pending: 0,
     };
     if (outcome === "ready" || outcome === "in_library") {
       item.entry_id = `ent_${1000 + (idx % 24)}`;
@@ -143,8 +169,8 @@ function packageHints(items: S["ImportItem"][]): S["ImportPackageHint"][] {
 
 /** The series the preview has reached show their outcome; the rest are pending. */
 function visibleItem(found: MockImport, item: S["ImportItem"]): S["ImportItem"] {
-  if (item.idx < found.import.progress.done) return item;
-  const { entry_id: _e, work_id: _w, source_id: _s, message: _m, ...rest } = item;
+  if (found.previewed || item.idx < found.import.progress.done) return item;
+  const { entry_id: _e, work_id: _w, source_id: _s, message: _m, result: _r, ...rest } = item;
   return { ...rest, outcome: "pending", candidates: [] };
 }
 
@@ -161,8 +187,14 @@ function outcomesOf(found: MockImport): S["ImportOutcomeCount"][] {
   return [...counts.values()];
 }
 
+function resultsOf(found: MockImport): S["ImportResultCount"][] {
+  const counts = new Map<S["ImportResult"], number>();
+  for (const item of found.items) if (item.result) counts.set(item.result, (counts.get(item.result) ?? 0) + 1);
+  return [...counts].map(([result, series]) => ({ result, series }));
+}
+
 function view(found: MockImport): S["Import"] {
-  return { ...found.import, outcomes: outcomesOf(found) };
+  return { ...found.import, outcomes: outcomesOf(found), results: resultsOf(found) };
 }
 
 export function importsOf(d: MockDb, userId: string): MockImport[] {
@@ -172,23 +204,83 @@ export function importsOf(d: MockDb, userId: string): MockImport[] {
 
 const RUNNING: S["ImportState"][] = ["previewing", "applying"];
 
-/** Moves every preview on by a few series, with events as the server sends them. */
+/** Moves every preview and apply on by a few series, with events as the server sends them. */
 export function tickImports(d: MockDb): boolean {
   let changed = false;
   for (const found of d.imports ?? []) {
     const imp = found.import;
-    if (imp.state !== "previewing") continue;
-    imp.progress = { ...imp.progress, done: Math.min(imp.progress.total, imp.progress.done + PER_TICK) };
-    changed = true;
-    emit("import.progress", { import_id: imp.id, done: imp.progress.done, total: imp.progress.total });
-    if (imp.progress.done >= imp.progress.total) {
-      imp.state = "preview";
-      imp.finished_at = new Date().toISOString();
-      imp.summary = { ...imp.summary, package_hints: packageHints(found.items) };
-      emit("import.finished", { import_id: imp.id, state: imp.state });
+    if (imp.state === "previewing") {
+      imp.progress = { ...imp.progress, done: Math.min(imp.progress.total, imp.progress.done + PER_TICK) };
+      changed = true;
+      emit("import.progress", { import_id: imp.id, done: imp.progress.done, total: imp.progress.total });
+      if (imp.progress.done >= imp.progress.total) {
+        found.previewed = true;
+        imp.state = "preview";
+        imp.finished_at = new Date().toISOString();
+        imp.summary = { ...imp.summary, package_hints: packageHints(found.items) };
+        emit("import.finished", { import_id: imp.id, state: imp.state });
+      }
+    } else if (imp.state === "applying") {
+      const user = d.users.find((u) => u.id === found.user_id);
+      const end = Math.min(found.items.length, found.applied + APPLY_PER_TICK);
+      for (; found.applied < end; found.applied++) {
+        const item = found.items[found.applied];
+        if (user && item) applyItem(d, found, user, item);
+      }
+      imp.progress = { done: found.applied, total: found.items.length };
+      changed = true;
+      emit("import.progress", { import_id: imp.id, done: imp.progress.done, total: imp.progress.total });
+      if (found.applied >= found.items.length) {
+        imp.state = "done";
+        imp.finished_at = new Date().toISOString();
+        emit("import.finished", { import_id: imp.id, state: imp.state });
+      }
     }
   }
   return changed;
+}
+
+/** The user's series some import of theirs applied already (by source and series key). */
+function importedKey(userId: string, item: S["ImportItem"]): string {
+  return `${userId}|${item.source_compat_id}|${item.series_key}`;
+}
+
+/**
+ * Applies one series as the server does: series with a work go into the library (a new entry
+ * keeps the backup's added date) and get their reading; a series applied before by any of the
+ * user's imports is `already_imported`. Series that need a choice, weren't found or aren't
+ * allowed are left as they are.
+ */
+function applyItem(d: MockDb, found: MockImport, user: S["User"], item: S["ImportItem"]): void {
+  if (item.result) return;
+  if (!item.entry_id || !["ready", "in_library", "source_missing"].includes(item.outcome)) return;
+  d.importedSeries ??= [];
+  const key = importedKey(user.id, item);
+  const added = deps?.addToLibrary(user, item.entry_id);
+  if (added?.created && item.added_at) {
+    const entry = d.library.find((e) => e.user_id === user.id && e.work_id === added.workId);
+    if (entry) entry.added_at = item.added_at;
+  }
+  if (added) item.work_id = added.workId;
+  item.applied_at = new Date().toISOString();
+  if (d.importedSeries.includes(key)) {
+    item.result = "already_imported";
+    return;
+  }
+  d.importedSeries.push(key);
+  item.result = "applied";
+  // A newly attached series' chapters come after its first check; some marks name no chapter.
+  item.pending = item.outcome === "ready" && item.idx % 6 === 1 ? 2 : 0;
+  item.unplaced = item.idx % 10 === 7 ? 1 : 0;
+  item.placed = Math.max(0, item.chapters - item.pending - item.unplaced);
+  const mayAttach = user.role === "admin" || user.grants.may_add || user.grants.may_manage_matches;
+  const messages = [
+    item.source_id && !mayAttach ? WHY_MAY_NOT_ATTACH : "",
+    item.outcome === "ready" && item.idx === 4 ? WHY_KEPT_OTHER : "",
+    item.unplaced > 0 ? `${item.unplaced} chapters couldn't be placed: Panelarr has no such chapters` : "",
+  ].filter(Boolean);
+  if (messages.length > 0) item.message = messages.join("; ");
+  if (!found.import.summary.clamped_times) found.import.summary = { ...found.import.summary, clamped_times: CLAMPED };
 }
 
 /** A finished preview of the made-up backup for `userId`, for tests and seeded states. */
@@ -198,6 +290,8 @@ export function seedImport(d: MockDb, userId: string, createdAt = "2026-11-01T10
     user_id: userId,
     sha256: newId(),
     items,
+    previewed: true,
+    applied: 0,
     import: {
       id: newId(),
       format: "mihon_backup",
@@ -207,6 +301,7 @@ export function seedImport(d: MockDb, userId: string, createdAt = "2026-11-01T10
       progress: { done: items.length, total: items.length },
       summary: { ...summaryOf(items), package_hints: packageHints(items) },
       outcomes: [],
+      results: [],
     },
   };
   d.imports ??= [];
@@ -236,6 +331,14 @@ export async function receiveBackup(user: S["User"], bytes: Uint8Array): Promise
   const mineAll = importsOf(d, user.id);
   const same = mineAll.find((i) => i.sha256 === sha && i.import.state !== "failed" && i.import.state !== "cancelled");
   if (same) return HttpResponse.json(view(same), { status: 200 });
+  if (mineAll.length >= MAX_IMPORTS) {
+    return problem(
+      409,
+      "too_many_imports",
+      "Too many imports",
+      `you keep ${MAX_IMPORTS} imports already: delete one first`,
+    );
+  }
   if (mineAll.some((i) => RUNNING.includes(i.import.state))) {
     return problem(409, "import_running", "An import is running", "Another import of yours is running.");
   }
@@ -244,6 +347,8 @@ export async function receiveBackup(user: S["User"], bytes: Uint8Array): Promise
     user_id: user.id,
     sha256: sha,
     items,
+    previewed: false,
+    applied: 0,
     import: {
       id: newId(),
       format: "mihon_backup",
@@ -252,6 +357,7 @@ export async function receiveBackup(user: S["User"], bytes: Uint8Array): Promise
       progress: { done: 0, total: items.length },
       summary: summaryOf(items),
       outcomes: [],
+      results: [],
     },
   };
   d.imports.unshift(found);
@@ -259,7 +365,69 @@ export async function receiveBackup(user: S["User"], bytes: Uint8Array): Promise
   return HttpResponse.json(view(found), { status: 202 });
 }
 
-export function importOperations(requireUser: () => S["User"] | Response): MockOperation[] {
+/** The 400 the server answers for an entry the user may not see. */
+function noSuchEntry(): Response {
+  return HttpResponse.json(
+    {
+      type: "about:blank",
+      title: "Invalid request",
+      status: 400,
+      code: "invalid_request",
+      detail: "entry_id: no such catalogue entry",
+      errors: [{ field: "entry_id", message: "no such catalogue entry" }],
+    },
+    { status: 400, headers: { "Content-Type": "application/problem+json" } },
+  );
+}
+
+/**
+ * Sets the work of a series by hand, or skips it, as the server does: the choice waits for
+ * apply, or is applied at once when the import was applied already.
+ */
+function resolveItem(found: MockImport, user: S["User"], idx: number, body: S["ImportResolve"]): Response {
+  const imp = found.import;
+  if (RUNNING.includes(imp.state)) {
+    return problem(
+      409,
+      "import_running",
+      "An import is running",
+      "an import of yours is running: wait for it, cancel it or delete it",
+    );
+  }
+  const item = found.items[idx];
+  if (!item || !found.previewed) return problem(404, "not_found", "Not found", "no such series in the import");
+  const itemState = () =>
+    problem(409, "import_item_state", "Not in that state", "the series can't be resolved that way in its state");
+  if (body.skip) {
+    if (item.result) return itemState();
+    item.result = "skipped";
+    commit();
+    return HttpResponse.json(item);
+  }
+  if (!(item.result === "skipped" || (!item.result && ["needs_choice", "not_found"].includes(item.outcome)))) {
+    return itemState();
+  }
+  const entry = CATALOG.find((e) => e.id === body.entry_id);
+  if (!entry || !withinCeiling(entry.content_rating, user.grants.content_rating_ceiling)) return noSuchEntry();
+  const d = db();
+  const work = d.works.find((w) => w.entry_id === entry.id);
+  const inLibrary = !!work && d.library.some((e) => e.user_id === user.id && e.work_id === work.id);
+  const source = SOURCES.find((s) => s.compat === item.source_compat_id);
+  if (!inLibrary && user.role !== "admin" && !user.grants.may_add) {
+    return problem(422, "not_allowed", "Not allowed", "your account may not add works");
+  }
+  delete item.result;
+  item.entry_id = entry.id;
+  if (work) item.work_id = work.id;
+  item.outcome = inLibrary ? "in_library" : source ? "ready" : "source_missing";
+  if (source) item.source_id = source.id;
+  if (imp.state !== "preview") applyItem(d, found, user, item);
+  commit();
+  return HttpResponse.json(item);
+}
+
+export function importOperations(requireUser: () => S["User"] | Response, given: ImportDeps): MockOperation[] {
+  deps = given;
   const mine = (id: unknown) => {
     const user = requireUser();
     if (user instanceof Response) return user;
@@ -267,14 +435,20 @@ export function importOperations(requireUser: () => S["User"] | Response): MockO
     return found ?? problem(404, "not_found", "Not found", "No such import.");
   };
   return [
-    op("get", "/me/imports", () => {
+    op("get", "/me/imports", ({ request }) => {
       const user = requireUser();
       if (user instanceof Response) return user;
-      const list = importsOf(db(), user.id)
+      const url = new URL(request.url);
+      const all = importsOf(db(), user.id)
         .map(view)
-        .sort((a, b) => b.created_at.localeCompare(a.created_at))
-        .slice(0, 100);
-      return HttpResponse.json({ imports: list } satisfies S["ImportList"]);
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      const size = Math.min(Math.max(Number(url.searchParams.get("page_size") ?? 50), 1), 200);
+      const offset = Number(url.searchParams.get("page_token") || 0);
+      const next = offset + size < all.length ? String(offset + size) : "";
+      return HttpResponse.json({
+        imports: all.slice(offset, offset + size),
+        next_page_token: next,
+      } satisfies S["ImportList"]);
     }),
     op("post", "/me/imports", async ({ request }) => {
       const user = requireUser();
@@ -310,8 +484,11 @@ export function importOperations(requireUser: () => S["User"] | Response): MockO
       if (found instanceof Response) return found;
       const url = new URL(request.url);
       const outcome = url.searchParams.get("outcome");
-      const all = found.items.map((item) => visibleItem(found, item));
-      const list = outcome ? all.filter((item) => item.outcome === outcome) : all;
+      const result = url.searchParams.get("result");
+      const list = found.items
+        .map((item) => visibleItem(found, item))
+        .filter((item) => !outcome || item.outcome === outcome)
+        .filter((item) => !result || item.result === result);
       const size = Math.min(Math.max(Number(url.searchParams.get("page_size") ?? 50), 1), 200);
       const offset = Number(url.searchParams.get("page_token") || 0);
       const next = offset + size < list.length ? String(offset + size) : "";
@@ -319,6 +496,58 @@ export function importOperations(requireUser: () => S["User"] | Response): MockO
         items: list.slice(offset, offset + size),
         next_page_token: next,
       } satisfies S["ImportItemPage"]);
+    }),
+    op("post", "/me/imports/{id}/apply", ({ params }) => {
+      const found = mine(params.id);
+      if (found instanceof Response) return found;
+      const imp = found.import;
+      const resumable = (imp.state === "cancelled" || imp.state === "failed") && found.previewed;
+      if (imp.state !== "preview" && !resumable) {
+        return problem(
+          409,
+          "import_state",
+          "Not in that state",
+          "only an import whose preview finished can be applied: in preview, or cancelled or failed after it",
+        );
+      }
+      if (importsOf(db(), found.user_id).some((i) => i !== found && RUNNING.includes(i.import.state))) {
+        return problem(
+          409,
+          "import_running",
+          "An import is running",
+          "an import of yours is running: wait for it, cancel it or delete it",
+        );
+      }
+      imp.state = "applying";
+      delete imp.finished_at;
+      delete imp.message;
+      imp.progress = { done: found.applied, total: found.items.length };
+      commit();
+      return HttpResponse.json(view(found), { status: 202 });
+    }),
+    op("post", "/me/imports/{id}/cancel", ({ params }) => {
+      const found = mine(params.id);
+      if (found instanceof Response) return found;
+      const imp = found.import;
+      if (!RUNNING.includes(imp.state)) {
+        return problem(409, "import_not_running", "Not running", "the import isn't running");
+      }
+      imp.state = "cancelled";
+      imp.finished_at = new Date().toISOString();
+      emit("import.finished", { import_id: imp.id, state: imp.state });
+      commit();
+      return HttpResponse.json(view(found));
+    }),
+    op("post", "/me/imports/{id}/items/{idx}/resolve", async ({ params, request }) => {
+      const found = mine(params.id);
+      if (found instanceof Response) return found;
+      const user = requireUser();
+      if (user instanceof Response) return user;
+      const body = (await request.json()) as S["ImportResolve"];
+      if (!body.skip && !body.entry_id) {
+        return problem(400, "invalid_request", "Invalid request", "entry_id or skip: required");
+      }
+      return resolveItem(found, user, Number(params.idx), body);
     }),
   ];
 }

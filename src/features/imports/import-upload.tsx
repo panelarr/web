@@ -198,6 +198,19 @@ function UploadError({
           </AlertDescription>
         </Alert>
       );
+    case "too_many_imports":
+      return (
+        <Alert variant="destructive">
+          <AlertTitle>You have too many imports</AlertTitle>
+          <AlertDescription>
+            <p className="[overflow-wrap:anywhere]">{errorMessage(error)}</p>
+            <p>
+              Delete an old import under Your imports, then upload again. Deleting one keeps what it brought into your
+              library.
+            </p>
+          </AlertDescription>
+        </Alert>
+      );
     case "import_running":
       return (
         <Alert>

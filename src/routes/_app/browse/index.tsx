@@ -11,6 +11,7 @@ import { SearchInput } from "@/components/search-input";
 import { EmptyState, ErrorAlert, Loading, PageHeader } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCatalogSearch } from "@/features/catalog/catalog-search";
 import { EntryCard, EntryGrid } from "@/features/catalog/entry-card";
 import { CatalogFilters, type CatalogSearch, countFilters, validateCatalogSearch } from "@/features/catalog/filters";
 import { label, STATUS_LABELS, TYPE_LABELS } from "@/features/catalog/labels";
@@ -143,12 +144,7 @@ function query(search: CatalogSearch) {
 const nextPage = (last: { next_page_token: string }) => last.next_page_token || undefined;
 
 function SearchResults({ search }: { search: CatalogSearch }) {
-  const results = $api.useInfiniteQuery(
-    "get",
-    "/catalog/search",
-    { params: { query: { ...query(search), q: search.q ?? "" } } },
-    { initialPageParam: "", getNextPageParam: nextPage, pageParamName: "page_token" },
-  );
+  const results = useCatalogSearch({ ...query(search), q: search.q ?? "" });
   const hits = results.data?.pages.flatMap((page) => page.hits) ?? [];
   return (
     <Results
