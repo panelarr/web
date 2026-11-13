@@ -20,7 +20,7 @@ API, so anyone can build their own client against the same API.
 - **Chapters:** one list across sources, filling gaps from each, with the chosen copy and why; a tab per source; new chapter badges.
 - **Read:** a full-screen reader for phones and desktops: single or double page, vertical, webtoon or horizontal scroll, right to left or left to right, swipe, pinch and double-tap zoom, tap zones, keyboard shortcuts, settings per series, per source or everywhere, and progress that follows you across devices.
 - **Library views:** named views of your library, each with its own filters (include or leave out unread, started, downloaded, bookmarked, new; type, status, updated within N days), sort (including recently updated) and display; switch from the heading, one is your default, kept on your account (see `docs/library.md`).
-- **Import:** bring your library, read chapters and bookmarks from a Suwayomi or Mihon backup; a preview of each series first (see `docs/imports.md`).
+- **Import:** bring your library, read chapters and bookmarks from a Suwayomi or Mihon backup; a preview of each series first, then apply it with live progress, cancel and resume, a report, and choose the work of series that need one (see `docs/imports.md`).
 - **Updates:** new chapters of your library by day, one row per series; read, download or mark them from there; check now.
 - **History:** what you read, by day, one line per series with Resume; every chapter read, search, remove or clear.
 - **Download:** chapters stored once for everyone, live progress, automatic downloads of new chapters, local or S3-compatible storage.
@@ -55,7 +55,7 @@ The dev server listens on http://localhost:5173.
 - [Serving the web app](docs/embedding.md): the contract with the server (routing, caching, CSP)
 - [Network](docs/network.md): proxies, solvers and profiles, and where each is chosen
 - [Connected services in the admin](docs/admin.md): the metadata service and plugins inside Panelarr's admin, one Jobs view for all
-- [Importing from another app](docs/imports.md): the upload, the preview and what each answer shows
+- [Importing from another app](docs/imports.md): the upload, the preview, apply, the report, choosing a series' work and what each answer shows
 
 ## Licence
 

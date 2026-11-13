@@ -2728,7 +2728,12 @@ export const operations: MockOperation[] = [
   }),
 
   ...libraryViewOperations(requireUser),
-  ...importOperations(requireUser),
+  ...importOperations(requireUser, {
+    addToLibrary: (user, entryId) => {
+      const added = addToLibrary(user, entryId);
+      return added ? { created: added.created, workId: added.entry.work.id } : undefined;
+    },
+  }),
 ];
 
 // Jobs: the same model for the server's, meta's and plugins' (contracts/jobs.md).
