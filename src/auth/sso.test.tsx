@@ -63,6 +63,8 @@ describe("the login page", () => {
     ["account_disabled", "Your Panelarr account is disabled. Ask an admin."],
     ["state_mismatch", "The answer from the identity provider didn't belong to this sign-in. Try again."],
     ["oidc_unavailable", "The identity provider can't be reached right now. Try again later."],
+    ["invalid_return_to", "The page to come back to wasn't one of Panelarr's. Try again."],
+    ["invalid_request", "That sign-in couldn't be started. Try again."],
     ["some_new_code", "Signing in with SSO didn't work. Try again."],
   ])("explains the callback's %s", async (code, message) => {
     resetDb("sso-signed-out");
@@ -71,6 +73,20 @@ describe("the login page", () => {
     expect(screen.queryByText(code)).not.toBeInTheDocument();
     const again = screen.getByRole("link", { name: "Try again" });
     expect(again.getAttribute("href")).toContain("/api/v1/auth/oidc/start?");
+  });
+
+  it("tries again towards the page the refused start was for", async () => {
+    resetDb("sso-signed-out");
+    // The server keeps a refused start's valid return_to as `redirect`.
+    await renderApp("/login?sso_error=invite_invalid&redirect=%2Fdownloads%3Fstate%3Dfailed");
+    expect(
+      await screen.findByText("The invite was used up or has expired. Ask an admin for a new one."),
+    ).toBeInTheDocument();
+    for (const name of ["Try again", "Sign in with Example ID"]) {
+      const url = new URL(screen.getByRole("link", { name }).getAttribute("href") ?? "");
+      expect(url.pathname).toBe("/api/v1/auth/oidc/start");
+      expect(url.searchParams.get("return_to")).toBe("/downloads?state=failed");
+    }
   });
 
   it("never renders a made-up code as markup", async () => {

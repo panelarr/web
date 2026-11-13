@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { invite } from "./data";
 import { createDb } from "./db";
-import { finishFlow, PROVIDER_LOGINS, validReturnTo } from "./oidc";
+import { checkStart, finishFlow, PROVIDER_LOGINS, startRefusalPage, validReturnTo } from "./oidc";
 
 const login = (subject: string) => PROVIDER_LOGINS.find((l) => l.subject === subject);
 
@@ -53,5 +53,46 @@ describe("the mock single sign-on callback", () => {
     for (const bad of ["//evil.example", "https://evil.example/", "/api/v1/me", "/api", "relative"]) {
       expect(validReturnTo(bad)).toBe(false);
     }
+  });
+});
+
+// A refused start is a browser navigation: like the server, the mock sends it back to the app.
+describe("the mock single sign-on start", () => {
+  const start = (over: Partial<Parameters<typeof checkStart>[1]> = {}) => ({
+    return_to: "/downloads",
+    intent: null,
+    invite: null,
+    csrf_token: null,
+    ...over,
+  });
+
+  it("goes on to the provider, or stays a 404 without single sign-on", () => {
+    expect(checkStart(createDb("sso-signed-out"), start())).toEqual({ go: "provider" });
+    expect(checkStart(createDb("signed-out"), start())).toEqual({ go: "problem" });
+  });
+
+  it("sends a refused sign-in to the login page, keeping a valid return_to as redirect", () => {
+    const d = createDb("sso-signed-out");
+    expect(checkStart(d, start({ invite: "unknown" }))).toEqual({
+      go: "/login?sso_error=invite_invalid&redirect=%2Fdownloads",
+    });
+    expect(checkStart(d, start({ return_to: "/api/v1/me" }))).toEqual({ go: "/login?sso_error=invalid_return_to" });
+    expect(checkStart(d, start({ return_to: "//evil.example" }))).toEqual({ go: "/login?sso_error=invalid_return_to" });
+    expect(startRefusalPage({ return_to: "/", intent: null }, "oidc_unavailable")).toBe(
+      "/login?sso_error=oidc_unavailable",
+    );
+  });
+
+  it("sends a refused link back to its return_to", () => {
+    const back = "/settings?tab=security&sso=linked";
+    const link = start({ intent: "link", return_to: back });
+    expect(checkStart(createDb("sso"), link)).toEqual({ go: `${back}&sso_error=csrf_failed` });
+    expect(checkStart(createDb("sso"), { ...link, csrf_token: "mock-csrf-token" })).toEqual({ go: "provider" });
+    expect(checkStart(createDb("sso-signed-out"), link)).toEqual({ go: `${back}&sso_error=unauthenticated` });
+    expect(checkStart(createDb("sso"), { ...link, invite: "t" })).toEqual({ go: `${back}&sso_error=invalid_request` });
+    // Never back to a return_to that isn't valid.
+    expect(checkStart(createDb("sso"), { ...link, return_to: "https://evil.example/" })).toEqual({
+      go: "/login?sso_error=invalid_return_to",
+    });
   });
 });

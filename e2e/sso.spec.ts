@@ -107,6 +107,18 @@ test.describe("signing in with SSO", () => {
     }
   });
 
+  test("brings a refused start back to the login page, and tries again towards the same page", async ({ page }) => {
+    await page.goto("/login?mock=sso-signed-out");
+    await expect(ssoButton(page)).toBeVisible();
+    // A browser that starts with an invite that's gone gets the login page, not a JSON problem.
+    await page.goto("/api/v1/auth/oidc/start?return_to=%2Fdownloads&invite=gone");
+    await expect(page.getByText("The invite was used up or has expired. Ask an admin for a new one.")).toBeVisible();
+    await expect(page).toHaveURL(/\/login\?sso_error=invite_invalid&redirect=%2Fdownloads$/);
+    await page.getByRole("link", { name: "Try again" }).click();
+    await atProvider(page, "Continue as reader@example.com");
+    await expect(page.getByRole("heading", { name: "Downloads", exact: true })).toBeVisible();
+  });
+
   test("keeps passwords behind Use a password when they're for admins only", async ({ page }) => {
     await page.goto("/login?mock=sso-admins");
     await expect(ssoButton(page)).toBeVisible();
@@ -188,6 +200,17 @@ test.describe("linked logins", () => {
     await page.getByRole("button", { name: "Link SSO login" }).click();
     await atProvider(page, "Continue as reader@example.com");
     await expect(page.getByText("That login is already linked to another Panelarr account.")).toBeVisible();
+    await expect(page).toHaveURL(/\/settings\?tab=security$/);
+  });
+
+  test("say why a link started without the CSRF token was refused", async ({ page }) => {
+    await page.goto("/settings?tab=security&mock=sso");
+    await expect(page.getByRole("button", { name: "Link SSO login" })).toBeVisible();
+    // The old navigation form of starting a link, as another page could load it.
+    await page.goto(`/api/v1/auth/oidc/start?intent=link&return_to=${encodeURIComponent("/settings?tab=security")}`);
+    await expect(
+      page.getByText("Linking couldn't be confirmed as started here. Use Link SSO login on this page."),
+    ).toBeVisible();
     await expect(page).toHaveURL(/\/settings\?tab=security$/);
   });
 

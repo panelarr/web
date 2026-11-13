@@ -7,7 +7,7 @@
 import { apiBaseUrl } from "@/api/client";
 import { commit, db } from "./db";
 import { signIn } from "./handlers";
-import { finishFlow, type MockFlow, mockProviderUrl, PROVIDER_LOGINS, type ProviderLogin, validReturnTo } from "./oidc";
+import { checkStart, finishFlow, type MockFlow, mockProviderUrl, PROVIDER_LOGINS, type ProviderLogin } from "./oidc";
 
 /** Whether this page load is one of those navigations; if so, it has been answered. */
 export function answerSsoNavigation(): boolean {
@@ -34,17 +34,22 @@ export function answerSsoNavigation(): boolean {
 
 /** `GET /auth/oidc/start`: checks what the server checks, then off to the provider. */
 function start(params: URLSearchParams) {
-  const d = db();
   const returnTo = params.get("return_to") ?? "/";
-  const invite = params.get("invite") ?? undefined;
-  if (!d.oidc) return problemPage(404, "not_found", "Single sign-on isn't configured.");
-  if (!validReturnTo(returnTo)) return problemPage(400, "invalid_return_to", "return_to must be a path here.");
-  if (!d.oidc.reachable) return problemPage(503, "oidc_unavailable", "The identity provider can't be reached.");
-  if (invite !== undefined && !d.invites.some((i) => i.token === invite && Date.parse(i.expires_at) > Date.now())) {
-    return problemPage(404, "invite_invalid", "This invite link is unknown, used or expired.");
+  const invite = params.get("invite");
+  const intent = params.get("intent");
+  const checked = checkStart(db(), { return_to: returnTo, intent, invite, csrf_token: params.get("csrf_token") });
+  if (checked.go === "problem") return problemPage(404, "not_found", "Single sign-on isn't configured.");
+  if (checked.go !== "provider") {
+    // A refused navigation goes back to the app with `sso_error`, as the server sends it.
+    location.replace(new URL(checked.go, location.origin).href);
+    return;
   }
   location.replace(
-    mockProviderUrl("authorize", { intent: "login", return_to: returnTo, ...(invite ? { invite } : {}) }),
+    mockProviderUrl("authorize", {
+      intent: intent === "link" ? "link" : "login",
+      return_to: returnTo,
+      ...(invite ? { invite } : {}),
+    }),
   );
 }
 

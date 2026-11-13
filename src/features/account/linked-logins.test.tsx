@@ -50,6 +50,21 @@ describe("linked logins on the account page", () => {
     expect(screen.getByText("That login is already linked to another Panelarr account.")).toBeInTheDocument();
   });
 
+  it.each([
+    ["csrf_failed", "Linking couldn't be confirmed as started here. Use Link SSO login on this page."],
+    ["cross_site", "Linking was started from another site, so it was refused. Use Link SSO login on this page."],
+    ["unauthenticated", "Sign in first, then link your login."],
+    ["session_required", "Linking a login needs you signed in here, not an API key."],
+  ])("say why a refused link start (%s) didn't link", async (code, message) => {
+    resetDb("sso");
+    // The server sends a refused link start back to its return_to, as it does a failed callback.
+    const { router } = await renderApp(`/settings?tab=security&sso=linked&sso_error=${code}`);
+    expect(await within(await waitFor(card)).findByText(message)).toBeInTheDocument();
+    expect(screen.getByText("Not linked")).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.search).toEqual({ tab: "security" }));
+    expect(screen.queryByText("Single sign-on login linked.")).not.toBeInTheDocument();
+  });
+
   it("list the login, and unlink it when there's a password left", async () => {
     resetDb("sso");
     db().currentUserId = db().users.find((u) => u.username === "reader")?.id;
