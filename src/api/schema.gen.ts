@@ -3026,7 +3026,7 @@ export interface paths {
         };
         /**
          * Your imports
-         * @description Your imports from other apps' backups, newest first (at most 100).
+         * @description Your imports from other apps' backups, newest first, in pages. Each user keeps at most 20 imports.
          */
         get: operations["listMyImports"];
         put?: never;
@@ -3048,6 +3048,8 @@ export interface paths {
          *     Uploading a file you already imported (the same bytes) answers
          *     `200` with that import, unless it failed or was cancelled. While
          *     another import of yours is running, `409`, code `import_running`.
+         *     Each user keeps at most 20 imports: with 20, `409`, code
+         *     `too_many_imports` (delete one first).
          *     The server reads one backup at a time: when it is busy, `429`,
          *     code `busy`, with `Retry-After`.
          */
@@ -3095,11 +3097,123 @@ export interface paths {
         };
         /**
          * The series of one of your imports
-         * @description In the backup's order, optionally only those with one outcome. Series the preview hasn't reached yet are `pending`.
+         * @description In the backup's order, optionally only those with one outcome or one result. Series the preview hasn't reached yet are `pending`.
          */
         get: operations["listMyImportItems"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/imports/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply one of your imports
+         * @description Starts applying an import in state `preview` (task
+         *     `import.apply`), and answers `202` with it in state `applying`.
+         *     An import that was cancelled or failed after its preview finished
+         *     can be applied again: it resumes, and series already applied stay
+         *     as they are.
+         *     Each series that is `ready`, `in_library` or `source_missing` is
+         *     added to your library (a new entry keeps the backup's added date),
+         *     gets the backup's series attached where its source is in Panelarr,
+         *     you may use it, the work has no series on that source yet and you
+         *     have `may_add` or `may_manage_matches` (as attaching by hand
+         *     needs), and gets its read marks, pages, last-read times and bookmarks. Your
+         *     grants are checked again as they are now: a series you may no
+         *     longer add, or whose work is above your content rating limit now,
+         *     becomes `not_allowed`.
+         *
+         *     Imported reading never undoes newer reading in Panelarr: a read
+         *     chapter stays read, a newer page and time are kept, and nothing is
+         *     marked unread or unbookmarked. A mark the backup has no time for
+         *     may add reading or a read mark, but never moves a page or time
+         *     already in Panelarr. Applying a backup again adds
+         *     nothing twice (result `already_imported`). Chapters Panelarr doesn't
+         *     know yet (a newly attached series is checked first) are placed
+         *     when they appear, for up to 24 hours (`pending`).
+         *
+         *     Progress is reported like the preview's (`import.progress`, then
+         *     `import.finished`). Any other import (still previewing, applying
+         *     or done, or stopped before its preview finished) answers `409`,
+         *     code `import_state`; while another import of yours runs, or the
+         *     task of this one's cancelled apply is still stopping, `409`, code
+         *     `import_running` (try again in a moment).
+         */
+        post: operations["applyMyImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/imports/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel one of your imports while it runs
+         * @description Stops a preview or an apply; the import ends `cancelled`. What was
+         *     applied already stays applied, and its series say so. Applying it
+         *     again (once its preview finished) resumes with the rest. An import
+         *     that isn't running answers `409`, code `import_not_running`.
+         */
+        post: operations["cancelMyImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/imports/{id}/items/{idx}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                /** @description The series' position in the backup. */
+                idx: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose the work of a series, or skip it
+         * @description `{"entry_id": …}` sets the catalogue entry of a series that is
+         *     `needs_choice` or `not_found`, or was skipped (one of its candidates, or
+         *     any entry found by searching the catalogue). Before the import is
+         *     applied, the series is then applied with the rest. After (`done`,
+         *     `failed` or `cancelled`), it is applied right away: the work is
+         *     added to your library and the series' reading is placed, without
+         *     uploading the backup again. An entry you may not see answers `400`
+         *     on `entry_id`; one you may not add, `422`, code `not_allowed`.
+         *
+         *     `{"skip": true}` leaves out a series that hasn't been applied.
+         *
+         *     While the import runs, `409`, code `import_running`. A series in
+         *     another state answers `409`, code `import_item_state`.
+         */
+        post: operations["resolveMyImportItem"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3752,10 +3866,20 @@ export interface components {
          *     it), `not_found`, `source_missing` (the work is clear, but the
          *     backup's source isn't in Panelarr: it imports without it) or
          *     `not_allowed` (your account may not add works, may not use the
-         *     source, or the work is above your content rating limit).
+         *     source, or the work is above your content rating limit). Apply
+         *     checks the grants again: a series that no longer passes becomes
+         *     `not_allowed`. What apply did is the series' `result`.
          * @enum {string}
          */
         ImportOutcome: "pending" | "ready" | "in_library" | "needs_choice" | "not_found" | "source_missing" | "not_allowed";
+        /**
+         * @description What apply did with a series: `applied` (the work added, the
+         *     series attached or reading placed), `already_imported` (nothing
+         *     was left to change: the backup was applied before) or `skipped`
+         *     (left out by you).
+         * @enum {string}
+         */
+        ImportResult: "applied" | "already_imported" | "skipped";
         Import: {
             /** Format: uuid */
             id: string;
@@ -3775,9 +3899,11 @@ export interface components {
             summary: components["schemas"]["ImportSummary"];
             /** @description Series per outcome, with their read chapters and bookmarks. */
             outcomes: components["schemas"]["ImportOutcomeCount"][];
+            /** @description Series per result of apply (empty before apply). */
+            results: components["schemas"]["ImportResultCount"][];
         };
         ImportProgress: {
-            /** @description Series matched. */
+            /** @description Series matched; while applying, series applied. */
             done: number;
             total: number;
         };
@@ -3786,6 +3912,10 @@ export interface components {
             series: number;
             chapters_read: number;
             bookmarks: number;
+        };
+        ImportResultCount: {
+            result: components["schemas"]["ImportResult"];
+            series: number;
         };
         /** @description What the backup holds. Only series in its library count; categories and tracker links aren't imported. */
         ImportSummary: {
@@ -3801,6 +3931,8 @@ export interface components {
             /** @description Last-read times. */
             history: number;
             tracker_links: number;
+            /** @description Last-read times in the future (a wrong clock in the other app) that apply capped at the time it ran. */
+            clamped_times?: number;
             categories: components["schemas"]["ImportCategory"][];
             /** @description Packages a plugin offers that would provide sources the import is missing (after the preview). */
             package_hints: components["schemas"]["ImportPackageHint"][];
@@ -3818,6 +3950,7 @@ export interface components {
         };
         ImportList: {
             imports: components["schemas"]["Import"][];
+            next_page_token: string;
         };
         ImportItem: {
             /** @description The series' position in the backup. */
@@ -3834,7 +3967,8 @@ export interface components {
             added_at?: string;
             categories: string[];
             outcome: components["schemas"]["ImportOutcome"];
-            /** @description Why, for `not_allowed`. */
+            result?: components["schemas"]["ImportResult"];
+            /** @description Why, for `not_allowed`; after apply, what it kept (e.g. another series attached on the source). */
             message?: string;
             /**
              * Format: uuid
@@ -3851,6 +3985,22 @@ export interface components {
             chapters: number;
             chapters_read: number;
             bookmarks: number;
+            /**
+             * Format: date-time
+             * @description When apply (or resolving it) went through the series.
+             */
+            applied_at?: string;
+            /** @description Chapters whose reading was placed on a Panelarr chapter, by the source's chapter key, else by number. */
+            placed: number;
+            /** @description Chapters that couldn't be placed (no number, or no such chapter in Panelarr after 24 hours). */
+            unplaced: number;
+            /** @description Chapters waiting for the work's chapters to be known; placed when they appear, for up to 24 hours. */
+            pending: number;
+        };
+        /** @description Either a catalogue entry or skip. */
+        ImportResolve: {
+            entry_id?: string;
+            skip?: boolean;
         };
         ImportCandidate: {
             entry_id: string;
@@ -10039,7 +10189,12 @@ export interface operations {
     };
     listMyImports: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10140,6 +10295,8 @@ export interface operations {
         parameters: {
             query?: {
                 outcome?: components["schemas"]["ImportOutcome"];
+                /** @description Only series with this result of apply. */
+                result?: components["schemas"]["ImportResult"];
                 /** @description Items per page, 1 to 200. Default 50. */
                 page_size?: components["parameters"]["PageSize"];
                 /** @description The `next_page_token` of the previous page. */
@@ -10160,6 +10317,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportItemPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    applyMyImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import, applying. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Import"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    cancelMyImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import, cancelled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Import"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    resolveMyImportItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                /** @description The series' position in the backup. */
+                idx: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportResolve"];
+            };
+        };
+        responses: {
+            /** @description The series, resolved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportItem"];
                 };
             };
             default: components["responses"]["Problem"];
