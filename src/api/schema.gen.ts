@@ -42,6 +42,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/auth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How sign-in is configured (admins)
+         * @description Read-only: single sign-on is configured by the server's environment,
+         *     never from the API. Shows whether it is on, the issuer, whether the
+         *     provider can be reached, and the provisioning, group, password and
+         *     logout settings. The client secret is never returned, only whether
+         *     the client is public (has none).
+         */
+        get: operations["getSystemAuth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/setup": {
         parameters: {
             query?: never;
@@ -110,7 +134,12 @@ export interface paths {
          * @description Sets the session cookie and the CSRF cookie, and returns the CSRF
          *     token. Wrong credentials answer `401` with code
          *     `invalid_credentials`; too many failed attempts answer `429` with
-         *     code `rate_limited` and a `Retry-After` header.
+         *     code `rate_limited` and a `Retry-After` header. When password login
+         *     is limited to admins (`GET /auth/methods` says `password: admins`),
+         *     anyone else answers `401` with code `invalid_credentials`, the same
+         *     as a wrong password or an unknown user, whether their password was
+         *     right or not. Users created by single sign-on have no password
+         *     until they set one.
          */
         post: operations["login"];
         delete?: never;
@@ -130,7 +159,11 @@ export interface paths {
         put?: never;
         /**
          * Sign out (session only)
-         * @description Ends the current session and clears the cookies.
+         * @description Ends the current session and clears the cookies. When the session
+         *     was started with single sign-on and the server is set to log out
+         *     at the identity provider too, it answers `200` with the provider's
+         *     end-session URL: send the browser there, and the provider sends it
+         *     back to the login page. Otherwise `204`.
          */
         post: operations["logout"];
         delete?: never;
@@ -179,6 +212,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How users can sign in
+         * @description For the login page. `oidc` is present only when single sign-on is configured.
+         */
+        get: operations["getAuthMethods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start signing in with single sign-on
+         * @description A browser navigation, not an API call: redirects to the identity
+         *     provider. The flow's secrets travel in a short-lived, encrypted,
+         *     HTTP-only cookie. `return_to` must be a path on this server
+         *     (`/library`); anything else answers `400` with code
+         *     `invalid_return_to`. Answers `404` when single sign-on isn't
+         *     configured, and `503` with code `oidc_unavailable` while the
+         *     provider can't be reached.
+         *
+         *     `return_to` must not point into the API (`/api/...`).
+         *
+         *     `intent=link` links the login to the signed-in user instead. Use
+         *     `POST /auth/oidc/link`, which carries the CSRF token in a header;
+         *     this navigation form is kept for older clients and needs the
+         *     session's CSRF token in `csrf_token` (`403` with code
+         *     `csrf_failed` otherwise), a browser session (`401` otherwise) and
+         *     a navigation from Panelarr itself (`403` with code `cross_site`
+         *     otherwise). `invite` accepts an invite with single
+         *     sign-on: the user is created with the invite's role and grants; an
+         *     unknown, used or expired invite answers `404` with code
+         *     `invite_invalid`.
+         */
+        get: operations["startOidcLogin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start linking a single sign-on login (session only)
+         * @description Starts a flow that links a login at the identity provider to the
+         *     signed-in user. It sets the flow cookie (as
+         *     `GET /auth/oidc/start` does) and answers the provider's URL:
+         *     send the browser there. The provider sends it back to
+         *     `return_to`, with `sso_error=<code>` added when linking failed.
+         *     As a changing request it needs the `X-CSRF-Token` header, so no
+         *     other site can start it. `return_to` must be a path on this
+         *     server outside the API (`400` with code `invalid_return_to`
+         *     otherwise). Answers `404` when single sign-on isn't configured,
+         *     and `503` with code `oidc_unavailable` while the provider can't
+         *     be reached.
+         */
+        post: operations["startOidcLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Finish signing in with single sign-on
+         * @description The identity provider sends the browser here. On success it sets
+         *     the session cookies (as `POST /auth/login` does) and redirects to
+         *     the flow's `return_to`. On failure it starts no session and
+         *     redirects to `/login?sso_error=<code>`, where the code is one of:
+         *     `flow_expired` (no or an expired flow cookie: start again),
+         *     `state_mismatch`, `provider_error` (the provider refused or
+         *     failed), `oidc_unavailable`, `invalid_token` (the ID token failed
+         *     verification: signature, issuer, audience or azp, expiry or nonce),
+         *     `nonce_reused`, `not_allowed` (not in an allowed group),
+         *     `not_linked` (no Panelarr account is linked to this login, and
+         *     users aren't created automatically), `account_disabled`,
+         *     `invite_invalid` (the invite was used or expired meanwhile) or
+         *     `rate_limited`.
+         *
+         *     A login linked to a user signs that user in. Otherwise, an invite
+         *     creates its user and links the login, and with automatic
+         *     provisioning on, a new user is created (username from the
+         *     provider's claims, default grants, role from groups). When admin
+         *     groups are configured, a linked user's role follows them on every
+         *     sign-in, except that the last enabled admin is never demoted.
+         *
+         *     A link flow (`intent=link`) starts no session: it links the login
+         *     and redirects to `return_to`. Its failures redirect to `return_to`
+         *     with `sso_error` added, with the codes above or
+         *     `already_linked` (the login is linked to another user),
+         *     `link_exists` (you have a login at this provider already) or
+         *     `session_changed` (you signed out or in as someone else meanwhile).
+         *     Answers `404` when single sign-on isn't configured.
+         */
+        get: operations["finishOidcLogin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -208,7 +377,7 @@ export interface paths {
         put?: never;
         /**
          * Change your own password (session only)
-         * @description Needs the current password (`403` with code `invalid_credentials` otherwise). Ends every other session of the user.
+         * @description Needs the current password (`403` with code `invalid_credentials` otherwise). A user created by single sign-on without a password sets their first one with an empty `current_password`. Ends every other session of the user.
          */
         post: operations["changeMyPassword"];
         delete?: never;
@@ -289,6 +458,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your linked single sign-on logins (session only)
+         * @description Link one with `POST /auth/oidc/link`.
+         */
+        get: operations["listMyIdentities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/identities/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unlink one of your single sign-on logins (session only)
+         * @description Refused with `409` and code `last_login_method` when you would have
+         *     no way left to sign in: set a password first (`POST /me/password`).
+         *     A password counts only if you may sign in with it (see
+         *     `GET /auth/methods`).
+         */
+        delete: operations["deleteMyIdentity"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -339,6 +551,50 @@ export interface paths {
          *     disable or demote themselves (`409`, code `cannot_change_self`).
          */
         patch: operations["updateUser"];
+        trace?: never;
+    };
+    "/users/{id}/identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** A user's linked single sign-on logins */
+        get: operations["listUserIdentities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/identities/{identity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                identity_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unlink a user's single sign-on login
+         * @description Also ends the user's single sign-on sessions. Refused with `409` and
+         *     code `last_login_method` when the user would have no way left to
+         *     sign in: set a password for them first, or disable the user.
+         */
+        delete: operations["deleteUserIdentity"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/invites": {
@@ -5568,6 +5824,10 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             last_login_at?: string;
+            /** @description The user has a password. Users created by single sign-on have none until they set one. */
+            has_password?: boolean;
+            /** @description A single sign-on login is linked to the user. Set on the users endpoints and `GET /me`. */
+            sso?: boolean;
         };
         UserList: {
             users: components["schemas"]["User"][];
@@ -5611,6 +5871,85 @@ export interface components {
             user: components["schemas"]["User"];
             /** @description Send it as `X-CSRF-Token` with changing requests. Also in the `panelarr_csrf` cookie. */
             csrf_token: string;
+        };
+        AuthMethods: {
+            /**
+             * @description Who may sign in with a password. `admins` means everyone else signs in with single sign-on.
+             * @enum {string}
+             */
+            password: "all" | "admins";
+            oidc?: components["schemas"]["OidcMethod"];
+        };
+        OidcLinkRequest: {
+            /** @description Where the provider sends the browser back to. Default `/`. */
+            return_to?: string;
+        };
+        OidcLinkStart: {
+            /** @description The identity provider's authorization URL; send the browser there. */
+            redirect_to: string;
+        };
+        LogoutResult: {
+            /** @description The identity provider's end-session URL; send the browser there. */
+            redirect_to: string;
+        };
+        /** @description A single sign-on login linked to a user. */
+        Identity: {
+            /** Format: uuid */
+            id: string;
+            /** @description The identity provider. */
+            issuer: string;
+            /** @description The provider's ID of the login. */
+            subject: string;
+            /** @description The email the provider reported at the last sign-in; empty when none. For display only. */
+            email: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_login_at?: string;
+        };
+        IdentityList: {
+            identities: components["schemas"]["Identity"][];
+        };
+        SystemAuth: {
+            /**
+             * @description Who may sign in with a password. It can't be switched off.
+             * @enum {string}
+             */
+            password: "all" | "admins";
+            oidc: components["schemas"]["OidcStatus"];
+        };
+        /** @description Single sign-on settings. Only `enabled` is set when it is off. */
+        OidcStatus: {
+            enabled: boolean;
+            issuer?: string;
+            client_id?: string;
+            /** @description The client has no secret (PKCE only). */
+            public_client?: boolean;
+            /** @description The provider's discovery document could be read. */
+            reachable?: boolean;
+            /** @description Why it can't be reached. */
+            error?: string;
+            scopes?: string[];
+            button_label?: string;
+            username_claim?: string;
+            groups_claim?: string;
+            auto_provision?: boolean;
+            allowed_groups?: string[];
+            /**
+             * @description The provider's groups whose members are admins. Empty when none
+             *     are configured. When set, they decide every single sign-on
+             *     user's role at each sign-in (admin for members, user for
+             *     everyone else), overriding the role an admin or an invite gave;
+             *     the last enabled admin is never demoted.
+             */
+            admin_groups?: string[];
+            /** @enum {string} */
+            logout?: "local" | "provider";
+        };
+        /** @description Single sign-on; start it by navigating to `GET /auth/oidc/start`. */
+        OidcMethod: {
+            /** @description The sign-in button's label. */
+            label: string;
         };
         Session: {
             /** Format: uuid */
@@ -5808,6 +6147,27 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getSystemAuth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sign-in settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemAuth"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     getSetup: {
         parameters: {
             query?: never;
@@ -5909,6 +6269,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Signed out here; finish at the identity provider. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResult"];
+                };
+            };
             /** @description Signed out. */
             204: {
                 headers: {
@@ -5965,6 +6334,106 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LoginResponse"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAuthMethods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sign-in methods. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthMethods"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    startOidcLogin: {
+        parameters: {
+            query?: {
+                /** @description Where to go once signed in. Default `/`. */
+                return_to?: string;
+                /** @description `login` (default) or `link`. */
+                intent?: "login" | "link";
+                /** @description With `intent=link`, the session's CSRF token. Prefer `POST /auth/oidc/link`, which keeps it out of the URL. */
+                csrf_token?: string;
+                /** @description An invite token to accept with single sign-on. */
+                invite?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To the identity provider. */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    startOidcLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OidcLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description The flow started; send the browser to `redirect_to`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OidcLinkStart"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    finishOidcLogin: {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+                error?: string;
+                error_description?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To `return_to`, or to the login page with an error code. */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };
@@ -6147,6 +6616,48 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    listMyIdentities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Linked logins, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteMyIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlinked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     listUsers: {
         parameters: {
             query?: {
@@ -6265,6 +6776,51 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["User"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listUserIdentities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Linked logins, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteUserIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                identity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlinked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };
