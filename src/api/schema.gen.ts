@@ -2270,6 +2270,8 @@ export interface paths {
          *     | `progress.synced` | the user (all devices) | `WorkEvent` (`chapter_id`, `page`, `completed` when one chapter changed) |
          *     | `bookmarks.changed` | the user (all devices) | `WorkEvent` |
          *     | `library_views.changed` | the user (all devices) | `LibraryViewsEvent` |
+         *     | `import.progress` | the user | `ImportProgressEvent` |
+         *     | `import.finished` | the user | `ImportFinishedEvent` (refetch the import) |
          */
         get: operations["streamEvents"];
         put?: never;
@@ -3015,6 +3017,95 @@ export interface paths {
         patch: operations["updateMyLibraryView"];
         trace?: never;
     };
+    "/me/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your imports
+         * @description Your imports from other apps' backups, newest first (at most 100).
+         */
+        get: operations["listMyImports"];
+        put?: never;
+        /**
+         * Upload a backup to import
+         * @description Upload a Suwayomi or Mihon backup (`.tachibk`) as the multipart
+         *     field `file`, at most 64 MiB (larger bodies answer `413`, code
+         *     `too_large`). The server reads it right away and keeps only the
+         *     parsed series, never the file. A file that isn't a usable backup
+         *     (not gzip or protobuf, damaged, a legacy JSON backup, over a limit
+         *     once decompressed, or nothing in the library) answers `422`, code
+         *     `bad_backup`, and creates nothing.
+         *
+         *     The new import (`202`) is in state `previewing`: its series are
+         *     matched in the background (task `import.preview`), with
+         *     `import.progress` and then `import.finished` on your event stream.
+         *     Nothing changes in your library until you apply it.
+         *
+         *     Uploading a file you already imported (the same bytes) answers
+         *     `200` with that import, unless it failed or was cancelled. While
+         *     another import of yours is running, `409`, code `import_running`.
+         *     The server reads one backup at a time: when it is busy, `429`,
+         *     code `busy`, with `Retry-After`.
+         */
+        post: operations["createMyImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One of your imports
+         * @description With what the file holds, how far the preview is and the series per outcome. Another user's import answers `404`, like a missing one.
+         */
+        get: operations["getMyImport"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete one of your imports
+         * @description Deletes the import and its series, stopping it if it runs. What it already imported stays in your library.
+         */
+        delete: operations["deleteMyImport"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/imports/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The series of one of your imports
+         * @description In the backup's order, optionally only those with one outcome. Series the preview hasn't reached yet are `pending`.
+         */
+        get: operations["listMyImportItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storages": {
         parameters: {
             query?: never;
@@ -3641,6 +3732,152 @@ export interface components {
              */
             view_id?: string;
         };
+        ImportUpload: {
+            /**
+             * Format: binary
+             * @description The backup file.
+             */
+            file: string;
+        };
+        /**
+         * @description `previewing` (matching the series), `preview` (ready to review),
+         *     `applying`, `done`, `failed` (see `message`) or `cancelled`.
+         * @enum {string}
+         */
+        ImportState: "previewing" | "preview" | "applying" | "done" | "failed" | "cancelled";
+        /**
+         * @description What the preview found for a series: `pending` (not matched yet),
+         *     `ready` (the work is clear and its source is in Panelarr),
+         *     `in_library`, `needs_choice` (several catalogue entries could be
+         *     it), `not_found`, `source_missing` (the work is clear, but the
+         *     backup's source isn't in Panelarr: it imports without it) or
+         *     `not_allowed` (your account may not add works, may not use the
+         *     source, or the work is above your content rating limit).
+         * @enum {string}
+         */
+        ImportOutcome: "pending" | "ready" | "in_library" | "needs_choice" | "not_found" | "source_missing" | "not_allowed";
+        Import: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description A Suwayomi or Mihon backup.
+             * @enum {string}
+             */
+            format: "mihon_backup";
+            state: components["schemas"]["ImportState"];
+            /** @description Why it failed, when it did. */
+            message?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at?: string;
+            progress: components["schemas"]["ImportProgress"];
+            summary: components["schemas"]["ImportSummary"];
+            /** @description Series per outcome, with their read chapters and bookmarks. */
+            outcomes: components["schemas"]["ImportOutcomeCount"][];
+        };
+        ImportProgress: {
+            /** @description Series matched. */
+            done: number;
+            total: number;
+        };
+        ImportOutcomeCount: {
+            outcome: components["schemas"]["ImportOutcome"];
+            series: number;
+            chapters_read: number;
+            bookmarks: number;
+        };
+        /** @description What the backup holds. Only series in its library count; categories and tracker links aren't imported. */
+        ImportSummary: {
+            /** @description Series in the backup's library. */
+            series: number;
+            /** @description Series kept only for their history (Mihon backups); not imported. */
+            out_of_library: number;
+            chapters: number;
+            chapters_read: number;
+            /** @description Unread chapters with a page read. */
+            in_progress: number;
+            bookmarks: number;
+            /** @description Last-read times. */
+            history: number;
+            tracker_links: number;
+            categories: components["schemas"]["ImportCategory"][];
+            /** @description Packages a plugin offers that would provide sources the import is missing (after the preview). */
+            package_hints: components["schemas"]["ImportPackageHint"][];
+        };
+        ImportCategory: {
+            name: string;
+            series: number;
+        };
+        ImportPackageHint: {
+            plugin_id: string;
+            package_id: string;
+            package_name: string;
+            /** @description Series of the import it would let Panelarr attach. */
+            series: number;
+        };
+        ImportList: {
+            imports: components["schemas"]["Import"][];
+        };
+        ImportItem: {
+            /** @description The series' position in the backup. */
+            idx: number;
+            title: string;
+            author: string;
+            artist: string;
+            /** @description The source's name in the backup (no language). */
+            source_name: string;
+            /** @description The source as the backup names it, e.g. `mihon:<id>`. */
+            source_compat_id: string;
+            series_key: string;
+            /** Format: date-time */
+            added_at?: string;
+            categories: string[];
+            outcome: components["schemas"]["ImportOutcome"];
+            /** @description Why, for `not_allowed`. */
+            message?: string;
+            /**
+             * Format: uuid
+             * @description The work, when it exists.
+             */
+            work_id?: string;
+            /** @description The catalogue entry, when it is clear. */
+            entry_id?: string;
+            /** @description The Panelarr source the series would be attached on. */
+            source_id?: string;
+            /** @description Catalogue entries it could be (for `needs_choice`), best first. */
+            candidates: components["schemas"]["ImportCandidate"][];
+            /** @description Chapters with something to import (read, a page or a bookmark). */
+            chapters: number;
+            chapters_read: number;
+            bookmarks: number;
+        };
+        ImportCandidate: {
+            entry_id: string;
+            title: string;
+            year?: number;
+            /** Format: float */
+            score: number;
+            matched_title?: string;
+            authors_match?: boolean;
+        };
+        ImportItemPage: {
+            items: components["schemas"]["ImportItem"][];
+            next_page_token: string;
+        };
+        /** @description Data of `import.progress`. */
+        ImportProgressEvent: {
+            /** Format: uuid */
+            import_id: string;
+            done: number;
+            total: number;
+        };
+        /** @description Data of `import.finished`; refetch the import. */
+        ImportFinishedEvent: {
+            /** Format: uuid */
+            import_id: string;
+            state: components["schemas"]["ImportState"];
+        };
         LibraryPage: {
             entries: components["schemas"]["LibraryEntry"][];
             next_page_token: string;
@@ -4027,6 +4264,13 @@ export interface components {
             /** @description The package (e.g. extension) that provides it, on plugins with the `packages` capability. */
             package_id?: string;
             package_name?: string;
+            /**
+             * @description IDs the source is known by in other apps' ecosystems, as its
+             *     plugin reports them ("<scheme>:<id>", e.g. `mihon:123`). Imports
+             *     from those apps use them to find the source. Admins only: set
+             *     on the admin source calls, left out elsewhere.
+             */
+            compat_ids?: string[];
         };
         SourceList: {
             sources: components["schemas"]["SourceInfo"][];
@@ -9788,6 +10032,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LibraryView"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMyImports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your imports. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createMyImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImportUpload"];
+            };
+        };
+        responses: {
+            /** @description You imported this file before; that import. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Import"];
+                };
+            };
+            /** @description The new import, previewing. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Import"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMyImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Import"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteMyImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMyImportItems: {
+        parameters: {
+            query?: {
+                outcome?: components["schemas"]["ImportOutcome"];
+                /** @description Items per page, 1 to 200. Default 50. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description The `next_page_token` of the previous page. */
+                page_token?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of series. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportItemPage"];
                 };
             };
             default: components["responses"]["Problem"];
