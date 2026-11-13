@@ -28,6 +28,7 @@ import {
 import { initialStorages } from "./downloads";
 import { initialDuplicates } from "./duplicates";
 import type { OwnRetries } from "./image-retries";
+import type { MockImport } from "./imports";
 import { initialJobs, initialMetaJobs, initialPluginJobs, initialRuns, initialTasks, type JobsState } from "./jobs";
 import { initialMetaSyncRuns, initialSearchEngine } from "./meta";
 import { initialNetwork, type NetworkState } from "./network";
@@ -110,6 +111,8 @@ export interface MockDb extends JobsState, NetworkState {
   origins: Record<string, S["PackageOrigin"][]>;
   /** Image retry settings set on an extension ("package:plugin:package") or a source ("source:id"). */
   imageRetries: Record<string, OwnRetries>;
+  /** Every user's imports from other apps' backups. */
+  imports: MockImport[];
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -161,6 +164,7 @@ export function createDb(scenario: Scenario = "ready"): MockDb {
     readerSettings: {},
     preferences: {},
     libraryViews: [],
+    imports: [],
     appeared: {},
     storages: initialStorages(),
     ...initialNetwork(),

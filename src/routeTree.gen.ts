@@ -41,6 +41,7 @@ import { Route as AppAdminUsersIndexRouteImport } from './routes/_app/admin/user
 import { Route as AppAdminUsersUserIdRouteImport } from './routes/_app/admin/users/$userId'
 import { Route as AppBrowseSourcesIndexRouteImport } from './routes/_app/browse/sources/index'
 import { Route as AppBrowseSourcesSplatRouteImport } from './routes/_app/browse/sources/$'
+import { Route as AppSettingsImportsImportIdRouteImport } from './routes/_app/settings_.imports.$importId'
 import { Route as AppAdminJobsJobIdIndexRouteImport } from './routes/_app/admin/jobs/$jobId/index'
 import { Route as AppAdminSourcesSourceIdIndexRouteImport } from './routes/_app/admin/sources/$sourceId/index'
 import { Route as AppAdminSourcesSourceIdSeriesRouteImport } from './routes/_app/admin/sources/$sourceId/series'
@@ -204,6 +205,12 @@ const AppBrowseSourcesSplatRoute = AppBrowseSourcesSplatRouteImport.update({
   path: '/browse/sources/$',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsImportsImportIdRoute =
+  AppSettingsImportsImportIdRouteImport.update({
+    id: '/settings_/imports/$importId',
+    path: '/settings/imports/$importId',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppAdminJobsJobIdIndexRoute = AppAdminJobsJobIdIndexRouteImport.update({
   id: '/jobs/$jobId/',
   path: '/jobs/$jobId/',
@@ -254,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/admin/users/$userId': typeof AppAdminUsersUserIdRoute
   '/browse/sources/$': typeof AppBrowseSourcesSplatRoute
+  '/settings/imports/$importId': typeof AppSettingsImportsImportIdRoute
   '/admin/jobs/': typeof AppAdminJobsIndexRoute
   '/admin/plugins/': typeof AppAdminPluginsIndexRoute
   '/admin/sources/': typeof AppAdminSourcesIndexRoute
@@ -289,6 +297,7 @@ export interface FileRoutesByTo {
   '/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/admin/users/$userId': typeof AppAdminUsersUserIdRoute
   '/browse/sources/$': typeof AppBrowseSourcesSplatRoute
+  '/settings/imports/$importId': typeof AppSettingsImportsImportIdRoute
   '/admin/jobs': typeof AppAdminJobsIndexRoute
   '/admin/plugins': typeof AppAdminPluginsIndexRoute
   '/admin/sources': typeof AppAdminSourcesIndexRoute
@@ -328,6 +337,7 @@ export interface FileRoutesById {
   '/_app/admin/plugins/$pluginId': typeof AppAdminPluginsPluginIdRoute
   '/_app/admin/users/$userId': typeof AppAdminUsersUserIdRoute
   '/_app/browse/sources/$': typeof AppBrowseSourcesSplatRoute
+  '/_app/settings_/imports/$importId': typeof AppSettingsImportsImportIdRoute
   '/_app/admin/jobs/': typeof AppAdminJobsIndexRoute
   '/_app/admin/plugins/': typeof AppAdminPluginsIndexRoute
   '/_app/admin/sources/': typeof AppAdminSourcesIndexRoute
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/admin/plugins/$pluginId'
     | '/admin/users/$userId'
     | '/browse/sources/$'
+    | '/settings/imports/$importId'
     | '/admin/jobs/'
     | '/admin/plugins/'
     | '/admin/sources/'
@@ -401,6 +412,7 @@ export interface FileRouteTypes {
     | '/admin/plugins/$pluginId'
     | '/admin/users/$userId'
     | '/browse/sources/$'
+    | '/settings/imports/$importId'
     | '/admin/jobs'
     | '/admin/plugins'
     | '/admin/sources'
@@ -439,6 +451,7 @@ export interface FileRouteTypes {
     | '/_app/admin/plugins/$pluginId'
     | '/_app/admin/users/$userId'
     | '/_app/browse/sources/$'
+    | '/_app/settings_/imports/$importId'
     | '/_app/admin/jobs/'
     | '/_app/admin/plugins/'
     | '/_app/admin/sources/'
@@ -684,6 +697,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBrowseSourcesSplatRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings_/imports/$importId': {
+      id: '/_app/settings_/imports/$importId'
+      path: '/settings/imports/$importId'
+      fullPath: '/settings/imports/$importId'
+      preLoaderRoute: typeof AppSettingsImportsImportIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/jobs/$jobId/': {
       id: '/_app/admin/jobs/$jobId/'
       path: '/jobs/$jobId'
@@ -773,6 +793,7 @@ interface AppRouteChildren {
   AppWorksWorkIdRoute: typeof AppWorksWorkIdRoute
   AppBrowseIndexRoute: typeof AppBrowseIndexRoute
   AppBrowseSourcesSplatRoute: typeof AppBrowseSourcesSplatRoute
+  AppSettingsImportsImportIdRoute: typeof AppSettingsImportsImportIdRoute
   AppBrowseSourcesIndexRoute: typeof AppBrowseSourcesIndexRoute
 }
 
@@ -788,6 +809,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppWorksWorkIdRoute: AppWorksWorkIdRoute,
   AppBrowseIndexRoute: AppBrowseIndexRoute,
   AppBrowseSourcesSplatRoute: AppBrowseSourcesSplatRoute,
+  AppSettingsImportsImportIdRoute: AppSettingsImportsImportIdRoute,
   AppBrowseSourcesIndexRoute: AppBrowseSourcesIndexRoute,
 }
 

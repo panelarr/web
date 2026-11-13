@@ -11,6 +11,7 @@ import { downloadItem, queueDownload } from "./downloads";
 import { initialDuplicates, judgeTest } from "./duplicates";
 import { emit, onMockEvent } from "./events";
 import { packageKey, packageRetries, sourceKey, sourceRetries, validDelays } from "./image-retries";
+import { importOperations } from "./imports";
 import { finishRun, type JobStore, queueState, startRun, taskEvent } from "./jobs";
 import { libraryViewOperations } from "./library-views";
 import {
@@ -2727,6 +2728,7 @@ export const operations: MockOperation[] = [
   }),
 
   ...libraryViewOperations(requireUser),
+  ...importOperations(requireUser),
 ];
 
 // Jobs: the same model for the server's, meta's and plugins' (contracts/jobs.md).

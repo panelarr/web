@@ -10,6 +10,8 @@ export type PluginEvent = S["PluginEvent"];
 export type TaskEvent = S["TaskEvent"];
 export type WorkEvent = S["WorkEvent"];
 export type LibraryViewsEvent = S["LibraryViewsEvent"];
+export type ImportProgressEvent = S["ImportProgressEvent"];
+export type ImportFinishedEvent = S["ImportFinishedEvent"];
 
 export interface EventMap {
   "job.started": JobEvent;
@@ -28,6 +30,8 @@ export interface EventMap {
   "progress.synced": WorkEvent;
   "bookmarks.changed": WorkEvent;
   "library_views.changed": LibraryViewsEvent;
+  "import.progress": ImportProgressEvent;
+  "import.finished": ImportFinishedEvent;
 }
 
 export type EventType = keyof EventMap;

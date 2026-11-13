@@ -4,6 +4,7 @@ import { setupWorker } from "msw/browser";
 import { commit, db, loadBrowserDb } from "./db";
 import { tickDownloads } from "./downloads";
 import { createEventsHandler, operations } from "./handlers";
+import { tickImports } from "./imports";
 import { tickJobs } from "./jobs";
 import { tickMetaSyncs } from "./meta";
 import { isDraft } from "./op";
@@ -29,7 +30,8 @@ export async function startMockWorker(mode: "all" | "drafts"): Promise<void> {
       const downloads = tickDownloads(db());
       const packages = tickPackages(db());
       const syncs = tickMetaSyncs(db());
-      if (jobs || matching || downloads || packages || syncs) commit();
+      const imports = tickImports(db());
+      if (jobs || matching || downloads || packages || syncs || imports) commit();
     }, 1_000);
   }
   await worker.start({
