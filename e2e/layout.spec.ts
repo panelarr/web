@@ -177,7 +177,7 @@ test("fields side by side line up, and tab strips only scroll sideways", async (
   await check(page, "run job", found);
   await page.keyboard.press("Escape");
 
-  for (const tab of ["profile", "security", "api-keys", "appearance"]) {
+  for (const tab of ["profile", "security", "api-keys", "appearance", "import"]) {
     await open(`/settings?tab=${tab}`);
     await check(page, `settings ${tab}`, found);
   }

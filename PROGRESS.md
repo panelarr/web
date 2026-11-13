@@ -91,6 +91,11 @@ Everything in the metadata service's and source plugins' own admin pages, inside
 - [x] **W2. Views on the library:** the heading names the view and opens the list (a menu on desktops, a sheet from the bottom on phones); `?view=<id>` (pushed when switching; `/` is the default view); someone else's or a missing view falls back to the default with a notice; old `?only=` links are dropped; the first visit makes "Library" from the remembered sort and display, only once they loaded (another device doing the same at once is fine); the sheet edits the active view and saves after a short pause; Reset view; an empty view's own state, with "Show everything" for now (not saved).
 - [x] **W3. New view and Edit views:** create from this view or everything (then set it up in the sheet); rename in place, reorder by dragging or with up and down, make default, duplicate, delete with a confirmation; the only view can't be deleted (`docs/library.md`).
 
+## Import from Suwayomi or Mihon (FEAT-0017)
+
+- [x] **W1. Upload and preview:** the server's imports API (spec synced); Settings → Import with how to make a backup, an upload area (picked or dropped) that says what went wrong (not a backup, too large, an import already running with a link to it, the server busy with a countdown to Try again) and the user's imports; an import's page with matching followed live from events (reload-safe), the totals, package hints (admins get a link to the package in Extensions, others are told to ask an admin), the categories note, tabs by outcome in the URL with each series' source and chapters read a page at a time, and delete (`docs/imports.md`). The mock server matches a made-up backup.
+- [ ] **W2. Apply, report and resolve:** apply with progress, the report, choosing an entry for series that need one, cancel.
+
 ## Working assumptions
 
 Settled for now, cheap to change:

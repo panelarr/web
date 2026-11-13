@@ -8,12 +8,14 @@ import { ApiKeysCard } from "@/features/account/api-keys-card";
 import { AppearanceCard } from "@/features/account/appearance-card";
 import { ProfileCard } from "@/features/account/profile-card";
 import { PasswordCard, SessionsCard } from "@/features/account/security-cards";
+import { ImportsCard } from "@/features/imports/imports-card";
 
 const TABS = [
   { id: "profile", label: "Profile" },
   { id: "security", label: "Security" },
   { id: "api-keys", label: "API keys" },
   { id: "appearance", label: "Appearance" },
+  { id: "import", label: "Import" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -53,6 +55,9 @@ function SettingsPage() {
         </TabsContent>
         <TabsContent value="appearance" className="mt-4">
           <AppearanceCard />
+        </TabsContent>
+        <TabsContent value="import" className="mt-4">
+          <ImportsCard />
         </TabsContent>
       </Tabs>
     </>

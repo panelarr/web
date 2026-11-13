@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { Query, QueryClient } from "@tanstack/react-query";
-import type { EventMap, EventType, PluginEvent, TaskEvent } from "./event-types";
+import type { EventMap, EventType, ImportProgressEvent, PluginEvent, TaskEvent } from "./event-types";
 
 /**
  * Which cached queries each server event makes stale: API path prefixes (the second part of
@@ -21,6 +21,8 @@ export const INVALIDATIONS: Partial<Record<EventType, readonly string[]>> = {
   "progress.synced": ["/works", "/me/history", "/chapters"],
   "bookmarks.changed": ["/works", "/library"],
   "library_views.changed": ["/me/library-views"],
+  // The import, its series and the list: outcomes and package hints are known now.
+  "import.finished": ["/me/imports"],
 };
 
 /**
@@ -67,6 +69,17 @@ export const PATCHES: Partial<Record<EventType, (client: QueryClient, data: neve
         ),
     );
   },
+  // An import's progress moves on in place; its outcomes come with `import.finished`.
+  "import.progress": (client, event: ImportProgressEvent) => {
+    const patch = <T extends ImportLike>(item: T): T =>
+      item.id === event.import_id ? { ...item, progress: { done: event.done, total: event.total } } : item;
+    client.setQueriesData<ImportLike>({ predicate: (q) => keyPath(q) === "/me/imports/{id}" }, (old) =>
+      old ? patch(old) : old,
+    );
+    client.setQueriesData<{ imports?: ImportLike[] }>({ predicate: (q) => keyPath(q) === "/me/imports" }, (old) =>
+      old?.imports ? { ...old, imports: old.imports.map(patch) } : old,
+    );
+  },
   // The health shows at once; the refetch (TARGETED) brings the rest.
   "plugin.health": (client, event: PluginEvent) => {
     const patch = (plugin: PluginHealth): PluginHealth => {
@@ -91,6 +104,10 @@ interface PluginHealth {
   id: string;
   health: string;
   health_message?: string;
+}
+interface ImportLike {
+  id: string;
+  progress: { done: number; total: number };
 }
 interface DownloadPage {
   items?: Array<{ task: { id: string } }>;

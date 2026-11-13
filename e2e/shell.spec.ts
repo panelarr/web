@@ -33,6 +33,7 @@ test("never scrolls sideways", async ({ page }) => {
     "/downloads",
     "/settings",
     "/settings?tab=security",
+    "/settings?tab=import",
     "/history",
     "/updates",
     "/more",

@@ -16,6 +16,7 @@ const PAGES = [
   "/downloads",
   "/settings?tab=appearance",
   "/settings?tab=api-keys",
+  "/settings?tab=import",
   "/admin/users",
   "/admin/plugins/example",
   "/admin/sources",
