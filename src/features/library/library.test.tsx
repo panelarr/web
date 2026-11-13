@@ -367,6 +367,99 @@ describe("a view's filters, sort and display", () => {
     }
   });
 
+  describe("by content rating", () => {
+    /** Adds an erotic (Ninth Floor Detectives), an unrated (A Quiet Spell) and a pornographic work (Hollow Crown Academy). */
+    const addRated = () => {
+      for (const id of ["ent_1005", "ent_1006", "ent_1011"]) addToLibrary(ctx.user, id);
+    };
+    const ratingGroup = (sheet: HTMLElement) => within(sheet).getByRole("group", { name: "Content rating" });
+    /** The checkboxes' labels, in order. */
+    const offered = (group: HTMLElement) =>
+      within(group)
+        .getAllByRole("checkbox")
+        .map((box) => document.querySelector(`label[for="${box.id}"]`)?.textContent);
+
+    it("offers every rating in order with counts, hides 18+ from the default view's hint, and keeps only 18+", async () => {
+      addRated();
+      seedViews({ name: "Library" });
+      await renderApp("/");
+      await screen.findByText("6 works");
+      const sheet = await openSheet();
+      const group = ratingGroup(sheet);
+      expect(offered(group)).toEqual(["Safe (3)", "Suggestive (0)", "Erotic (1)", "Pornographic (1)", "Unrated (1)"]);
+      // The hint, on the default view without a rating filter.
+      expect(within(sheet).getByText(/^Tip: hide 18\+ here/)).toBeInTheDocument();
+      const hint = within(sheet)
+        .getAllByRole("button", { name: "Hide 18+" })
+        .find((b) => !group.contains(b));
+      if (!hint) throw new Error("no hint");
+      await userEvent.click(hint);
+      await waitFor(() =>
+        expect(savedView("Library")?.definition.content_ratings).toEqual(["safe", "suggestive", "unknown"]),
+      );
+      expect(within(sheet).queryByText(/^Tip: hide 18\+ here/)).not.toBeInTheDocument();
+      expect(within(group).getByRole("button", { name: "Hide 18+" })).toHaveAttribute("aria-pressed", "true");
+      expect(within(group).getByRole("checkbox", { name: "Unrated (1)" })).toBeChecked();
+      expect(within(group).getByRole("checkbox", { name: "Erotic (1)" })).not.toBeChecked();
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(titles()).toEqual(["A Quiet Spell", "Iron Garden", "Moonlit Bakery", "The Lantern Keeper"]),
+      );
+      expect(screen.getByRole("button", { name: "Filter, sort and display (1 filters on)" })).toBeInTheDocument();
+
+      // Only 18+, then one ticked off by hand.
+      const again = ratingGroup(await openSheet());
+      await userEvent.click(within(again).getByRole("button", { name: "Only 18+" }));
+      await waitFor(() => expect(savedView("Library")?.definition.content_ratings).toEqual(["erotic", "pornographic"]));
+      await userEvent.click(within(again).getByRole("checkbox", { name: "Erotic (1)" }));
+      await waitFor(() => expect(savedView("Library")?.definition.content_ratings).toEqual(["pornographic"]));
+      expect(within(again).getByRole("button", { name: "Only 18+" })).toHaveAttribute("aria-pressed", "false");
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(titles()).toEqual(["Hollow Crown Academy"]));
+    });
+
+    it("gives no hint on a view that isn't the default", async () => {
+      addRated();
+      seedViews({ name: "Library" }, { name: "Other" });
+      const other = savedView("Other");
+      await renderApp(`/?view=${other?.id}`);
+      await screen.findByText("6 works");
+      const sheet = await openSheet();
+      expect(within(ratingGroup(sheet)).getByRole("button", { name: "Hide 18+" })).toBeInTheDocument();
+      expect(within(sheet).queryByText(/^Tip:/)).not.toBeInTheDocument();
+    });
+
+    it("offers only what the ceiling allows, without the 18+ picks, and a held rating above it to take off", async () => {
+      addRated();
+      ctx.user.role = "user";
+      ctx.user.grants.content_rating_ceiling = "suggestive";
+      seedViews({ name: "Library", definition: { content_ratings: ["pornographic", "unknown"] } });
+      await renderApp("/");
+      await screen.findByText("1 of 4");
+      const sheet = await openSheet();
+      const group = ratingGroup(sheet);
+      expect(offered(group)).toEqual(["Safe (3)", "Suggestive (0)", "Pornographic (0)", "Unrated (1)"]);
+      expect(within(group).queryByRole("button")).not.toBeInTheDocument();
+      expect(within(sheet).queryByText(/^Tip:/)).not.toBeInTheDocument();
+      expect(within(group).queryByText(/18\+/)).not.toBeInTheDocument();
+      await userEvent.click(within(group).getByRole("checkbox", { name: "Pornographic (0)" }));
+      await waitFor(() => expect(savedView("Library")?.definition.content_ratings).toEqual(["unknown"]));
+      expect(within(group).queryByRole("checkbox", { name: /^Pornographic/ })).not.toBeInTheDocument();
+    });
+
+    it("are left out by Show everything, and cleared by Reset view", async () => {
+      seedViews({ name: "Grown-up", definition: { content_ratings: ["erotic", "pornographic"] } });
+      await renderApp("/");
+      expect(await screen.findByText("Nothing in this view")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Show everything" }));
+      await waitFor(() => expect(titles()).toHaveLength(3));
+      expect(savedView("Grown-up")?.definition.content_ratings).toEqual(["erotic", "pornographic"]);
+      const sheet = await openSheet();
+      await userEvent.click(within(sheet).getByRole("button", { name: "Reset view" }));
+      await waitFor(() => expect(savedView("Grown-up")?.definition).not.toHaveProperty("content_ratings"));
+    });
+  });
+
   it("is put back to the defaults by Reset view", async () => {
     seedViews({ name: "Library", definition: { filters: { started: "include" }, sort: "unread", reverse: true } });
     await renderApp("/");

@@ -31,12 +31,22 @@ function invalid(field: string, message: string) {
 const FILTER_KEYS = ["unread", "started", "downloaded", "bookmarked", "new"];
 const SORTS = ["title", "added", "read", "latest", "updated", "unread", "total"];
 const LAYOUTS = ["compact", "comfortable", "list"];
+const RATINGS = ["safe", "suggestive", "erotic", "pornographic", "unknown"];
 
 /** What's wrong with a definition, as the server says it; undefined when it's fine. */
 export function definitionProblem(raw: unknown): [string, string] | undefined {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return ["definition", "required"];
   const d = raw as Record<string, unknown>;
-  const allowed = ["filters", "types", "statuses", "updated_within_days", "sort", "reverse", "display"];
+  const allowed = [
+    "filters",
+    "types",
+    "statuses",
+    "content_ratings",
+    "updated_within_days",
+    "sort",
+    "reverse",
+    "display",
+  ];
   const unknownKey = Object.keys(d).find((k) => !allowed.includes(k));
   if (unknownKey) return ["definition", `unknown field "${unknownKey}"`];
   if (d.filters !== undefined) {
@@ -54,6 +64,16 @@ export function definitionProblem(raw: unknown): [string, string] | undefined {
     if (values.some((v) => typeof v !== "string" || v.length < 1 || v.length > 40)) {
       return [`definition.${field}`, "each value must be 1 to 40 characters"];
     }
+  }
+  const ratings = d.content_ratings;
+  if (ratings !== undefined) {
+    if (!Array.isArray(ratings) || ratings.length > RATINGS.length) {
+      return ["definition.content_ratings", `at most ${RATINGS.length} values`];
+    }
+    if (ratings.some((v) => !RATINGS.includes(v))) {
+      return ["definition.content_ratings", `each value must be one of ${RATINGS.join(", ")}`];
+    }
+    if (new Set(ratings).size !== ratings.length) return ["definition.content_ratings", "values must be unique"];
   }
   const days = d.updated_within_days;
   if (days !== undefined && (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > 365)) {

@@ -47,6 +47,9 @@ const GENRES = [
   "Sports",
 ];
 const RATINGS: S["EntryContentRating"][] = ["safe", "safe", "safe", "suggestive", "safe", "erotic"];
+/** Mostly the cycle; one unrated and one pornographic work, where a "suggestive" user sees the same as before. */
+const rating = (i: number): S["EntryContentRating"] =>
+  i === 6 ? "unknown" : i === 11 ? "pornographic" : pick(RATINGS, i);
 const PEOPLE = ["Aoi Hoshino", "Ren Tachibana", "Mika Sorano", "Jun Kiriyama", "Sora Amane", "Kai Morioka"];
 
 export const ATTRIBUTION: S["Attribution"] = {
@@ -75,7 +78,7 @@ export const CATALOG: S["CatalogEntry"][] = TITLES.map(([en, romanized, native],
     title: en,
     type,
     status,
-    content_rating: pick(RATINGS, i),
+    content_rating: rating(i),
     original_language:
       type === "manhwa" || type === "webtoon" ? "ko" : type === "manhua" ? "zh" : type === "comic" ? "en" : "ja",
     year,

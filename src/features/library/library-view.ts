@@ -31,6 +31,28 @@ export type FilterMode = "include" | "exclude";
 
 export type Layout = "compact" | "comfortable" | "list";
 
+/** A work's content rating, from its metadata (`unknown`: the metadata has none). */
+export type Rating = components["schemas"]["EntryContentRating"];
+/** The user's ceiling: the strongest rating they may see. */
+export type Ceiling = components["schemas"]["ContentRating"];
+
+/** The content ratings, mildest first, then works without one. */
+export const RATINGS = {
+  safe: "Safe",
+  suggestive: "Suggestive",
+  erotic: "Erotic",
+  pornographic: "Pornographic",
+  unknown: "Unrated",
+} as const satisfies Record<Rating, string>;
+
+/** 18+ is erotic and pornographic; suggestive isn't. */
+export const ADULT: readonly Rating[] = ["erotic", "pornographic"];
+/** "Hide 18+": every rating but those, unrated works included. */
+export const NOT_ADULT: readonly Rating[] = ["safe", "suggestive", "unknown"];
+
+/** Whether a user with this ceiling may see 18+ works at all. */
+export const seesAdult = (ceiling: Ceiling) => ceiling === "erotic" || ceiling === "pornographic";
+
 /** The "updated within" choices offered, in days. */
 export const UPDATED_WITHIN = [1, 3, 7, 14, 30, 90] as const;
 
@@ -45,6 +67,8 @@ export interface LibraryView {
   types: readonly string[];
   /** Only works with these publication statuses (empty: any). */
   statuses: readonly string[];
+  /** Only works with these content ratings (empty: any). */
+  contentRatings: readonly Rating[];
   /** Only works with a new chapter found within this many days. */
   updatedWithinDays?: number | undefined;
   sort: Sort;
@@ -60,6 +84,7 @@ export const DEFAULT_VIEW: LibraryView = {
   filters: {},
   types: [],
   statuses: [],
+  contentRatings: [],
   sort: "title",
   reverse: false,
   layout: "comfortable",
@@ -75,6 +100,12 @@ const isMode = (value: unknown): value is FilterMode => value === "include" || v
 const flag = (value: unknown, fallback: boolean) => (typeof value === "boolean" ? value : fallback);
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((v): v is string => typeof v === "string" && v !== "") : [];
+const isRating = (value: unknown): value is Rating => typeof value === "string" && Object.hasOwn(RATINGS, value);
+/** The ratings a definition holds that the app knows, once each, in the fixed order. */
+const ratings = (value: unknown): Rating[] => {
+  const held = Array.isArray(value) ? value.filter(isRating) : [];
+  return (Object.keys(RATINGS) as Rating[]).filter((r) => held.includes(r));
+};
 
 /** A saved definition as the app shows it: anything missing or unknown takes the default. */
 export function fromDefinition(definition: ViewDefinition | undefined): LibraryView {
@@ -89,6 +120,7 @@ export function fromDefinition(definition: ViewDefinition | undefined): LibraryV
     filters,
     types: strings(d.types),
     statuses: strings(d.statuses),
+    contentRatings: ratings(d.content_ratings),
     ...(typeof days === "number" && days >= 1 ? { updatedWithinDays: days } : {}),
     sort: isSort(d.sort) ? d.sort : DEFAULT_VIEW.sort,
     reverse: flag(d.reverse, DEFAULT_VIEW.reverse),
@@ -108,6 +140,7 @@ export function toDefinition(view: LibraryView): ViewDefinition {
     ...(Object.keys(filters).length > 0 ? { filters } : {}),
     ...(view.types.length > 0 ? { types: [...view.types] } : {}),
     ...(view.statuses.length > 0 ? { statuses: [...view.statuses] } : {}),
+    ...(view.contentRatings.length > 0 ? { content_ratings: [...view.contentRatings] } : {}),
     ...(view.updatedWithinDays ? { updated_within_days: view.updatedWithinDays } : {}),
     sort: view.sort,
     reverse: view.reverse,
@@ -120,12 +153,13 @@ export function toDefinition(view: LibraryView): ViewDefinition {
   };
 }
 
-/** How many of the view's filters narrow the library (filters, types, statuses, updated within). */
+/** How many of the view's filters narrow the library (filters, types, statuses, ratings, updated within). */
 export function activeFilters(view: LibraryView): number {
   return (
     Object.keys(view.filters).length +
     (view.types.length > 0 ? 1 : 0) +
     (view.statuses.length > 0 ? 1 : 0) +
+    (view.contentRatings.length > 0 ? 1 : 0) +
     (view.updatedWithinDays ? 1 : 0)
   );
 }
@@ -133,7 +167,7 @@ export function activeFilters(view: LibraryView): number {
 /** The view with nothing filtered out (its sort and display kept). */
 export function withoutFilters(view: LibraryView): LibraryView {
   const { updatedWithinDays: _, ...rest } = view;
-  return { ...rest, filters: {}, types: [], statuses: [] };
+  return { ...rest, filters: {}, types: [], statuses: [], contentRatings: [] };
 }
 
 const MATCHES: Record<Filter, (entry: LibraryEntry) => boolean> = {
@@ -143,6 +177,9 @@ const MATCHES: Record<Filter, (entry: LibraryEntry) => boolean> = {
   bookmarked: (e) => e.bookmarks > 0,
   new: (e) => e.new_chapters > 0,
 };
+
+/** An entry's rating is its work's (the metadata's); none counts as unrated. */
+const ratingOf = (entry: LibraryEntry): Rating => entry.work.content_rating ?? "unknown";
 
 const DAY_MS = 86_400_000;
 
@@ -180,6 +217,7 @@ export function matchesView(entry: LibraryEntry, view: LibraryView, now: number 
   }
   if (view.types.length > 0 && !view.types.includes(entry.work.type ?? "")) return false;
   if (view.statuses.length > 0 && !view.statuses.includes(entry.work.status ?? "")) return false;
+  if (view.contentRatings.length > 0 && !view.contentRatings.includes(ratingOf(entry))) return false;
   if (view.updatedWithinDays) {
     const at = entry.last_updated_at ? Date.parse(entry.last_updated_at) : Number.NaN;
     if (!(at >= now - view.updatedWithinDays * DAY_MS)) return false;
@@ -226,4 +264,21 @@ export function valuesIn(
   return [...counts]
     .map(([value, count]) => ({ value, count }))
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+}
+
+/**
+ * The content ratings the sheet offers, mildest first, with how many works have each: those up
+ * to the user's ceiling, then unrated. One a view still holds above the ceiling (it was lowered
+ * since) is listed too, so it can be taken off.
+ */
+export function ratingCounts(
+  entries: readonly LibraryEntry[],
+  ceiling: Ceiling,
+  chosen: readonly Rating[] = [],
+): Array<{ value: Rating; count: number }> {
+  const order = Object.keys(RATINGS) as Rating[];
+  const limit = order.indexOf(ceiling);
+  return order
+    .filter((rating, i) => rating === "unknown" || i <= limit || chosen.includes(rating))
+    .map((value) => ({ value, count: entries.filter((entry) => ratingOf(entry) === value).length }));
 }

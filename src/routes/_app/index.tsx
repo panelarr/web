@@ -5,6 +5,7 @@ import { ArrowLeft, Info, LibraryBig, ListFilter, Search, X } from "lucide-react
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { errorMessage, isApiError } from "@/api/errors";
+import { useMe } from "@/auth/session";
 import { HeaderSearch } from "@/components/header-search";
 import { EmptyState, ErrorAlert, Loading } from "@/components/states";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,9 @@ function LibraryPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const library = useLibrary();
   const views = useLibraryViews();
+  const { user } = useMe();
+  // Admins see every rating, whatever their grant says.
+  const ceiling = user.role === "admin" ? "pornographic" : user.grants.content_rating_ceiling;
   // Read only: the old preference is left as it was, so an older app still finds it.
   const remembered = usePreference("library", parseRemembered);
   const [sheet, setSheet] = useState(false);
@@ -313,6 +317,8 @@ function LibraryPage() {
           name={active.name}
           view={view}
           entries={all}
+          ceiling={ceiling}
+          isDefault={active.default}
           onChange={change}
           onReset={() => views.edit(active.id, toDefinition(DEFAULT_VIEW))}
         />

@@ -13,14 +13,21 @@ import type { LibraryEntry } from "@/features/catalog/library-index";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import {
+  ADULT,
+  type Ceiling,
   FILTERS,
   type Filter,
   type FilterMode,
   filterCounts,
   type Layout,
   type LibraryView,
+  NOT_ADULT,
+  RATINGS,
+  type Rating,
+  ratingCounts,
   SORTS,
   type Sort,
+  seesAdult,
   UPDATED_WITHIN,
   valuesIn,
 } from "./library-view";
@@ -39,6 +46,8 @@ export function LibrarySheet({
   name,
   view,
   entries,
+  ceiling,
+  isDefault,
   onChange,
   onReset,
 }: {
@@ -49,6 +58,10 @@ export function LibrarySheet({
   view: LibraryView;
   /** The whole library, for the counts and the types and statuses in it. */
   entries: readonly LibraryEntry[];
+  /** The strongest content rating the user may see (the server already left out the rest). */
+  ceiling: Ceiling;
+  /** Whether this is the user's default view (it gets the hint to keep 18+ works apart). */
+  isDefault: boolean;
   onChange: (change: Partial<LibraryView>) => void;
   /** Puts the view back to the defaults; undefined when it can't be (nothing saved yet). */
   onReset?: (() => void) | undefined;
@@ -57,6 +70,13 @@ export function LibrarySheet({
   const counts = useMemo(() => filterCounts(entries), [entries]);
   const types = useMemo(() => valuesIn(entries, "type", view.types), [entries, view.types]);
   const statuses = useMemo(() => valuesIn(entries, "status", view.statuses), [entries, view.statuses]);
+  const ratings = useMemo(
+    () => ratingCounts(entries, ceiling, view.contentRatings),
+    [entries, ceiling, view.contentRatings],
+  );
+  const adult = seesAdult(ceiling);
+  const adultHere = ratings.some(({ value, count }) => ADULT.includes(value) && count > 0);
+  const hint = isDefault && adult && adultHere && view.contentRatings.length === 0;
   const cycle = (filter: Filter) => {
     const next = NEXT_MODE[view.filters[filter] ?? "off"];
     const { [filter]: _, ...rest } = view.filters;
@@ -82,6 +102,14 @@ export function LibrarySheet({
           </TabsList>
           <div className="overflow-y-auto px-4 py-4">
             <TabsContent value="filter" className="grid gap-5">
+              {hint ? (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <p className="min-w-0 flex-1">Tip: hide 18+ here and keep a separate view for it.</p>
+                  <Button variant="outline" size="sm" onClick={() => onChange({ contentRatings: NOT_ADULT })}>
+                    Hide 18+
+                  </Button>
+                </div>
+              ) : null}
               <fieldset className="grid gap-3">
                 <legend className="mb-1 text-sm font-medium">Works that are</legend>
                 {(Object.keys(FILTERS) as Filter[]).map((filter) => (
@@ -120,6 +148,37 @@ export function LibrarySheet({
                   ))}
                 </fieldset>
               ) : null}
+              <fieldset className="grid gap-3">
+                <legend className="mb-1 text-sm font-medium">Content rating</legend>
+                {adult ? (
+                  <div className="flex flex-wrap gap-2">
+                    <QuickPick
+                      label="Hide 18+"
+                      ratings={NOT_ADULT}
+                      chosen={view.contentRatings}
+                      onPick={(contentRatings) => onChange({ contentRatings })}
+                    />
+                    <QuickPick
+                      label="Only 18+"
+                      ratings={ADULT}
+                      chosen={view.contentRatings}
+                      onPick={(contentRatings) => onChange({ contentRatings })}
+                    />
+                  </div>
+                ) : null}
+                {ratings.map(({ value, count }) => (
+                  <Check
+                    key={value}
+                    label={`${RATINGS[value]} (${count})`}
+                    checked={view.contentRatings.includes(value)}
+                    onChange={(on) => onChange({ contentRatings: toggleRating(view.contentRatings, value, on) })}
+                  />
+                ))}
+                <p className="text-xs text-muted-foreground">
+                  Shows only works with the ticked ratings.{adult ? " Erotic and Pornographic are 18+." : ""} Unrated
+                  works have no rating in the metadata.
+                </p>
+              </fieldset>
               <UpdatedWithin
                 days={view.updatedWithinDays}
                 onChange={(updatedWithinDays) => onChange({ updatedWithinDays })}
@@ -205,6 +264,40 @@ export function LibrarySheet({
         </Tabs>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Ratings toggled, kept in the fixed mild-to-strong order. */
+function toggleRating(list: readonly Rating[], value: Rating, on: boolean): Rating[] {
+  return (Object.keys(RATINGS) as Rating[]).filter((r) => (r === value ? on : list.includes(r)));
+}
+
+const sameRatings = (a: readonly Rating[], b: readonly Rating[]) =>
+  a.length === b.length && a.every((r) => b.includes(r));
+
+/** Sets the ratings to a preset; pressed while the view holds exactly those, and pressing it then clears them. */
+function QuickPick({
+  label,
+  ratings,
+  chosen,
+  onPick,
+}: {
+  label: string;
+  ratings: readonly Rating[];
+  chosen: readonly Rating[];
+  onPick: (ratings: readonly Rating[]) => void;
+}) {
+  const pressed = sameRatings(ratings, chosen);
+  return (
+    <Button
+      variant={pressed ? "secondary" : "outline"}
+      size="sm"
+      aria-pressed={pressed}
+      className={cn(pressed && "text-primary")}
+      onClick={() => onPick(pressed ? [] : ratings)}
+    >
+      {label}
+    </Button>
   );
 }
 
