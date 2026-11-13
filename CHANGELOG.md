@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.1.1](https://github.com/panelarr/web/compare/v0.1.0...v0.1.1) (2026-11-13)
+
+
+### Features
+
+* **admin:** Health in place of System, and Updates for extensions ([#11](https://github.com/panelarr/web/issues/11)) ([8f82c0b](https://github.com/panelarr/web/commit/8f82c0b4ce5ac5fb28248efd994ef6404dc08b0c))
+* **auth:** explain single sign-on starts the server refuses ([ed9e169](https://github.com/panelarr/web/commit/ed9e16980ab4cf1d517afb8879e089552f78fc9f))
+* **auth:** explain single sign-on starts the server refuses ([0628ed2](https://github.com/panelarr/web/commit/0628ed2ba8e5eaf83c6a854ca56a810a1bef2e90))
+* **auth:** sign in, link logins and accept invites with single sign-on ([77be191](https://github.com/panelarr/web/commit/77be19130699121402db94d3c94f49b34f77d418))
+* **auth:** sign in, link logins and accept invites with single sign-on ([87f3664](https://github.com/panelarr/web/commit/87f3664a97260d60298b17543cfe083d11f4d1ad))
+* **imports:** apply, progress, report and choosing a series' work ([9c993d4](https://github.com/panelarr/web/commit/9c993d41abc8fe866acf764511710237ffc36013))
+* **imports:** apply, progress, report and choosing a series' work ([65c833c](https://github.com/panelarr/web/commit/65c833c48f843750001e044e58a2924aa5b287a6))
+* **imports:** Settings → Import, upload and preview ([f3b56af](https://github.com/panelarr/web/commit/f3b56af8c6a96e13b59f6abcfbf894f373f94e83))
+* **imports:** Settings → Import, upload and preview ([5e2773b](https://github.com/panelarr/web/commit/5e2773b8d94fe4756d906b8731b69fd4c3e24a46))
+* **library:** content-rating filter in views ([3d292fd](https://github.com/panelarr/web/commit/3d292fd58deb5bb0c7285b0d17d744da6a13b836))
+* **library:** content-rating filter in views ([5a02632](https://github.com/panelarr/web/commit/5a026329c1560b9eef637a9569f61e47f48143a9))
+* **library:** saved library views ([#12](https://github.com/panelarr/web/issues/12)) ([40f3aa6](https://github.com/panelarr/web/commit/40f3aa69d36ddea71af43ab10f24cfa235914bcd))
+* search clear button, extension order, description on the series page ([#10](https://github.com/panelarr/web/issues/10)) ([a502fe1](https://github.com/panelarr/web/commit/a502fe14dffe19ecd135c42b3258b973c77303f0))
+
+
+### Bug Fixes
+
+* **covers:** a cover starts over when its row shows another series ([#8](https://github.com/panelarr/web/issues/8)) ([f928b26](https://github.com/panelarr/web/commit/f928b2652364a6b60e27a5ba4558c8248f89aa04))
+* **deps:** patched fast-uri, serialize-javascript and minimatch ([#6](https://github.com/panelarr/web/issues/6)) ([9c7d627](https://github.com/panelarr/web/commit/9c7d627c994ee147c9d2874fd209b81639febb38))
+* Escape in a dialog clears its search first; no retries without meta; Check now spins only when asked ([#13](https://github.com/panelarr/web/issues/13)) ([7813f9a](https://github.com/panelarr/web/commit/7813f9a8a334ea0e35a0bd4efc2a3a7deb406b5f))
+* leave the reader without stacking it, open added works on Sources, say when an attach fails ([#9](https://github.com/panelarr/web/issues/9)) ([3d324c1](https://github.com/panelarr/web/commit/3d324c1cd5da0cecb5dda904c981b467e2d39914))
+* time-of-day-proof History test; sync spec; flag best-guess attaches ([#14](https://github.com/panelarr/web/issues/14)) ([84e93e2](https://github.com/panelarr/web/commit/84e93e2b52cdc680ee6a6d9efc21ec06a539cac1))
+
 ## 0.1.0 (2026-11-09)
 
 
