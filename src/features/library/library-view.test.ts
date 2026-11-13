@@ -3,12 +3,15 @@
 import { describe, expect, it } from "vitest";
 import type { LibraryEntry } from "@/features/catalog/library-index";
 import {
+  ADULT,
   activeFilters,
   DEFAULT_VIEW,
   type Filter,
   filterCounts,
   fromDefinition,
   type LibraryView,
+  NOT_ADULT,
+  ratingCounts,
   type Sort,
   toDefinition,
   valuesIn,
@@ -21,14 +24,14 @@ const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
 
 let n = 0;
 function entry(title: string, more: Partial<Omit<LibraryEntry, "work">> & Partial<LibraryEntry["work"]> = {}) {
-  const { type, status, ...rest } = more;
+  const { type, status, content_rating, ...rest } = more;
   n += 1;
   return {
     work: {
       id: `w${n}`,
       entry_id: `ent_${n}`,
       title,
-      content_rating: "safe",
+      content_rating: content_rating ?? "safe",
       attached_sources: 1,
       ...(type ? { type } : {}),
       ...(status ? { status } : {}),
@@ -173,13 +176,64 @@ describe("filters", () => {
     expect(show(list, { updatedWithinDays: 1 })).toEqual(["Today"]);
   });
 
+  describe("content ratings", () => {
+    const rated = [
+      entry("Safe", { content_rating: "safe" }),
+      entry("Suggestive", { content_rating: "suggestive" }),
+      entry("Erotic", { content_rating: "erotic" }),
+      entry("Pornographic", { content_rating: "pornographic" }),
+      entry("Unrated", { content_rating: "unknown" }),
+    ];
+    // A work from an older server, without a rating at all.
+    const { content_rating: _, ...bare } = entry("No rating").work;
+    const missing = { ...entry("No rating"), work: bare } as unknown as LibraryEntry;
+
+    it("keeps every work without a rating filter", () => {
+      expect(show([...rated, missing], { contentRatings: [] })).toHaveLength(6);
+    });
+
+    it("hides 18+ and keeps unrated works, or keeps only 18+", () => {
+      expect(show([...rated, missing], { contentRatings: NOT_ADULT })).toEqual([
+        "No rating",
+        "Safe",
+        "Suggestive",
+        "Unrated",
+      ]);
+      expect(show([...rated, missing], { contentRatings: ADULT })).toEqual(["Erotic", "Pornographic"]);
+      expect(show([...rated, missing], { contentRatings: ["unknown"] })).toEqual(["No rating", "Unrated"]);
+    });
+
+    it("offers the ratings up to the ceiling and unrated, in order, with counts", () => {
+      const list = [...rated, entry("Also safe"), missing];
+      expect(ratingCounts(list, "pornographic")).toEqual([
+        { value: "safe", count: 2 },
+        { value: "suggestive", count: 1 },
+        { value: "erotic", count: 1 },
+        { value: "pornographic", count: 1 },
+        { value: "unknown", count: 2 },
+      ]);
+      expect(ratingCounts(list, "suggestive").map((r) => r.value)).toEqual(["safe", "suggestive", "unknown"]);
+      // Held by the view from before the ceiling was lowered: listed, to be taken off.
+      expect(ratingCounts([], "safe", ["pornographic"])).toEqual([
+        { value: "safe", count: 0 },
+        { value: "pornographic", count: 0 },
+        { value: "unknown", count: 0 },
+      ]);
+    });
+  });
+
   it("searches on top of the filters", () => {
     expect(show(all, { q: " UNREAD ", filters: { downloaded: "exclude" } })).toEqual(["Unread only"]);
   });
 
   it("says how many filters are on, and takes them all off", () => {
-    const busy = view({ filters: { unread: "include", new: "exclude" }, types: ["manga"], updatedWithinDays: 7 });
-    expect(activeFilters(busy)).toBe(4);
+    const busy = view({
+      filters: { unread: "include", new: "exclude" },
+      types: ["manga"],
+      contentRatings: ["safe"],
+      updatedWithinDays: 7,
+    });
+    expect(activeFilters(busy)).toBe(5);
     const none = withoutFilters({ ...busy, sort: "updated", layout: "list" });
     expect(activeFilters(none)).toBe(0);
     expect(none).toMatchObject({ sort: "updated", layout: "list" });
@@ -192,6 +246,7 @@ describe("definitions", () => {
       filters: { unread: "include", started: "exclude" },
       types: ["manhwa"],
       statuses: ["releasing"],
+      contentRatings: ["safe", "suggestive", "unknown"],
       updatedWithinDays: 14,
       sort: "updated",
       reverse: true,
@@ -205,6 +260,7 @@ describe("definitions", () => {
       filters: { unread: "include", started: "exclude" },
       types: ["manhwa"],
       statuses: ["releasing"],
+      content_ratings: ["safe", "suggestive", "unknown"],
       updated_within_days: 14,
       sort: "updated",
       reverse: true,
@@ -226,5 +282,13 @@ describe("definitions", () => {
   it("ignores values it doesn't know (from a newer server)", () => {
     const odd = { filters: { unread: "maybe" }, sort: "rating", display: { layout: "cards" } } as never;
     expect(fromDefinition(odd)).toEqual(DEFAULT_VIEW);
+  });
+
+  it("keeps the content ratings it knows, once each, and saves none for an empty list", () => {
+    const odd = { content_ratings: ["nsfw", "erotic", "", "pornographic", "erotic", 3] } as never;
+    expect(fromDefinition(odd).contentRatings).toEqual(["erotic", "pornographic"]);
+    expect(toDefinition(fromDefinition(odd)).content_ratings).toEqual(["erotic", "pornographic"]);
+    expect(fromDefinition({ content_ratings: [] }).contentRatings).toEqual([]);
+    expect(toDefinition(view({ contentRatings: [] }))).not.toHaveProperty("content_ratings");
   });
 });

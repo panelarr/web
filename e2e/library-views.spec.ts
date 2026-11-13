@@ -6,22 +6,26 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 // heading's list (a menu, or a sheet from the bottom), new views, editing them, and the URL.
 
 /** A fresh install's library with a few works; optionally the sort and display remembered from before views. */
-async function fillLibrary(page: Page, remembered?: Record<string, unknown>) {
+async function fillLibrary(page: Page, remembered?: Record<string, unknown>, extra: string[] = []) {
   // Not the library: it would make the first view before the preference is in place.
   await page.goto("/settings?mock=ready");
   await expect(page.getByRole("heading", { name: "Settings" }).first()).toBeVisible();
-  await page.evaluate(async (library) => {
-    const send = async (method: string, path: string, body: unknown) => {
-      const response = await fetch(`/api/v1${path}`, {
-        method,
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": "mock-csrf-token" },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) throw new Error(`${method} ${path}: ${response.status}`);
-    };
-    for (let i = 0; i < 8; i++) await send("POST", "/library", { entry_id: `ent_${1000 + i}` });
-    if (library) await send("PUT", "/me/preferences", { version: 1, library });
-  }, remembered);
+  await page.evaluate(
+    async ({ library, extra }) => {
+      const send = async (method: string, path: string, body: unknown) => {
+        const response = await fetch(`/api/v1${path}`, {
+          method,
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": "mock-csrf-token" },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error(`${method} ${path}: ${response.status}`);
+      };
+      for (let i = 0; i < 8; i++) await send("POST", "/library", { entry_id: `ent_${1000 + i}` });
+      for (const id of extra) await send("POST", "/library", { entry_id: id });
+      if (library) await send("PUT", "/me/preferences", { version: 1, library });
+    },
+    { library: remembered, extra },
+  );
   await page.goto("/");
 }
 
@@ -134,6 +138,81 @@ test("a new view, switched to and back, saved across reloads (AC1, AC2, AC5)", a
   await expect(heading(page)).toHaveText("Manhwa to start");
   expect(page.url()).toBe(viewUrl);
   expect(libraryLoads).toBe(0);
+});
+
+test("a Library view without 18+ works and an 18+ view, kept across reloads and switches", async ({
+  page,
+  isMobile,
+}) => {
+  // Eight works with one erotic (Ninth Floor Detectives) and one unrated (A Quiet Spell), plus a
+  // pornographic one (Hollow Crown Academy).
+  await fillLibrary(page, undefined, ["ent_1011"]);
+  await viewsReady(page);
+  await expect(page.getByText("9 works")).toBeVisible();
+  const adult = ["Hollow Crown Academy", "Ninth Floor Detectives"];
+  const shown = (title: string) => works(page).filter({ hasText: title });
+
+  // Library: Hide 18+, from the default view's tip.
+  await page.getByRole("button", { name: /^Filter, sort and display/ }).click();
+  let sheet = page.getByRole("dialog", { name: "Library" });
+  await expect(sheet.getByText(/^Tip: hide 18\+ here/)).toBeVisible();
+  const group = sheet.getByRole("group", { name: "Content rating" });
+  await expect(group.getByRole("checkbox", { name: "Erotic (1)" })).toBeVisible();
+  await group.getByRole("button", { name: "Hide 18+" }).click();
+  await expect(group.getByRole("checkbox", { name: "Unrated (1)" })).toBeChecked();
+  await expect(sheet.getByText(/^Tip:/)).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("7 of 9")).toBeVisible();
+  await expect(shown("A Quiet Spell")).toHaveCount(1);
+  for (const title of adult) await expect(shown(title)).toHaveCount(0);
+
+  // 18+: a new view from everything, Only 18+.
+  const list = await openViews(page, isMobile);
+  await list.getByRole(isMobile ? "button" : "menuitem", { name: "New view…" }).click();
+  const dialog = page.getByRole("dialog", { name: "New view" });
+  await dialog.getByLabel("Name").fill("18+");
+  await dialog.getByRole("radio", { name: "Everything" }).check();
+  await dialog.getByRole("button", { name: "Create" }).click();
+  sheet = page.getByRole("dialog", { name: "18+" });
+  await expect(sheet.getByText(/^Tip:/)).toBeHidden();
+  await sheet.getByRole("group", { name: "Content rating" }).getByRole("button", { name: "Only 18+" }).click();
+  await page.keyboard.press("Escape");
+  await expect(heading(page)).toHaveText("18+");
+  await expect(page.getByText("2 of 9")).toBeVisible();
+  for (const title of adult) await expect(shown(title)).toHaveCount(1);
+
+  // Saved on the server.
+  await expect
+    .poll(async () =>
+      page.evaluate(async () => {
+        const { views } = await (await fetch("/api/v1/me/library-views")).json();
+        return views.map((v: { name: string; definition: { content_ratings?: string[] } }) => [
+          v.name,
+          v.definition.content_ratings,
+        ]);
+      }),
+    )
+    .toEqual([
+      ["Library", ["safe", "suggestive", "unknown"]],
+      ["18+", ["erotic", "pornographic"]],
+    ]);
+
+  // After a reload and switching back and forth, each still shows its own.
+  await page.reload();
+  await viewsReady(page);
+  await expect(heading(page)).toHaveText("18+");
+  await expect(page.getByText("2 of 9")).toBeVisible();
+  await pick(page, isMobile, /^Library/);
+  await expect(heading(page)).toHaveText("Library");
+  await expect(page.getByText("7 of 9")).toBeVisible();
+  for (const title of adult) await expect(shown(title)).toHaveCount(0);
+  await page.goto("/");
+  await viewsReady(page);
+  await expect(page.getByText("7 of 9")).toBeVisible();
+  await pick(page, isMobile, /^18\+/);
+  await expect(heading(page)).toHaveText("18+");
+  await expect(page.getByText("2 of 9")).toBeVisible();
+  for (const title of adult) await expect(shown(title)).toHaveCount(1);
 });
 
 test("views are renamed, reordered, duplicated, made the default and deleted (AC3, AC4)", async ({

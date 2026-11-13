@@ -1749,6 +1749,8 @@ export const operations: MockOperation[] = [
       .flatMap((e) => {
         const work = d.works.find((w) => w.id === e.work_id);
         if (!work || (q && !work.title.toLowerCase().includes(q))) return [];
+        // As the server: never a work above the user's ceiling, whatever is in the library.
+        if (!withinCeiling(work.content_rating, user.grants.content_rating_ceiling)) return [];
         return [
           {
             work,
