@@ -68,6 +68,13 @@ const SSO_ERRORS: Record<string, string> = {
   already_linked: "That login is already linked to another Panelarr account.",
   link_exists: "You already have a login at this identity provider linked. Unlink it first.",
   session_changed: "You signed out or switched accounts while linking. Try again.",
+  // A start the server refused before going to the provider: it sends the browser back with these.
+  invalid_return_to: "The page to come back to wasn't one of Panelarr's. Try again.",
+  invalid_request: "That sign-in couldn't be started. Try again.",
+  csrf_failed: "Linking couldn't be confirmed as started here. Use Link SSO login on this page.",
+  cross_site: "Linking was started from another site, so it was refused. Use Link SSO login on this page.",
+  unauthenticated: "Sign in first, then link your login.",
+  session_required: "Linking a login needs you signed in here, not an API key.",
 };
 
 /** The message for an `sso_error` code; a generic one for codes this app doesn't know. */

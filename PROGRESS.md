@@ -100,6 +100,7 @@ Everything in the metadata service's and source plugins' own admin pages, inside
 
 - [x] **W1. Login:** the server's single sign-on API (spec synced); the login page from `/auth/methods`: the SSO button with the server's label above the password form, the form behind Use a password when passwords are for admins; the callback's errors in plain words (unknown codes generically, never shown as they are) with Try again and Use a password; sign-out finishes at the provider when the server says so.
 - [x] **W2. Linking and admin:** Accept with SSO on invites; Settings → Security: linked logins (provider, email, linked, last used, Unlink, the last-way-in refusal), Link SSO login through the CSRF-checked POST, the result when the provider sends you back, a first password for users created by single sign-on; admins: an SSO mark on linked users, a user's logins with Unlink, a first password, the read-only status on Health, and the warning on admin invites when the provider's groups decide the role. Nothing changes without single sign-on. The mock server plays a made-up provider (`docs/sso.md`).
+- [x] **W3. Refused starts:** the server sends a refused start back to `/login?sso_error=<code>&redirect=<page>` (a link start to its `return_to`), spec synced; plain messages for `invalid_return_to`, `invalid_request`, `csrf_failed`, `cross_site`, `unauthenticated` and `session_required`; Try again goes on towards `redirect`; the mock's start refuses the same way.
 
 ## Working assumptions
 

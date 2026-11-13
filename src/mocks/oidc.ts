@@ -178,6 +178,50 @@ export function validReturnTo(value: unknown): value is string {
   );
 }
 
+/** What the server's `GET /auth/oidc/start` sees: its query and who is signed in. */
+export interface MockStart {
+  return_to: string | null;
+  intent: string | null;
+  invite: string | null;
+  csrf_token: string | null;
+}
+
+/**
+ * The server's `GET /auth/oidc/start` checks, in its order: `"provider"` to go on, `"problem"`
+ * when single sign-on isn't configured (still a 404), or the page a refused browser navigation
+ * is sent to instead.
+ */
+export function checkStart(d: MockDb, start: MockStart): { go: string } {
+  if (!d.oidc) return { go: "problem" };
+  const returnTo = start.return_to ?? "/";
+  const refuse = (code: string) => ({ go: startRefusalPage(start, code) });
+  if (!validReturnTo(returnTo)) return refuse("invalid_return_to");
+  if (start.intent === "link") {
+    if (start.invite) return refuse("invalid_request");
+    if (!d.users.some((u) => u.id === d.currentUserId)) return refuse("unauthenticated");
+    if (start.csrf_token !== "mock-csrf-token") return refuse("csrf_failed");
+  } else if (
+    start.invite &&
+    !d.invites.some((i) => i.token === start.invite && Date.parse(i.expires_at) > Date.now())
+  ) {
+    return refuse("invite_invalid");
+  }
+  if (!d.oidc.reachable) return refuse("oidc_unavailable");
+  return { go: "provider" };
+}
+
+/**
+ * As the server: a link goes back to its (valid) `return_to` with `sso_error`; anything else to
+ * the login page, keeping a valid `return_to` other than `/` as `redirect` for "Try again".
+ */
+export function startRefusalPage(start: Pick<MockStart, "return_to" | "intent">, code: string): string {
+  const returnTo = start.return_to !== null && validReturnTo(start.return_to) ? start.return_to : undefined;
+  if (returnTo !== undefined && start.intent === "link") return withError(returnTo, code);
+  const query = new URLSearchParams({ sso_error: code });
+  if (returnTo !== undefined && returnTo !== "/") query.set("redirect", returnTo);
+  return `/login?${query}`;
+}
+
 /** Where the made-up provider's pages live in the dev server (served by `src/mocks/browser.ts`). */
 export function mockProviderUrl(page: "authorize" | "end-session", params: Record<string, string>): string {
   return `${new URL(`mock-provider/${page}`, document.baseURI).href}?${new URLSearchParams(params)}`;

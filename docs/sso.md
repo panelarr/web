@@ -24,6 +24,12 @@ page shows a plain message for each code it knows, a generic one for any other, 
 app's own list (anything that isn't a short lowercase code counts as unknown), so a crafted link
 can't put text or markup on the page.
 
+A start the server refuses before it gets to the provider (an invite that's gone, a `return_to`
+that isn't a page here, the provider unreachable) is a browser navigation too, so the server
+sends it to the same page rather than answering JSON: `/login?sso_error=<code>&redirect=<page>`,
+with the page the start was for kept in `redirect` (when it was valid). **Try again** and the
+SSO button start again towards that page. Only "single sign-on isn't configured" stays a `404`.
+
 ## Invites
 
 An invite page offers **Accept with SSO** next to choosing a username and password. It
@@ -39,7 +45,10 @@ linked and last used, and **Unlink**. **Link SSO login** sends `POST /auth/oidc/
 call, so it carries the CSRF header and no other site can start it) and then sends the browser to
 the `redirect_to` it answers. The provider sends it back to the security tab, marked
 `sso=linked`, with `sso_error` added when linking failed; the page says which and takes both out
-of the address. The older navigation `start?intent=link` isn't used.
+of the address. The older navigation `start?intent=link` isn't used; when another page starts
+one and the server refuses it (signed out, an API key, no CSRF token, from another site), the
+server sends the browser back to its `return_to` with `sso_error`, and the security tab explains
+it the same way.
 
 The server refuses to unlink someone's only way in (`409 last_login_method`); the card says to
 set a password first. Users created by single sign-on have no password (`has_password: false`):
@@ -64,6 +73,6 @@ sends it back to the login page.
 Starting single sign-on is a series of navigations, which the mock service worker never sees. In
 full mock mode the dev server answers them with the app's page, and `src/mocks/provider-pages.ts`
 plays the server's start and callback and a made-up provider ("Example ID") before the app starts:
-its page lets you continue as one of a few logins or cancel. The callback follows the server's
-rules (linked login, link, invite, automatic provisioning, roles from groups). Scenarios `sso`,
+its page lets you continue as one of a few logins or cancel. The start refuses as the server does
+(sending a browser back with `sso_error`), and the callback follows the server's rules (linked login, link, invite, automatic provisioning, roles from groups). Scenarios `sso`,
 `sso-signed-out` and `sso-admins` turn it on (`docs/api.md`).
